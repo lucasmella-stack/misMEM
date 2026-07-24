@@ -1,0 +1,81 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+package-lock.json
+
+# Notas y scripts personales (nunca commitear)
+personal/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Compiled binaries
+engine/dist/bin/
+*.exe
+*.node
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# Database (NEVER commit personal memory)
+*.db
+*.db-shm
+*.db-wal
+.mismem/
+
+# Engram dumps (contain personal observations)
+engram-dump*.jsonl
+engram-recover*.jsonl
+
+# ChatGPT export (personal conversations + attachments + metadata)
+conversations-*.json
+chat.html
+export_manifest.json
+file-*
+file_*
+files.zip
+*.zip
+group_chats.json
+message_feedback.json
+shared_conversations.json
+user.json
+user_settings.json
+
+# Bardon personal practice + copyrighted material
+bardon_diario.md
+*.pdf
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# OS
+desktop.ini
+
+# Bun
+.bun/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Temp
+tmp/
+temp/
+*.tmp
+
+openrouter-mismemAPI.txt
+*api*key*.txt
+*openrouter*.txt
