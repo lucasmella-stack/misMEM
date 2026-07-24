@@ -31,9 +31,15 @@ Cliente MCP (VS Code / Claude Code / Claude Desktop / agente)
 
 ---
 
-## Fase 1 — Construir la imagen
+## Fase 1 — Obtener la imagen
 
-Opción A — build en el servidor (arquitectura nativa):
+Opción A — imagen oficial multi-arch desde GHCR (recomendada):
+
+```bash
+docker pull ghcr.io/lucasmella-stack/mismem-brain:latest
+```
+
+Opción B — build en el servidor (arquitectura nativa):
 
 ```bash
 ssh <tu-servidor>
@@ -42,23 +48,13 @@ cd mismem/engine
 docker build -t mismem-brain:latest -f Dockerfile.mismem-brain .
 ```
 
-Opción B — push desde local con `docker buildx` multi-arch:
-
-```bash
-cd engine
-docker buildx build --platform linux/amd64,linux/arm64 \
-  -t <registry>/mismem-brain:latest -f Dockerfile.mismem-brain . --push
-```
-
-Después en el servidor: `docker pull <registry>/mismem-brain:latest`.
-
 ---
 
 ## Fase 2 — Servicio en `docker-compose.yml`
 
 ```yaml
   mismem-brain:
-    image: mismem-brain:latest
+    image: ghcr.io/lucasmella-stack/mismem-brain:latest
     container_name: mismem-brain
     restart: unless-stopped
     environment:

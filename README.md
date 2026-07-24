@@ -36,6 +36,36 @@ Además, una **capa engram-compat** (`mem_save`, `mem_search`, `mem_context`, `m
 
 ## Quickstart
 
+La forma más rápida — sin clonar nada, vía [npm](https://www.npmjs.com/package/mismem). En el `mcp.json` de tu cliente (VS Code / Claude Code / Claude Desktop):
+
+```json
+{
+  "mcpServers": {
+    "mismem": {
+      "command": "npx",
+      "args": ["-y", "mismem"]
+    }
+  }
+}
+```
+
+La DB se crea sola en el primer uso (default: `~/.mismem/mem.db`, configurable con `MISMEM_DB`). Tu memoria vive en tu disco — nunca sale de tu máquina.
+
+### Instancia remota (multi-cliente)
+
+Para acceder a la misma memoria desde varias máquinas, la imagen Docker oficial:
+
+```bash
+docker run -d --name mismem-brain \
+  -e MISMEM_AUTH_USER=brain -e MISMEM_AUTH_PASS=<pass> \
+  -v mismem-data:/data -p 3200:3200 \
+  ghcr.io/lucasmella-stack/mismem-brain:latest
+```
+
+Guía completa con Traefik + TLS en [DEPLOY.md](./DEPLOY.md).
+
+### Desde el código
+
 ```bash
 git clone https://github.com/lucasmella-stack/misMEM.git
 cd misMEM/engine
@@ -44,21 +74,7 @@ pnpm test        # todo verde antes de usar
 pnpm build       # tsc → dist/
 ```
 
-Conectarlo a un cliente MCP (`mcp.json` de VS Code / Claude Code / Claude Desktop):
-
-```json
-{
-  "mcpServers": {
-    "mismem": {
-      "command": "node",
-      "args": ["<ruta-al-repo>/misMEM/engine/dist/server.js"],
-      "env": { "MISMEM_DB": "<home>/.mismem/mem.db" }
-    }
-  }
-}
-```
-
-La DB se crea sola en el primer uso (default: `~/.mismem/mem.db`).
+Y en `mcp.json`: `"command": "node", "args": ["<ruta-al-repo>/misMEM/engine/dist/server.js"]`.
 
 ## Componentes
 

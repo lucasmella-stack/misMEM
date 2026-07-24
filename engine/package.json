@@ -1,9 +1,35 @@
 {
-  "name": "@mismem/engine",
+  "name": "mismem",
   "version": "0.1.0",
-  "description": "Memoria persistente con consolidacion (episodes -> memories -> traits). MCP stdio.",
+  "description": "Cooperative persistent memory for LLMs via MCP — episodes → memories → traits over SQLite (FTS5 + Hebbian recall)",
+  "mcpName": "io.github.lucasmella-stack/mismem",
   "type": "module",
-  "private": true,
+  "license": "MIT",
+  "author": "Lucas Mella",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lucasmella-stack/misMEM.git",
+    "directory": "engine"
+  },
+  "homepage": "https://github.com/lucasmella-stack/misMEM#readme",
+  "bugs": {
+    "url": "https://github.com/lucasmella-stack/misMEM/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "memory",
+    "llm",
+    "agent-memory",
+    "sqlite",
+    "fts5",
+    "claude",
+    "persistent-memory"
+  ],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "bin": {
     "mismem": "./dist/server.js",
     "mismem-http": "./dist/server-http.js",
@@ -21,7 +47,8 @@
     "start:http": "node dist/server-http.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
@@ -38,5 +65,6 @@
   },
   "engines": {
     "node": ">=22"
-  }
+  },
+  "packageManager": "pnpm@11.15.0"
 }
