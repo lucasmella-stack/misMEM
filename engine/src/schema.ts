@@ -49,4 +49,6 @@ export interface RecallHit {
   text: string;
   salience?: number;
   created_at: number;
+  /** Presente cuando el hit vino de la búsqueda semántica y no del FTS5. */
+  via?: "semantic";
 }

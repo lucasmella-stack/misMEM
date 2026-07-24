@@ -3,6 +3,11 @@ import type { Database as DB } from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { homedir } from "node:os";
+import { createHash } from "node:crypto";
+
+export function contentHash(body: string): string {
+  return createHash("sha256").update(body, "utf8").digest("hex");
+}
 
 export function defaultDbPath(): string {
   return resolve(process.env.MISMEM_DB ?? `${homedir()}/.mismem/mem.db`);
@@ -91,10 +96,49 @@ CREATE TRIGGER IF NOT EXISTS traits_au AFTER UPDATE ON traits BEGIN
   INSERT INTO traits_fts(traits_fts, rowid, name) VALUES('delete', old.rowid, old.name);
   INSERT INTO traits_fts(rowid, name) VALUES (new.rowid, new.name);
 END;
+
+CREATE TABLE IF NOT EXISTS memory_embeddings (
+  memory_id  TEXT PRIMARY KEY REFERENCES memories(id) ON DELETE CASCADE,
+  model      TEXT NOT NULL,
+  dims       INTEGER NOT NULL,
+  vec        BLOB NOT NULL,
+  created_at INTEGER NOT NULL
+);
 `;
+
+// Additive migrations over DBs created before the column/index existed.
+// Safe to re-run: each step checks current state first.
+function migrate(db: DB): void {
+  const cols = db.prepare("PRAGMA table_info(episodes)").all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === "content_hash")) {
+    db.exec("ALTER TABLE episodes ADD COLUMN content_hash TEXT");
+  }
+
+  const pending = db
+    .prepare("SELECT id, body FROM episodes WHERE content_hash IS NULL LIMIT 10000")
+    .all() as Array<{ id: string; body: string }>;
+  if (pending.length > 0) {
+    const upd = db.prepare("UPDATE episodes SET content_hash = ? WHERE id = ?");
+    const backfill = db.transaction((rows: Array<{ id: string; body: string }>) => {
+      for (const r of rows) upd.run(contentHash(r.body), r.id);
+    });
+    // Chunked so a huge legacy DB never holds one giant transaction.
+    let rows = pending;
+    while (rows.length > 0) {
+      backfill(rows);
+      rows = db
+        .prepare("SELECT id, body FROM episodes WHERE content_hash IS NULL LIMIT 10000")
+        .all() as Array<{ id: string; body: string }>;
+    }
+  }
+
+  // Non-unique on purpose: legacy DBs may already hold duplicates.
+  db.exec("CREATE INDEX IF NOT EXISTS idx_episodes_hash ON episodes(scope, content_hash)");
+}
 
 export function openDb(path: string): DB {
   const db = new Database(path);
   db.exec(SCHEMA);
+  migrate(db);
   return db;
 }

@@ -62,5 +62,5 @@ Default DB: `~/.mismem/mem.db` (configurable con `MISMEM_DB`).
 - [x] Fase 2: servidor Streamable HTTP + capa engram-compat + deploy en VPS
 - [x] Fase 3: consolidación LLM (episodes → memories vía OpenRouter) + pre-filtro Pareto
 - [x] Fase 4: viewer read-only (`/viewer`) + CLIs (`mismem-stats`, `mismem-forget`, `mismem-migrate-engram`)
-- [ ] Fase 5: embeddings (sqlite-vec + Ollama nomic-embed-text)
+- [x] Fase 5: dedup por content-hash + embeddings opcionales (Ollama nomic-embed-text, coseno en JS, `mismem-embed`)
 - [ ] Fase 6: binario empaquetado (bun --compile) + onboarding

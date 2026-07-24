@@ -1,5 +1,6 @@
 import type { Database as DB } from "better-sqlite3";
 import { consolidate } from "../tools.js";
+import { embedPendingMemories } from "../embeddings/index.js";
 import { classify } from "../pareto/classifier.js";
 import { distill, loadLlmConfig, type LlmConfig, type DistilledMemory } from "./llm.js";
 import { SYSTEM_PROMPT, buildUserPrompt, type EpisodeForPrompt } from "./prompts.js";
@@ -103,6 +104,19 @@ export async function runConsolidation(
       const msg = err instanceof Error ? err.message : String(err);
       summary.errors.push({ scope, error: msg });
       log(`[consolidation] ERROR scope="${scope}": ${msg}`);
+    }
+  }
+
+  // Backfill de embeddings para las memorias nuevas (y cualquier rezagada).
+  // Opcional: si no hay Ollama, degrada sin afectar la consolidación.
+  if (!opts.dryRun) {
+    try {
+      const emb = await embedPendingMemories(db, { timeoutMs: 120_000 });
+      if (emb.pending > 0) {
+        log(`[consolidation] embeddings: pendientes=${emb.pending} embebidas=${emb.embedded} fallidas=${emb.failed}`);
+      }
+    } catch {
+      /* la capa semántica nunca rompe el ciclo de sueño */
     }
   }
 

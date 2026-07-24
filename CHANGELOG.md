@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.2.0 — 2026-07-24
+
+Los dos "bordes conocidos" de la 0.1.0, liquidados:
+
+### Dedup en captura e ingesta
+- `capture` calcula `content_hash` (sha256) y re-capturar el mismo `(scope, body)`
+  devuelve el id original en vez de duplicar. Re-ingestar un export completo
+  ahora es idempotente.
+- Migración automática y aditiva al abrir la DB: backfill de hashes para filas
+  existentes (chunked, seguro para DBs grandes en producción).
+- `mismem-ingest walk` reporta `chunksDeduped`.
+
+### Búsqueda semántica opcional (recall híbrido)
+- `recall` / `mem_search` ahora combinan FTS5 (léxico) con coseno sobre
+  embeddings (semántico): "problemas de plata" encuentra "deudas".
+- Embeddings vía **Ollama local** (`nomic-embed-text` default). Sin Ollama,
+  degradación silenciosa a FTS5 puro — cero configuración obligatoria.
+- Sin extensiones nativas: vectores como BLOB en la misma SQLite, coseno
+  brute-force en JS (para memoria personal de miles de filas, <50ms).
+- Nueva CLI `mismem-embed` para backfill idempotente; la consolidación
+  nocturna embebe automáticamente las memorias nuevas.
+- Hits semánticos marcados con `via: "semantic"` y con refuerzo Hebbiano.
+- Env: `MISMEM_EMBEDDINGS=off`, `MISMEM_OLLAMA_URL`, `MISMEM_EMBEDDING_MODEL`.
+
 ## 0.1.0 — 2026-07-24
 
 Primera versión pública. Historia condensada del desarrollo (abril–julio 2026):

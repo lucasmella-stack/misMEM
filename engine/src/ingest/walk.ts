@@ -28,6 +28,7 @@ export interface WalkStats {
   filesIngested: number;
   filesSkipped: number;
   bytesIngested: number;
+  chunksDeduped: number;
   errors: string[];
 }
 
@@ -51,7 +52,7 @@ function chunkText(text: string): string[] {
 export async function walkAndIngest(opts: WalkOptions): Promise<WalkStats> {
   const stats: WalkStats = {
     filesSeen: 0, filesIngested: 0, filesSkipped: 0,
-    bytesIngested: 0, errors: [],
+    bytesIngested: 0, chunksDeduped: 0, errors: [],
   };
 
   async function walk(dir: string): Promise<void> {
@@ -93,7 +94,8 @@ export async function walkAndIngest(opts: WalkOptions): Promise<WalkStats> {
           const header = chunks.length > 1
             ? `# ${rel} [chunk ${i + 1}/${chunks.length}]\n\n`
             : `# ${rel}\n\n`;
-          capture(opts.db, { scope: scope || opts.scopePrefix, body: header + chunks[i] });
+          const r = capture(opts.db, { scope: scope || opts.scopePrefix, body: header + chunks[i] });
+          if (r.deduped) stats.chunksDeduped++;
         }
         stats.filesIngested++;
         stats.bytesIngested += s.size;

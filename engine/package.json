@@ -3,7 +3,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Cooperative persistent memory for LLMs via MCP — episodes → memories → traits over SQLite (FTS5 + Hebbian recall)",
   "mcpName": "io.github.lucasmella-stack/mismem",
   "type": "module",
@@ -40,7 +40,8 @@
     "mismem-consolidate": "./dist/consolidate-cli.js",
     "mismem-forget": "./dist/forget-cli.js",
     "mismem-migrate-engram": "./dist/migrate-engram-cli.js",
-    "mismem-stats": "./dist/stats-cli.js"
+    "mismem-stats": "./dist/stats-cli.js",
+    "mismem-embed": "./dist/embed-cli.js"
   },
   "scripts": {
     "build": "tsc",

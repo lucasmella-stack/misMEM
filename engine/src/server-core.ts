@@ -8,7 +8,8 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Database as DB } from "better-sqlite3";
-import { capture, recall, consolidate, crystallize, forget } from "./tools.js";
+import { capture, recallHybrid, consolidate, crystallize, forget } from "./tools.js";
+import { embedPendingMemories } from "./embeddings/index.js";
 import {
   ENGRAM_TOOLS,
   dispatchEngramTool,
@@ -102,7 +103,7 @@ const ALL_TOOLS = [...CANONICAL_TOOLS, ...ENGRAM_TOOLS];
 
 export function createServer(db: DB): Server {
   const server = new Server(
-    { name: "mismem", version: "0.1.0" },
+    { name: "mismem", version: "0.2.0" },
     { capabilities: { tools: {} } },
   );
 
@@ -119,11 +120,20 @@ export function createServer(db: DB): Server {
           result = capture(db, args);
           break;
         case "recall":
-          result = recall(db, args);
+        case "mem_search":
+          result = await recallHybrid(db, args);
           break;
-        case "consolidate":
+        case "consolidate": {
           result = consolidate(db, args);
+          // Best-effort: si hay embedder local, la memoria nueva queda
+          // embebida ya; si no, el backfill nocturno la levanta después.
+          try {
+            await embedPendingMemories(db);
+          } catch {
+            /* semántica es opcional; nunca rompe el write path */
+          }
           break;
+        }
         case "crystallize":
           result = crystallize(db, args);
           break;

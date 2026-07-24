@@ -8,6 +8,12 @@ import {
   ForgetInput,
   type RecallHit,
 } from "./schema.js";
+import { contentHash } from "./db.js";
+import {
+  embedTexts,
+  semanticSearchMemories,
+  type EmbedFn,
+} from "./embeddings/index.js";
 
 const now = (): number => Date.now();
 
@@ -23,13 +29,23 @@ function escapeFts(query: string): string {
   return escaped || '""';
 }
 
-export function capture(db: DB, raw: unknown): { id: string } {
+export function capture(db: DB, raw: unknown): { id: string; deduped: boolean } {
   const input = CaptureInput.parse(raw);
+  const hash = contentHash(input.body);
+
+  // Idéntico (scope, body) ya inscripto → no duplicar; re-ingestar es idempotente.
+  const existing = db
+    .prepare(
+      "SELECT id FROM episodes WHERE scope = ? AND content_hash = ? LIMIT 1",
+    )
+    .get(input.scope, hash) as { id: string } | undefined;
+  if (existing) return { id: existing.id, deduped: true };
+
   const id = ulid();
   db.prepare(
-    "INSERT INTO episodes (id, scope, body, created_at) VALUES (?, ?, ?, ?)",
-  ).run(id, input.scope, input.body, now());
-  return { id };
+    "INSERT INTO episodes (id, scope, body, created_at, content_hash) VALUES (?, ?, ?, ?, ?)",
+  ).run(id, input.scope, input.body, now(), hash);
+  return { id, deduped: false };
 }
 
 export function recall(db: DB, raw: unknown): { hits: RecallHit[] } {
@@ -95,6 +111,52 @@ export function recall(db: DB, raw: unknown): { hits: RecallHit[] } {
   for (const h of hits) if (h.layer === "memory") bumpMem.run(ts, h.id);
 
   return { hits };
+}
+
+/**
+ * Recall híbrido: FTS5 (léxico) + coseno sobre embeddings (semántico).
+ * Si no hay embedder disponible (Ollama caído / MISMEM_EMBEDDINGS=off),
+ * el resultado es idéntico a recall().
+ */
+export async function recallHybrid(
+  db: DB,
+  raw: unknown,
+  embedFn: EmbedFn = (texts) => embedTexts(texts),
+): Promise<{ hits: RecallHit[] }> {
+  const input = RecallInput.parse(raw);
+  const lexical = recall(db, raw);
+  if (lexical.hits.length >= input.limit) return lexical;
+
+  const vecs = await embedFn([input.query]);
+  const queryVec = vecs?.[0];
+  if (!queryVec) return lexical;
+
+  const seen = new Set(lexical.hits.map((h) => h.id));
+  const semantic = semanticSearchMemories(db, queryVec, {
+    scope: input.scope,
+    limit: input.limit,
+  }).filter((s) => !seen.has(s.id));
+
+  const extra: RecallHit[] = semantic
+    .slice(0, input.limit - lexical.hits.length)
+    .map((s) => ({
+      layer: "memory" as const,
+      id: s.id,
+      scope: s.scope,
+      text: s.text,
+      salience: s.salience,
+      created_at: s.created_at,
+      via: "semantic" as const,
+    }));
+
+  // Hebb también para lo recuperado semánticamente.
+  const ts = now();
+  const bumpMem = db.prepare(
+    "UPDATE memories SET salience = MIN(1.0, salience + 0.05), last_accessed_at = ? WHERE id = ?",
+  );
+  for (const h of extra) bumpMem.run(ts, h.id);
+
+  return { hits: [...lexical.hits, ...extra] };
 }
 
 export function consolidate(

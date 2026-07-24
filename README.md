@@ -100,8 +100,17 @@ Y en `mcp.json`: `"command": "node", "args": ["<ruta-al-repo>/misMEM/engine/dist
 - ✅ Servidor Streamable HTTP + deploy Docker/Traefik.
 - ✅ Consolidación LLM nocturna (episodes → memories).
 - ✅ Viewer read-only + CLIs de introspección.
-- 🚧 Embeddings locales (sqlite-vec + Ollama).
+- ✅ Dedup en captura/ingesta (re-ingestar es idempotente).
+- ✅ Recall híbrido: FTS5 + búsqueda semántica opcional vía [Ollama](https://ollama.com) local.
 - 🚧 Binario distribuible (Bun --compile).
+
+### Búsqueda semántica (opcional)
+
+Con Ollama corriendo (`ollama pull nomic-embed-text`), `recall` suma búsqueda
+por significado: "problemas de plata" encuentra memorias que dicen "deudas".
+Los vectores se guardan como BLOB en la misma SQLite y la búsqueda es coseno
+en JS — sin extensiones nativas ni servicios externos. Si Ollama no está,
+todo degrada silenciosamente a FTS5 puro. Backfill: `mismem-embed`.
 
 ## Privacidad
 
