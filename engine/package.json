@@ -1,5 +1,8 @@
 {
-  "name": "mismem",
+  "name": "@lucasmella/mismem",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.1.0",
   "description": "Cooperative persistent memory for LLMs via MCP — episodes → memories → traits over SQLite (FTS5 + Hebbian recall)",
   "mcpName": "io.github.lucasmella-stack/mismem",

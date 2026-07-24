@@ -36,14 +36,14 @@ Además, una **capa engram-compat** (`mem_save`, `mem_search`, `mem_context`, `m
 
 ## Quickstart
 
-La forma más rápida — sin clonar nada, vía [npm](https://www.npmjs.com/package/mismem). En el `mcp.json` de tu cliente (VS Code / Claude Code / Claude Desktop):
+La forma más rápida — sin clonar nada, vía [npm](https://www.npmjs.com/package/@lucasmella/mismem). En el `mcp.json` de tu cliente (VS Code / Claude Code / Claude Desktop):
 
 ```json
 {
   "mcpServers": {
     "mismem": {
       "command": "npx",
-      "args": ["-y", "mismem"]
+      "args": ["-y", "@lucasmella/mismem"]
     }
   }
 }
