@@ -33,7 +33,7 @@ const CANONICAL_TOOLS = [
   {
     name: "recall",
     description:
-      "Search across traits, memories, and episodes (FTS5). Reinforces recalled memories (Hebbian).",
+      "Hybrid search: FTS5 across all layers plus semantic ranking for memories. Reinforces returned memories (Hebbian).",
     inputSchema: {
       type: "object",
       required: ["query"],
@@ -93,6 +93,11 @@ const CANONICAL_TOOLS = [
           maximum: 1,
           default: 0.1,
         },
+        memory_grace_days: {
+          type: "integer",
+          minimum: 0,
+          default: 30,
+        },
         dry_run: { type: "boolean", default: true },
       },
     },
@@ -103,7 +108,7 @@ const ALL_TOOLS = [...CANONICAL_TOOLS, ...ENGRAM_TOOLS];
 
 export function createServer(db: DB): Server {
   const server = new Server(
-    { name: "mismem", version: "0.2.0" },
+    { name: "mismem", version: "0.3.0" },
     { capabilities: { tools: {} } },
   );
 
@@ -120,7 +125,6 @@ export function createServer(db: DB): Server {
           result = capture(db, args);
           break;
         case "recall":
-        case "mem_search":
           result = await recallHybrid(db, args);
           break;
         case "consolidate": {
@@ -142,7 +146,7 @@ export function createServer(db: DB): Server {
           break;
         default:
           if (isEngramTool(name)) {
-            result = dispatchEngramTool(db, name, args);
+            result = await dispatchEngramTool(db, name, args);
             break;
           }
           throw new Error(`Unknown tool: ${name}`);

@@ -5,13 +5,14 @@
  *   GET /viewer            → HTML autocontenido (vanilla JS, ~6 KB)
  *   GET /api/stats         → totales por capa + top scopes
  *   GET /api/recent        → últimas N filas de una capa (?layer=&scope=&limit=)
- *   GET /api/search        → recall() vía FTS (?q=&scope=&limit=)
+ *   GET /api/search        → recall híbrido read-only (?q=&scope=&limit=)
  *
  * Cero dependencias nuevas, cero escrituras desde el browser.
  */
 import type { ServerResponse } from "node:http";
 import type { Database as DB } from "better-sqlite3";
-import { recall } from "./tools.js";
+import { recallHybrid } from "./tools.js";
+import type { EmbedFn } from "./embeddings/index.js";
 
 type Layer = "episode" | "memory" | "trait";
 const LAYERS: readonly Layer[] = ["episode", "memory", "trait"] as const;
@@ -108,7 +109,13 @@ export function handleRecent(db: DB, res: ServerResponse, url: URL): void {
   json(res, 200, { layer, scope, rows });
 }
 
-export function handleSearch(db: DB, res: ServerResponse, url: URL): void {
+export async function handleSearch(
+  db: DB,
+  res: ServerResponse,
+  url: URL,
+  embedFn?: EmbedFn,
+  embeddingModel?: string,
+): Promise<void> {
   const query = (url.searchParams.get("q") ?? "").trim();
   if (!query) {
     json(res, 400, { error: "missing q" });
@@ -117,7 +124,12 @@ export function handleSearch(db: DB, res: ServerResponse, url: URL): void {
   const scope = url.searchParams.get("scope") ?? undefined;
   const limit = clampLimit(url.searchParams.get("limit"), 20, 50);
   try {
-    const out = recall(db, { query, scope, limit });
+    const out = await recallHybrid(
+      db,
+      { query, scope, limit },
+      embedFn,
+      { reinforce: false, embeddingModel },
+    );
     json(res, 200, out);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -175,7 +187,7 @@ main{padding:8px 16px}
 </nav>
 <div class="controls">
   <input id="scope" placeholder="filter scope (e.g. project)" />
-  <input id="q" placeholder="search query (FTS5)" style="display:none" />
+  <input id="q" placeholder="search query (hybrid)" style="display:none" />
   <button class="primary" id="reload">Reload</button>
 </div>
 <main id="list"><div class="spinner">loading…</div></main>

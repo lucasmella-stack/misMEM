@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.3.0 — 2026-07-28
+
+### Decay y olvido coherentes
+
+- Decay exponencial de `salience` con checkpoint idempotente y vida media
+  configurable (90 días por defecto).
+- El refuerzo Hebbiano aplica primero el decay pendiente y actualiza el
+  checkpoint de la memory.
+- `forget --dry-run` calcula elegibilidad sin escribir; las memories tienen
+  período de gracia y al purgarlas elimina sus episodes consolidados para que
+  no reaparezcan.
+- Migración automática y aditiva para DBs existentes.
+
+### Recall híbrido consistente
+
+- FTS5 y semántica se ejecutan sobre candidatos independientes de `limit`.
+- Fusión RRF con salience, conservando prioridad traits > memories > episodes.
+- MCP `recall`, `mem_search`, Engram directo y viewer comparten el mismo núcleo.
+- El viewer no aplica refuerzo y vuelve a ser realmente read-only.
+- Descripciones MCP actualizadas; `mem_context` permanece como contexto reciente.
+
+### Índice semántico seguro
+
+- No se mezclan modelos ni dimensionalidades incompatibles.
+- Cambiar de modelo reindexa automáticamente sin borrar el vector anterior si
+  Ollama falla.
+- `mismem-embed --status` diagnostica el índice y `--force` permite reconstruirlo.
+- Actualizar una memory invalida su embedding para el siguiente backfill.
+
+### Documentación y calidad
+
+- Explicación concisa de episodes, memories y traits.
+- 80+ tests incluyendo decay, migraciones, consistencia entre superficies,
+  propiedad de prefijo y cambio de modelo.
+- `better-sqlite3` 12.11.1 para instalaciones precompiladas compatibles con
+  Node 24, verificadas en CI junto con Node 22.
+
 ## 0.2.0 — 2026-07-24
 
 Los dos "bordes conocidos" de la 0.1.0, liquidados:

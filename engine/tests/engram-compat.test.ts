@@ -72,9 +72,9 @@ describe("engram-compat: mem_save → capture", () => {
 });
 
 describe("engram-compat: mem_search → recall", () => {
-  it("returns FTS hits", () => {
+  it("returns FTS hits", async () => {
     capture(db, { scope: "x", body: "alpha beta gamma" });
-    const out = dispatchEngramTool(db, "mem_search", { query: "alpha" }) as {
+    const out = (await dispatchEngramTool(db, "mem_search", { query: "alpha" })) as {
       hits: unknown[];
     };
     expect(out.hits.length).toBe(1);
@@ -173,6 +173,32 @@ describe("engram-compat: mem_update", () => {
       .prepare("SELECT gist FROM memories WHERE id = ?")
       .get(memory_id) as { gist: string };
     expect(row.gist).toBe("new gist");
+  });
+
+  it("invalida el embedding al actualizar una memory", () => {
+    const { id: ep } = capture(db, { scope: "s", body: "x" });
+    const { memory_id } = consolidate(db, {
+      scope: "s",
+      gist: "old",
+      source_episode_ids: [ep],
+    });
+    db.prepare(
+      `INSERT INTO memory_embeddings (memory_id, model, dims, vec, created_at)
+       VALUES (?, 'fake', 1, ?, ?)`,
+    ).run(memory_id, Buffer.from(new Float32Array([1]).buffer), Date.now());
+
+    dispatchEngramTool(db, "mem_update", {
+      id: memory_id,
+      content: "new gist",
+    });
+
+    expect(
+      db
+        .prepare(
+          "SELECT 1 FROM memory_embeddings WHERE memory_id = ?",
+        )
+        .get(memory_id),
+    ).toBeUndefined();
   });
 
   it("appends new episode if id not found", () => {

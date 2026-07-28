@@ -12,6 +12,9 @@ La pérdida es **intencional y asimétrica**, como la memoria humana:
 - **memories** — destilación con `salience` que decae si no se accede. Núcleo operativo.
 - **traits** — patrones cristalizados. El **Soul Mirror** de Bardon. Permanente salvo borrado explícito.
 
+En corto: un episode conserva “lo que ocurrió”, una memory conserva “lo que
+aprendimos” y un trait conserva “el patrón estable que guía decisiones”.
+
 ## Invocaciones (5)
 
 | Invocación    | Capa de origen → destino             | Quién decide  |
@@ -22,7 +25,10 @@ La pérdida es **intencional y asimétrica**, como la memoria humana:
 | `crystallize` | N memories → 1 trait                 | LLM o usuario |
 | `forget`      | episodes/memories → ∅                | usuario       |
 
-`recall` refuerza salience de memorias devueltas (Hebb).
+`recall` fusiona FTS5 y semántica mediante RRF para `memories`, y refuerza
+solo las memorias finalmente devueltas. La salience tiene una vida media de
+90 días por defecto; `forget` aplica el decay antes de evaluar la purga.
+El viewer usa el mismo ranking sin refuerzo, por lo que es realmente read-only.
 
 ## Scope
 
@@ -63,4 +69,5 @@ Default DB: `~/.mismem/mem.db` (configurable con `MISMEM_DB`).
 - [x] Fase 3: consolidación LLM (episodes → memories vía OpenRouter) + pre-filtro Pareto
 - [x] Fase 4: viewer read-only (`/viewer`) + CLIs (`mismem-stats`, `mismem-forget`, `mismem-migrate-engram`)
 - [x] Fase 5: dedup por content-hash + embeddings opcionales (Ollama nomic-embed-text, coseno en JS, `mismem-embed`)
-- [ ] Fase 6: binario empaquetado (bun --compile) + onboarding
+- [x] Fase 6: decay idempotente + ranking híbrido consistente + reindexado seguro
+- [ ] Fase 7: binario empaquetado (bun --compile) + onboarding

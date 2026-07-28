@@ -112,7 +112,10 @@ const httpServer = createHttpServer(async (req, res) => {
       }
       if (url.pathname === "/api/stats") return handleStats(db, res);
       if (url.pathname === "/api/recent") return handleRecent(db, res, url);
-      if (url.pathname === "/api/search") return handleSearch(db, res, url);
+      if (url.pathname === "/api/search") {
+        await handleSearch(db, res, url);
+        return;
+      }
       return handleViewerHtml(res);
     }
 

@@ -112,10 +112,10 @@ describe("viewer: /api/recent", () => {
 });
 
 describe("viewer: /api/search", () => {
-  it("returns FTS hits", () => {
+  it("returns FTS hits", async () => {
     capture(db, { scope: "x", body: "alpha beta gamma" });
     const res = mockRes();
-    handleSearch(
+    await handleSearch(
       db,
       res as unknown as import("node:http").ServerResponse,
       urlFor("/api/search?q=alpha"),
@@ -124,9 +124,9 @@ describe("viewer: /api/search", () => {
     expect(j.hits.length).toBe(1);
   });
 
-  it("rejects empty query", () => {
+  it("rejects empty query", async () => {
     const res = mockRes();
-    handleSearch(
+    await handleSearch(
       db,
       res as unknown as import("node:http").ServerResponse,
       urlFor("/api/search?q=%20"),

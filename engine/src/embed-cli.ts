@@ -1,28 +1,30 @@
 #!/usr/bin/env node
 /**
- * mismem-embed — backfill de embeddings para memorias sin vector.
+ * mismem-embed — backfill y reindexado de embeddings para memories.
  *
  * Requiere Ollama corriendo con el modelo de embeddings
- * (default: `ollama pull nomic-embed-text`). Idempotente: correrlo de nuevo
- * solo procesa lo que falta.
+ * (default: `ollama pull nomic-embed-text`). Idempotente: procesa vectores
+ * ausentes u obsoletos; `--force` reconstruye también los compatibles.
  *
  * Uso:
- *   mismem-embed [--scope <name>] [--batch 32] [--stats]
+ *   mismem-embed [--scope <name>] [--batch 32] [--status] [--force]
  */
 import { defaultDbPath, openDefaultDb } from "./db.js";
 import {
   embedPendingMemories,
+  getEmbeddingIndexStatus,
   loadEmbeddingConfig,
 } from "./embeddings/index.js";
 
 interface Args {
   scope?: string;
   batch: number;
-  stats: boolean;
+  status: boolean;
+  force: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { batch: 32, stats: false };
+  const args: Args = { batch: 32, status: false, force: false };
   for (let i = 0; i < argv.length; i++) {
     switch (argv[i]) {
       case "--scope":
@@ -32,12 +34,16 @@ function parseArgs(argv: string[]): Args {
         args.batch = Number(argv[++i]) || 32;
         break;
       case "--stats":
-        args.stats = true;
+      case "--status":
+        args.status = true;
+        break;
+      case "--force":
+        args.force = true;
         break;
       case "--help":
       case "-h":
         console.log(
-          "mismem-embed [--scope <name>] [--batch 32] [--stats]\n" +
+          "mismem-embed [--scope <name>] [--batch 32] [--status] [--force]\n" +
             `DB: ${defaultDbPath()} (override con MISMEM_DB)\n` +
             "Env: MISMEM_OLLAMA_URL, MISMEM_EMBEDDING_MODEL, MISMEM_EMBEDDINGS=off",
         );
@@ -50,40 +56,41 @@ function parseArgs(argv: string[]): Args {
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const db = openDefaultDb();
-  const cfg = loadEmbeddingConfig();
+  try {
+    const cfg = loadEmbeddingConfig();
+    const status = getEmbeddingIndexStatus(db, cfg.model);
 
-  const total = db.prepare("SELECT COUNT(*) AS n FROM memories").get() as { n: number };
-  const embedded = db
-    .prepare("SELECT COUNT(*) AS n FROM memory_embeddings")
-    .get() as { n: number };
+    if (args.status) {
+      console.log(
+        JSON.stringify(
+          { db: defaultDbPath(), active_model: cfg.model, ...status },
+          null,
+          2,
+        ),
+      );
+      return;
+    }
 
-  if (args.stats) {
     console.log(
-      JSON.stringify(
-        { db: defaultDbPath(), model: cfg.model, memories: total.n, embedded: embedded.n },
-        null,
-        2,
-      ),
+      `[embed] modelo=${cfg.model} ollama=${cfg.url} memorias=${status.memories} embebidas=${status.embedded}`,
     );
-    return;
-  }
-
-  console.log(
-    `[embed] modelo=${cfg.model} ollama=${cfg.url} memorias=${total.n} embebidas=${embedded.n}`,
-  );
-  const result = await embedPendingMemories(db, {
-    scope: args.scope,
-    batchSize: args.batch,
-    timeoutMs: 120_000,
-  });
-  console.log(
-    `[embed] pendientes=${result.pending} embebidas=${result.embedded} fallidas=${result.failed}`,
-  );
-  if (result.failed > 0 && result.embedded === 0) {
-    console.error(
-      `[embed] ¿Ollama está corriendo? Probá: curl ${cfg.url}/api/tags — y \`ollama pull ${cfg.model}\``,
+    const result = await embedPendingMemories(db, {
+      scope: args.scope,
+      batchSize: args.batch,
+      timeoutMs: 120_000,
+      force: args.force,
+    });
+    console.log(
+      `[embed] pendientes=${result.pending} embebidas=${result.embedded} reembebidas=${result.reembedded} fallidas=${result.failed}`,
     );
-    process.exit(1);
+    if (result.failed > 0 && result.embedded === 0) {
+      console.error(
+        `[embed] ¿Ollama está corriendo? Probá: curl ${cfg.url}/api/tags — y \`ollama pull ${cfg.model}\``,
+      );
+      process.exitCode = 1;
+    }
+  } finally {
+    db.close();
   }
 }
 

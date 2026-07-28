@@ -19,7 +19,8 @@
  *   mem_session_end      → no-op informativo
  */
 import type { Database as DB } from "better-sqlite3";
-import { capture, recall } from "./tools.js";
+import { capture, recallHybrid } from "./tools.js";
+import type { EmbedFn } from "./embeddings/index.js";
 
 export interface EngramToolDef {
   name: string;
@@ -54,7 +55,8 @@ export const ENGRAM_TOOLS: EngramToolDef[] = [
   },
   {
     name: "mem_search",
-    description: "[engram-compat] FTS search across all layers. Maps to recall().",
+    description:
+      "[engram-compat] Hybrid search: FTS5 across all layers plus semantic ranking for memories.",
     inputSchema: {
       type: "object",
       required: ["query"],
@@ -201,6 +203,7 @@ export function dispatchEngramTool(
   db: DB,
   name: string,
   rawArgs: unknown,
+  searchOptions: { embedFn?: EmbedFn; embeddingModel?: string } = {},
 ): unknown {
   const args = asObject(rawArgs);
 
@@ -211,7 +214,9 @@ export function dispatchEngramTool(
     }
 
     case "mem_search": {
-      return recall(db, args);
+      return recallHybrid(db, args, searchOptions.embedFn, {
+        embeddingModel: searchOptions.embeddingModel,
+      });
     }
 
     case "mem_context": {
@@ -273,7 +278,10 @@ export function dispatchEngramTool(
       const updMem = db
         .prepare("UPDATE memories SET gist = ? WHERE id = ?")
         .run(content, id);
-      if (updMem.changes > 0) return { updated: "memory", id };
+      if (updMem.changes > 0) {
+        db.prepare("DELETE FROM memory_embeddings WHERE memory_id = ?").run(id);
+        return { updated: "memory", id };
+      }
       const updTr = db
         .prepare("UPDATE traits SET name = ?, updated_at = ? WHERE id = ?")
         .run(content, Date.now(), id);

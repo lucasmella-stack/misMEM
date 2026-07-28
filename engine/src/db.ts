@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS memories (
   source_episode_ids  TEXT NOT NULL,
   salience            REAL NOT NULL DEFAULT 1.0,
   created_at          INTEGER NOT NULL,
-  last_accessed_at    INTEGER
+  last_accessed_at    INTEGER,
+  salience_updated_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_memories_scope ON memories(scope, salience);
 
@@ -81,7 +82,7 @@ END;
 CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
   INSERT INTO memories_fts(memories_fts, rowid, gist, details) VALUES('delete', old.rowid, old.gist, COALESCE(old.details, ''));
 END;
-CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
+CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE OF gist, details ON memories BEGIN
   INSERT INTO memories_fts(memories_fts, rowid, gist, details) VALUES('delete', old.rowid, old.gist, COALESCE(old.details, ''));
   INSERT INTO memories_fts(rowid, gist, details) VALUES (new.rowid, new.gist, COALESCE(new.details, ''));
 END;
@@ -92,7 +93,7 @@ END;
 CREATE TRIGGER IF NOT EXISTS traits_ad AFTER DELETE ON traits BEGIN
   INSERT INTO traits_fts(traits_fts, rowid, name) VALUES('delete', old.rowid, old.name);
 END;
-CREATE TRIGGER IF NOT EXISTS traits_au AFTER UPDATE ON traits BEGIN
+CREATE TRIGGER IF NOT EXISTS traits_au AFTER UPDATE OF name ON traits BEGIN
   INSERT INTO traits_fts(traits_fts, rowid, name) VALUES('delete', old.rowid, old.name);
   INSERT INTO traits_fts(rowid, name) VALUES (new.rowid, new.name);
 END;
@@ -134,6 +135,38 @@ function migrate(db: DB): void {
 
   // Non-unique on purpose: legacy DBs may already hold duplicates.
   db.exec("CREATE INDEX IF NOT EXISTS idx_episodes_hash ON episodes(scope, content_hash)");
+
+  const memoryCols = db.prepare("PRAGMA table_info(memories)").all() as Array<{
+    name: string;
+  }>;
+  if (!memoryCols.some((c) => c.name === "salience_updated_at")) {
+    db.exec("ALTER TABLE memories ADD COLUMN salience_updated_at INTEGER");
+  }
+
+  // Legacy triggers reindexaban FTS ante cualquier UPDATE, incluso cuando
+  // solo cambiaban salience, timestamps o strength.
+  db.exec(`
+    DROP TRIGGER IF EXISTS memories_au;
+    CREATE TRIGGER memories_au AFTER UPDATE OF gist, details ON memories BEGIN
+      INSERT INTO memories_fts(memories_fts, rowid, gist, details)
+      VALUES('delete', old.rowid, old.gist, COALESCE(old.details, ''));
+      INSERT INTO memories_fts(rowid, gist, details)
+      VALUES (new.rowid, new.gist, COALESCE(new.details, ''));
+    END;
+
+    DROP TRIGGER IF EXISTS traits_au;
+    CREATE TRIGGER traits_au AFTER UPDATE OF name ON traits BEGIN
+      INSERT INTO traits_fts(traits_fts, rowid, name)
+      VALUES('delete', old.rowid, old.name);
+      INSERT INTO traits_fts(rowid, name) VALUES (new.rowid, new.name);
+    END;
+  `);
+
+  db.exec(
+    `UPDATE memories
+     SET salience_updated_at = COALESCE(last_accessed_at, created_at)
+     WHERE salience_updated_at IS NULL`,
+  );
 }
 
 export function openDb(path: string): DB {

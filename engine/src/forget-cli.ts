@@ -9,19 +9,27 @@ import { forget } from "./tools.js";
 interface Args {
   scope?: string;
   beforeDays: number;
+  memoryGraceDays: number;
   salienceBelow: number;
   dryRun: boolean;
   help: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
-  const out: Args = { beforeDays: 90, salienceBelow: 0.1, dryRun: false, help: false };
+  const out: Args = {
+    beforeDays: 90,
+    memoryGraceDays: 30,
+    salienceBelow: 0.1,
+    dryRun: false,
+    help: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--help" || a === "-h") out.help = true;
     else if (a === "--dry-run") out.dryRun = true;
     else if (a === "--scope") out.scope = argv[++i];
     else if (a === "--before-days") out.beforeDays = Number(argv[++i]);
+    else if (a === "--memory-grace-days") out.memoryGraceDays = Number(argv[++i]);
     else if (a === "--salience-below") out.salienceBelow = Number(argv[++i]);
   }
   return out;
@@ -39,6 +47,7 @@ Opciones:
   --dry-run                Mostrar qué se borraría sin borrar nada
   --scope <name>           Limitar a un scope
   --before-days <n>        Edad mínima de episodios consolidados (default 90)
+  --memory-grace-days <n>  Edad mínima de memorias antes de purgarlas (default 30)
   --salience-below <n>     Umbral de salience para memorias (default 0.1)
   --help                   Esta ayuda
 
@@ -56,6 +65,7 @@ async function main(): Promise<void> {
     const result = forget(db, {
       scope: opts.scope,
       before_days: opts.beforeDays,
+      memory_grace_days: opts.memoryGraceDays,
       salience_below: opts.salienceBelow,
       dry_run: opts.dryRun,
     });

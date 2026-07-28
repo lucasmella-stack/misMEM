@@ -22,12 +22,24 @@ traits    (patrones cristalizados — identidad, leyes, decisiones firmes)
 
 La pérdida es **intencional y asimétrica**, como en la memoria humana: lo crudo se disuelve, lo destilado persiste, lo cristalizado permanece.
 
+### Qué guarda cada capa
+
+| Capa | Qué representa | Ciclo de vida | Para qué sirve |
+|---|---|---|---|
+| `episodes` | Lo que ocurrió: texto original y fechado | Efímero después de consolidarse | Evidencia y contexto inmediato |
+| `memories` | Lo aprendido al resumir varios episodios | Su `salience` baja si no se usa y sube al recordarla | Conocimiento operativo y búsqueda semántica |
+| `traits` | Patrones, preferencias o decisiones estables | Permanente salvo borrado explícito | Identidad y reglas de máxima prioridad |
+
+Ejemplo: “hoy PostgreSQL rindió mejor” es un episode; “PostgreSQL es
+preferible en este proyecto” es una memory; “priorizamos soluciones robustas
+para concurrencia” puede cristalizar como trait.
+
 ## Cinco gestos, un solo territorio
 
 | Invocación | Qué hace |
 |---|---|
 | `capture` | Inscribir un episodio en un scope jerárquico (`proyecto/diario`, `vscode/transcripts`, …) |
-| `recall` | Buscar cross-scope con FTS5 + Hebbian boost (lo más usado pesa más) |
+| `recall` | Buscar con FTS5 + semántica y reforzar las memories devueltas |
 | `consolidate` | Espesar episodios relacionados en una memoria |
 | `crystallize` | Fijar un trait/ley con evidencia (identidad, decisiones firmes) |
 | `forget` | Soltar lo que ya no se consulta |
@@ -88,7 +100,7 @@ Y en `mcp.json`: `"command": "node", "args": ["<ruta-al-repo>/misMEM/engine/dist
 
 - **Engine**: TypeScript estricto, ES2022, ESM, Node ≥22.
 - **Storage**: SQLite con WAL (multiple readers + 1 writer concurrente). `better-sqlite3`.
-- **Búsqueda**: FTS5 + ranking traits > memories > episodes + refuerzo Hebbiano en recall.
+- **Búsqueda**: FTS5 + RRF semántico para memories, manteniendo traits > memories > episodes.
 - **Protocolo**: [Model Context Protocol](https://modelcontextprotocol.io/) vía `@modelcontextprotocol/sdk`.
 - **Validación**: Zod en todos los bordes.
 
@@ -110,7 +122,17 @@ Con Ollama corriendo (`ollama pull nomic-embed-text`), `recall` suma búsqueda
 por significado: "problemas de plata" encuentra memorias que dicen "deudas".
 Los vectores se guardan como BLOB en la misma SQLite y la búsqueda es coseno
 en JS — sin extensiones nativas ni servicios externos. Si Ollama no está,
-todo degrada silenciosamente a FTS5 puro. Backfill: `mismem-embed`.
+todo degrada silenciosamente a FTS5 puro. La semántica cubre deliberadamente
+solo `memories`; `episodes` y `traits` conservan búsqueda FTS5. Backfill y
+reindexado: `mismem-embed` (`--status`, `--force`).
+
+### Salience, decay y olvido
+
+Las memories pierden la mitad de su salience cada 90 días sin refuerzo
+(configurable con `MISMEM_SALIENCE_HALF_LIFE_DAYS`). `recall` aplica el decay
+pendiente y después suma el refuerzo Hebbiano. `forget` elimina memories bajo
+el umbral solo después de su período de gracia; `--dry-run` calcula el
+resultado sin modificar la DB.
 
 ## Privacidad
 
