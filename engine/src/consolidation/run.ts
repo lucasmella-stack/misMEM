@@ -200,7 +200,7 @@ async function processScope(
       gist: `[noise] ${candidates.length} episodios sin se\u00f1al consolidable (${new Date(cutoff).toISOString().slice(0, 10)})`,
       source_episode_ids: candidates.map((e) => e.id),
     });
-    db.prepare("UPDATE memories SET salience = 0.1 WHERE id = ?").run(stub.memory_id);
+    db.prepare("UPDATE memories SET salience = 0.05 WHERE id = ?").run(stub.memory_id);
     return { memories: 1 + (dropped_l0 > 0 ? 1 : 0), episodes: stub.consolidated + dropped_l0, dropped_l0 };
   }
 

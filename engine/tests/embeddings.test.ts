@@ -83,6 +83,69 @@ describe("embedPendingMemories", () => {
     expect(r.embedded).toBe(0);
     expect(r.failed).toBe(2);
   });
+
+  it("reindexa cuando cambia el modelo aunque las dimensiones coincidan", async () => {
+    const memoryId = makeMemory("vida", "cashflow del mes");
+    await embedPendingMemories(db, {
+      embedFn: fakeEmbed,
+      model: "modelo-a",
+    });
+    const next = await embedPendingMemories(db, {
+      embedFn: fakeEmbed,
+      model: "modelo-b",
+    });
+    const stored = db
+      .prepare(
+        "SELECT model, dims FROM memory_embeddings WHERE memory_id = ?",
+      )
+      .get(memoryId) as { model: string; dims: number };
+
+    expect(next).toMatchObject({
+      pending: 1,
+      embedded: 1,
+      reembedded: 1,
+      failed: 0,
+    });
+    expect(stored).toEqual({ model: "modelo-b", dims: 3 });
+  });
+
+  it("conserva el vector anterior si falla el reindexado", async () => {
+    const memoryId = makeMemory("vida", "cashflow del mes");
+    await embedPendingMemories(db, {
+      embedFn: fakeEmbed,
+      model: "modelo-a",
+    });
+    const failed = await embedPendingMemories(db, {
+      embedFn: deadEmbed,
+      model: "modelo-b",
+    });
+    const stored = db
+      .prepare(
+        "SELECT model FROM memory_embeddings WHERE memory_id = ?",
+      )
+      .get(memoryId) as { model: string };
+
+    expect(failed).toMatchObject({ pending: 1, embedded: 0, failed: 1 });
+    expect(stored.model).toBe("modelo-a");
+  });
+
+  it("permite reindexar explícitamente el mismo modelo con --force", async () => {
+    makeMemory("vida", "cashflow del mes");
+    await embedPendingMemories(db, {
+      embedFn: fakeEmbed,
+      model: "fake",
+    });
+    const forced = await embedPendingMemories(db, {
+      embedFn: fakeEmbed,
+      model: "fake",
+      force: true,
+    });
+    expect(forced).toMatchObject({
+      pending: 1,
+      embedded: 1,
+      reembedded: 1,
+    });
+  });
 });
 
 describe("recallHybrid", () => {
@@ -126,5 +189,36 @@ describe("recallHybrid", () => {
       salience: number;
     };
     expect(row.salience).toBeCloseTo(0.55);
+  });
+
+  it("no mezcla embeddings de otro modelo aunque tengan las mismas dimensiones", async () => {
+    makeMemory("vida", "cashflow apretado");
+    await embedPendingMemories(db, {
+      embedFn: fakeEmbed,
+      model: "modelo-a",
+    });
+    const hybrid = await recallHybrid(
+      db,
+      { query: "finanzas" },
+      fakeEmbed,
+      { reinforce: false, embeddingModel: "modelo-b" },
+    );
+    expect(hybrid.hits).toHaveLength(0);
+  });
+
+  it("descarta dimensiones incompatibles sin comparar vectores", async () => {
+    makeMemory("vida", "cashflow apretado");
+    await embedPendingMemories(db, {
+      embedFn: fakeEmbed,
+      model: "fake",
+    });
+    const fiveDims: EmbedFn = async () => [new Float32Array([1, 0, 0, 0, 0])];
+    const hybrid = await recallHybrid(
+      db,
+      { query: "finanzas" },
+      fiveDims,
+      { reinforce: false, embeddingModel: "fake" },
+    );
+    expect(hybrid.hits).toHaveLength(0);
   });
 });

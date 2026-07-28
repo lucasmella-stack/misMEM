@@ -6,12 +6,12 @@
     "url": "https://github.com/lucasmella-stack/misMEM",
     "source": "github"
   },
-  "version": "0.2.0",
+  "version": "0.3.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@lucasmella/mismem",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "transport": {
         "type": "stdio"
       },

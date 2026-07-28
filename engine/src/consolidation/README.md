@@ -34,7 +34,7 @@ mismem-consolidate [--dry-run] [--scope <name>] [--min-age-hours 24] [--min-epis
 - **Modelo**: DeepSeek V3 (top-tier synthesis, ~$0.14/M in / $0.28/M out)
 - **Costo estimado**: <$0.30/mes para volumen actual (~3999 episodios pendientes \u2192 single shot)
 - **Anti-alucinaci\u00f3n**: filtra `evidence_episode_ids` que no est\u00e9n en el batch
-- **Sin se\u00f1al**: si LLM devuelve `memories: []`, crea memoria stub con `salience=0.1` para que decay limpie
+- **Sin se\u00f1al**: si LLM devuelve `memories: []`, crea memoria stub con `salience=0.05` para que decay + `forget` limpien
 
 ## Deployment en producci\u00f3n (mismem-brain)
 

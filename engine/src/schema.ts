@@ -34,6 +34,7 @@ export type CrystallizeInput = z.infer<typeof CrystallizeInput>;
 export const ForgetInput = z.object({
   scope: Scope.optional(),
   before_days: z.number().int().positive().default(30),
+  memory_grace_days: z.number().int().nonnegative().default(30),
   salience_below: z.number().min(0).max(1).default(0.1),
   dry_run: z.boolean().default(true),
 });

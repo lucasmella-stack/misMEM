@@ -2,8 +2,8 @@
  * Capa semántica opcional sobre las memorias.
  *
  * Diseño: sin extensiones nativas. Los vectores viven como BLOB (Float32Array)
- * en `memory_embeddings` y la búsqueda es coseno brute-force en JS — para una
- * memoria personal (miles de filas, no millones) es < 50ms y no le agrega
+ * en `memory_embeddings` y la búsqueda es coseno brute-force en JS — pensada
+ * para una memoria personal (miles de filas, no millones) sin agregar
  * fragilidad de instalación al paquete.
  *
  * Embeddings via Ollama local (default: nomic-embed-text). Si Ollama no está
@@ -85,6 +85,8 @@ export interface SemanticHit {
   text: string;
   salience: number;
   created_at: number;
+  last_accessed_at: number | null;
+  salience_updated_at: number | null;
   score: number;
 }
 
@@ -92,21 +94,38 @@ export interface SemanticHit {
 export function semanticSearchMemories(
   db: DB,
   queryVec: Float32Array,
-  opts: { scope?: string; limit: number; minScore?: number },
+  opts: {
+    scope?: string;
+    limit: number;
+    minScore?: number;
+    model?: string;
+  },
 ): SemanticHit[] {
   const minScore = opts.minScore ?? 0.5;
+  const filters = [
+    opts.scope ? "m.scope = @scope" : null,
+    opts.model ? "e.model = @model" : null,
+    "e.dims = @dims",
+  ].filter((value): value is string => value !== null);
   const rows = db
     .prepare(
-      `SELECT m.id, m.scope, m.gist AS text, m.salience, m.created_at, e.vec
+      `SELECT m.id, m.scope, m.gist AS text, m.salience, m.created_at,
+              m.last_accessed_at, m.salience_updated_at, e.vec
        FROM memory_embeddings e JOIN memories m ON m.id = e.memory_id
-       ${opts.scope ? "WHERE m.scope = @scope" : ""}`,
+       WHERE ${filters.join(" AND ")}`,
     )
-    .all({ scope: opts.scope }) as Array<{
+    .all({
+      scope: opts.scope,
+      model: opts.model,
+      dims: queryVec.length,
+    }) as Array<{
     id: string;
     scope: string;
     text: string;
     salience: number;
     created_at: number;
+    last_accessed_at: number | null;
+    salience_updated_at: number | null;
     vec: Buffer;
   }>;
 
@@ -121,6 +140,8 @@ export function semanticSearchMemories(
         text: r.text,
         salience: r.salience,
         created_at: r.created_at,
+        last_accessed_at: r.last_accessed_at,
+        salience_updated_at: r.salience_updated_at,
         score,
       });
     }
@@ -132,12 +153,13 @@ export function semanticSearchMemories(
 export interface BackfillStats {
   pending: number;
   embedded: number;
+  reembedded: number;
   failed: number;
 }
 
 /**
- * Embebe todas las memorias sin embedding (idempotente).
- * Cubre cualquier write path que no haya podido embeber en el momento.
+ * Embebe memories sin vector o con un modelo obsoleto (idempotente).
+ * Cubre cualquier write path pendiente y permite reindexado explícito.
  */
 export async function embedPendingMemories(
   db: DB,
@@ -147,25 +169,52 @@ export async function embedPendingMemories(
     embedFn?: EmbedFn;
     model?: string;
     timeoutMs?: number;
+    expectedDims?: number;
+    force?: boolean;
   } = {},
 ): Promise<BackfillStats> {
   const cfg = loadEmbeddingConfig();
-  if (!cfg.enabled && !opts.embedFn) return { pending: 0, embedded: 0, failed: 0 };
+  if (!cfg.enabled && !opts.embedFn) {
+    return { pending: 0, embedded: 0, reembedded: 0, failed: 0 };
+  }
   const embedFn =
     opts.embedFn ??
     ((texts: string[]) => embedTexts(texts, { ...cfg, timeoutMs: opts.timeoutMs ?? cfg.timeoutMs }));
   const model = opts.model ?? cfg.model;
   const batchSize = opts.batchSize ?? 32;
+  const needsEmbedding = [
+    "e.memory_id IS NULL",
+    "e.model <> @model",
+    opts.expectedDims !== undefined ? "e.dims <> @expectedDims" : null,
+  ]
+    .filter((value): value is string => value !== null)
+    .join(" OR ");
 
   const pendingRows = db
     .prepare(
-      `SELECT m.id, m.gist, m.details FROM memories m
+      `SELECT m.id, m.gist, m.details, e.memory_id IS NOT NULL AS had_embedding
+       FROM memories m
        LEFT JOIN memory_embeddings e ON e.memory_id = m.id
-       WHERE e.memory_id IS NULL ${opts.scope ? "AND m.scope = @scope" : ""}`,
+       WHERE (${opts.force ? "1 = 1" : needsEmbedding})
+         ${opts.scope ? "AND m.scope = @scope" : ""}`,
     )
-    .all({ scope: opts.scope }) as Array<{ id: string; gist: string; details: string | null }>;
+    .all({
+      scope: opts.scope,
+      model,
+      expectedDims: opts.expectedDims,
+    }) as Array<{
+    id: string;
+    gist: string;
+    details: string | null;
+    had_embedding: number;
+  }>;
 
-  const stats: BackfillStats = { pending: pendingRows.length, embedded: 0, failed: 0 };
+  const stats: BackfillStats = {
+    pending: pendingRows.length,
+    embedded: 0,
+    reembedded: 0,
+    failed: 0,
+  };
 
   for (let i = 0; i < pendingRows.length; i += batchSize) {
     const batch = pendingRows.slice(i, i + batchSize);
@@ -182,7 +231,55 @@ export async function embedPendingMemories(
       if (!vec || !mem) continue;
       saveMemoryEmbedding(db, mem.id, model, vec);
       stats.embedded++;
+      if (mem.had_embedding) stats.reembedded++;
     }
   }
   return stats;
+}
+
+export interface EmbeddingIndexStatus {
+  memories: number;
+  embedded: number;
+  missing: number;
+  compatible: number;
+  stale_model: number;
+  models: Array<{ model: string; dims: number; count: number }>;
+}
+
+export function getEmbeddingIndexStatus(
+  db: DB,
+  activeModel: string,
+): EmbeddingIndexStatus {
+  const memories = (
+    db.prepare("SELECT COUNT(*) AS n FROM memories").get() as { n: number }
+  ).n;
+  const embedded = (
+    db.prepare("SELECT COUNT(*) AS n FROM memory_embeddings").get() as {
+      n: number;
+    }
+  ).n;
+  const compatible = (
+    db
+      .prepare(
+        "SELECT COUNT(*) AS n FROM memory_embeddings WHERE model = ?",
+      )
+      .get(activeModel) as { n: number }
+  ).n;
+  const models = db
+    .prepare(
+      `SELECT model, dims, COUNT(*) AS count
+       FROM memory_embeddings
+       GROUP BY model, dims
+       ORDER BY count DESC, model, dims`,
+    )
+    .all() as Array<{ model: string; dims: number; count: number }>;
+
+  return {
+    memories,
+    embedded,
+    missing: memories - embedded,
+    compatible,
+    stale_model: embedded - compatible,
+    models,
+  };
 }
