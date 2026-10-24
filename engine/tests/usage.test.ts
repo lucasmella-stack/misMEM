@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { formatInjection } from "../src/inject.js";
 import {
   assistantReply,
+  injectedMemories,
   lastTurn,
   overlap,
   recalledMemories,
@@ -81,5 +83,46 @@ describe("assistantReply", () => {
   it("junta sólo el texto del asistente", () => {
     const lines = [user("hola"), toolResult(hits()), assistant("respuesta"), assistant("segunda")];
     expect(assistantReply(lines)).toBe("respuesta\nsegunda");
+  });
+});
+
+// Así guarda Claude Code el additionalContext de un hook UserPromptSubmit.
+const injection = (text: string) => ({
+  type: "attachment",
+  attachment: { type: "hook_additional_context", hookEvent: "UserPromptSubmit", content: [text] },
+});
+const injected = (...rows: Array<{ id: string; scope: string; text: string }>) =>
+  injection(formatInjection(rows.map((r) => ({ ...r, layer: "memory" as const, created_at: 0 }))));
+
+describe("injectedMemories", () => {
+  it("toma los recuerdos del bloque de inyección de misMEM", () => {
+    const lines = [
+      user("¿cómo cambio las luces del teclado?"),
+      injected(
+        { id: "m1", scope: "pc", text: "las luces del teclado del portátil se controlan con nitro-kb" },
+        { id: "m2", scope: "pc", text: "el portátil es un Acer Nitro AN17" },
+      ),
+    ];
+    expect(injectedMemories(lines)).toEqual([
+      { id: "m1", text: "las luces del teclado del portátil se controlan con nitro-kb" },
+      { id: "m2", text: "el portátil es un Acer Nitro AN17" },
+    ]);
+  });
+
+  it("el contexto de otro hook no cuenta", () => {
+    expect(injectedMemories([injection("- [x1] otro — no es de misMEM")])).toEqual([]);
+  });
+
+  it("un recuerdo inyectado que la respuesta usa sale como usado", () => {
+    const lines = [
+      user("¿cómo cambio las luces del teclado?"),
+      injected(
+        { id: "m1", scope: "pc", text: "las luces del teclado del portátil se controlan con nitro-kb" },
+        { id: "m2", scope: "finanzas", text: "la deuda del cashflow quedó saldada" },
+      ),
+      assistant("Las luces del teclado del portátil se controlan con el comando nitro-kb."),
+    ];
+    const turn = lastTurn(lines);
+    expect(usedMemoryIds(injectedMemories(turn), assistantReply(turn))).toEqual(["m1"]);
   });
 });

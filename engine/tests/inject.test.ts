@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   formatInjection,
+  parseInjection,
   inExcludedScope,
   parseScopeList,
   selectForInjection,
@@ -85,5 +86,23 @@ describe("formatInjection", () => {
     const text = formatInjection([hit({ id: "m1", scope: "trabajo" })]);
     expect(text).toContain("[m1] trabajo — el deploy usa docker compose");
     expect(text).toMatch(/no se los atribuyas/);
+  });
+});
+
+describe("parseInjection", () => {
+  it("lee de vuelta lo que escribe formatInjection: si uno cambia, el refuerzo deja de ver lo inyectado", () => {
+    const hits = [
+      hit({ id: "01M1ABC", scope: "idiaval/portatil", text: "las luces del teclado se controlan con nitro-kb" }),
+      hit({ id: "01M1DEF", scope: "trabajo", text: "el deploy usa docker compose — con traefik delante" }),
+    ];
+    expect(parseInjection(formatInjection(hits))).toEqual([
+      { id: "01M1ABC", scope: "idiaval/portatil", text: "las luces del teclado se controlan con nitro-kb" },
+      { id: "01M1DEF", scope: "trabajo", text: "el deploy usa docker compose — con traefik delante" },
+    ]);
+  });
+
+  it("un texto que no es el bloque de misMEM no aporta nada", () => {
+    expect(parseInjection("- [x1] otro hook — algo que no es nuestro")).toEqual([]);
+    expect(parseInjection("")).toEqual([]);
   });
 });

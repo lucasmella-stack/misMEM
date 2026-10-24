@@ -2,7 +2,8 @@
 /**
  * mismem-used — hook `Stop` de Claude Code: refuerza los recuerdos que la respuesta usó.
  *
- * Lee por stdin el payload del hook (de ahí saca `transcript_path`), mira el último turno
+ * Lee por stdin el payload del hook (de ahí saca `transcript_path`), mira el último turno (lo
+ * que pidió con `recall` y lo que le puso delante el hook de inyección)
  * y manda a `reinforce` sólo los recuerdos cuyas palabras reaparecen en la respuesta.
  *
  * Con MISMEM_HOOK_URL habla con el servidor remoto por JSON-RPC; sin ella abre la base
@@ -15,6 +16,7 @@ import { callRemoteTool } from "./hook-client.js";
 import { reinforce } from "./tools.js";
 import {
   assistantReply,
+  injectedMemories,
   lastTurn,
   recalledMemories,
   usedMemoryIds,
@@ -84,7 +86,11 @@ async function main(): Promise<void> {
     });
 
   const turn = lastTurn(lines);
-  const memories = recalledMemories(turn);
+  // Lo que pidió con recall y lo que el hook de inyección le puso delante: los dos se usan igual.
+  const byId = new Map(
+    [...recalledMemories(turn), ...injectedMemories(turn)].map((memory) => [memory.id, memory]),
+  );
+  const memories = [...byId.values()];
   if (memories.length === 0) return;
 
   const opts: UsageOptions = {

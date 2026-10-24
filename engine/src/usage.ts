@@ -7,6 +7,7 @@
  * paráfrasis sin palabras compartidas no se detecta— pero falla hacia no reforzar,
  * que es el lado barato: un recuerdo útil que no suma saliencia sigue encontrándose.
  */
+import { parseInjection } from "./inject.js";
 import { contentTerms } from "./terms.js";
 
 export interface RecalledMemory {
@@ -92,6 +93,27 @@ export function recalledMemories(lines: readonly unknown[]): RecalledMemory[] {
         if (hit.layer !== "memory" || !hit.id || !hit.text) continue;
         out.set(hit.id, { id: hit.id, text: hit.text });
       }
+    }
+  }
+  return [...out.values()];
+}
+
+/**
+ * Los recuerdos que el hook de inyección puso en el contexto dentro de estas líneas. Claude
+ * Code guarda su `additionalContext` como un adjunto `hook_additional_context`, no como un
+ * `tool_result`, así que `recalledMemories` no los ve y nunca se reforzaban.
+ */
+export function injectedMemories(lines: readonly unknown[]): RecalledMemory[] {
+  const out = new Map<string, RecalledMemory>();
+  for (const line of lines) {
+    const attachment = (line as { type?: string; attachment?: { type?: string; content?: unknown } } | null)
+      ?.attachment;
+    if (roleOf(line) !== "attachment" || attachment?.type !== "hook_additional_context") continue;
+    const content = attachment.content;
+    const texts = Array.isArray(content) ? content : [content];
+    for (const text of texts) {
+      if (typeof text !== "string") continue;
+      for (const { id, text: memoryText } of parseInjection(text)) out.set(id, { id, text: memoryText });
     }
   }
   return [...out.values()];
