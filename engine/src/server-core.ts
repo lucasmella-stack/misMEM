@@ -41,6 +41,10 @@ const CANONICAL_TOOLS = [
         query: { type: "string" },
         scope: { type: "string" },
         limit: { type: "integer", minimum: 1, maximum: 50, default: 10 },
+        reinforce: {
+          type: "boolean",
+          description: "false for a search the user did not ask for (a hook injecting context): it is not use, so it must not raise salience",
+        },
       },
     },
   },
