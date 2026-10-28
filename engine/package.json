@@ -83,7 +83,7 @@
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "d3-force": "3.0.0",
-    "jscpd": "4.3.0",
+    "jscpd": "5.4.1",
     "knip": "6.41.0",
     "lucide-react": "1.57.0",
     "motion": "14.2.0",
