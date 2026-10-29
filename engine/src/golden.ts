@@ -126,7 +126,10 @@ function describeIssues(error: z.ZodError): string {
 export function parseGolden(files: readonly GoldenFile[]): GoldenCorpus {
   const domains: Record<string, GoldenRecord[]> = {};
   const seen = new Map<string, string>();
-  const memoryKeys = new Set<string>();
+  // Query ids share the key space with records, but they are not answers: keeping them
+  // apart lets the validator explain the difference instead of reporting a missing key.
+  const recordKeys = new Set<string>();
+  const queryIds = new Set<string>();
   const traits: Array<{ where: string; evidence: string[] }> = [];
   const queries: Array<{ where: string; kind: string; expect: string[] }> = [];
 
@@ -153,16 +156,23 @@ export function parseGolden(files: readonly GoldenFile[]): GoldenCorpus {
       if (previous) fail(where, `clave duplicada: ${key} (ya está en ${previous})`);
       seen.set(key, where);
 
-      if (data.type === "memory") memoryKeys.add(key);
-      if (data.type === "trait") traits.push({ where, evidence: data.evidence });
-      if (data.type === "query") queries.push({ where, kind: data.kind, expect: data.expect });
+      if (data.type === "query") {
+        queryIds.add(key);
+        queries.push({ where, kind: data.kind, expect: data.expect });
+      } else {
+        recordKeys.add(key);
+        if (data.type === "trait") traits.push({ where, evidence: data.evidence });
+      }
       records.push({ ...data, domain });
     });
   }
 
   for (const { where, evidence } of traits) {
     for (const key of evidence) {
-      if (!memoryKeys.has(key)) fail(where, `la evidencia ${key} no es una memoria`);
+      if (queryIds.has(key)) {
+        fail(where, `la evidencia ${key} es un id de pregunta, no una memoria, un episodio ni un rasgo`);
+      }
+      if (!recordKeys.has(key)) fail(where, `la evidencia ${key} no existe`);
     }
   }
   for (const { where, kind, expect } of queries) {
@@ -173,7 +183,10 @@ export function parseGolden(files: readonly GoldenFile[]): GoldenCorpus {
       fail(where, `una pregunta ${kind} necesita al menos una clave esperada`);
     }
     for (const key of expect) {
-      if (!seen.has(key)) fail(where, `la clave esperada ${key} no existe`);
+      if (queryIds.has(key)) {
+        fail(where, `la clave esperada ${key} es un id de pregunta, no una memoria, un episodio ni un rasgo`);
+      }
+      if (!recordKeys.has(key)) fail(where, `la clave esperada ${key} no existe`);
     }
   }
 

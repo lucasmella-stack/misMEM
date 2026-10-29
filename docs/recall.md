@@ -60,11 +60,11 @@ pregunta y `noiseHits` (marcadores que se escaparon: tiene que ser 0). Se corre 
 `tools.ts`, `search.ts` o `embeddings/`. El banco de preguntas es privado y sale de la propia memoria.
 Cómo usarlo en un servidor: [DEPLOY.md](../DEPLOY.md#medir-el-recall).
 
-`mismem-eval` mide lo mismo sobre un corpus sintético y público en castellano: una persona ficticia en doce
+El eval dorado (`pnpm eval`) mide lo mismo sobre un corpus sintético y público en castellano: una persona ficticia en doce
 dominios. Sirve para comparar entre máquinas y para subir el suelo en CI. Desde `engine/`:
 
 ```bash
-npx tsx src/eval-cli.ts --mode lexico
+pnpm eval --mode lexico
 node dist/eval-cli.js --mode semantico
 ```
 
@@ -73,14 +73,16 @@ El segundo exige `pnpm build` y las variables `MISMEM_EMBEDDING_*` del servidor 
 embedder responde. Los datos viven en `engine/eval/golden/`, un `.jsonl` por dominio, y el formato y los
 tipos de pregunta están en la cabecera de [`engine/src/golden.ts`](../engine/src/golden.ts). La puerta de CI
 (`engine/tests/golden.test.ts`) exige que el modo léxico no baje del suelo por tipo de `floor.json` ni supere
-`lexico_ajenas_max`, y que ningún marcador de ruido llegue al resultado; quien mejora el recall sube el suelo
-en el mismo PR. No viaja en el paquete npm: se corre desde el repositorio.
+`lexico_ajenas_max`, y que ningún marcador de ruido llegue al resultado. También comprueba el reparto del
+corpus (doce dominios, 40 preguntas por dominio y los tipos esperados) y que `expect` o `evidence` no nombren
+un id de pregunta; si el corpus no está, el test falla. Quien mejora el recall sube el suelo en el mismo PR.
+No viaja en el paquete npm: se corre desde el repositorio.
 
 Línea base del 2026-10-30 (tope 5, aciertos dentro del tope; caduca cuando cambia el corpus):
 
 | Modo | Global | MRR | Paráfrasis | Episodio | Rasgo | Ajenas con algo | Recuerdos por pregunta |
 |---|---|---|---|---|---|---|---|
-| Léxico | 221/432 | 0,48 | 0/72 | 20/24 | 8/24 | 8/48 | 0,9 |
-| Semántico (`embeddinggemma-2`, corte 0,65) | 370/432 | 0,79 | 64/72 | 0/24 | 0/24 | 11/48 | 4,8 |
+| Léxico | 221/432 | 0,48 | 1/72 | 20/24 | 8/24 | 8/48 | 0,9 |
+| Semántico (`embeddinggemma-2`, corte 0,65) | 368/432 | 0,80 | 64/72 | 0/24 | 0/24 | 11/48 | 4,8 |
 
 Los dos ceros del semántico son el issue #154.

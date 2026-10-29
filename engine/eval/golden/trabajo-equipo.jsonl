@@ -13,7 +13,7 @@
 {"type": "memory", "key": "eq-13", "scope": "cierzo/equipo", "gist": "La retrospectiva del equipo es cada dos viernes por la mañana y dura 45 minutos.", "days_ago": 210}
 {"type": "memory", "key": "eq-14", "scope": "cierzo/equipo", "gist": "La definición de terminado exige tests, changelog y una revisión de seguridad.", "days_ago": 130, "details": "Un cambio sin tests no se mergea. El changelog se escribe en la misma rama."}
 {"type": "memory", "key": "eq-15", "scope": "lucia/dev", "gist": "Lucía es la referente técnica de facturación dentro del equipo desde enero.", "days_ago": 300}
-{"type": "memory", "key": "eq-16", "scope": "cierzo/equipo", "gist": "Las mañanas hasta las 12:00 no tienen reuniones para dejar tiempo de concentración.", "days_ago": 6, "details": "Las reuniones se concentran después de comer. Las urgencias se avisan por el canal de guardia."}
+{"type": "memory", "key": "eq-16", "scope": "cierzo/equipo", "gist": "Las mañanas hasta las 12:00 no tienen reuniones, salvo la daily de las 9:30, para dejar tiempo de concentración.", "days_ago": 6, "details": "Las reuniones se concentran después de comer. Las urgencias se avisan por el canal de guardia."}
 {"type": "memory", "key": "eq-17", "scope": "cierzo/equipo", "gist": "La revisión salarial se hace en enero y se comunica antes del día 20.", "days_ago": 280}
 {"type": "memory", "key": "eq-18", "scope": "cierzo/equipo", "gist": "El modelo de trabajo es tres días de teletrabajo y dos presenciales en la oficina.", "days_ago": 110, "details": "No hay días fijos salvo el miércoles. Cada persona organiza el resto como quiere."}
 {"type": "memory", "key": "eq-19", "scope": "cierzo/equipo", "gist": "El miércoles es el día obligatorio de oficina para todo el equipo.", "days_ago": 110}
@@ -55,7 +55,7 @@
 {"type": "query", "id": "eq-q28", "kind": "larga", "query": "Para hablar con recursos humanos quiere saber en qué mes se revisan los sueldos y antes de qué fecha suelen comunicar la decisión, porque el año pasado se enteró tarde.", "expect": ["eq-17"]}
 {"type": "query", "id": "eq-q29", "kind": "clave", "query": "Linear", "expect": ["eq-08"]}
 {"type": "query", "id": "eq-q30", "kind": "clave", "query": "Notion", "expect": ["eq-09"]}
-{"type": "query", "id": "eq-q31", "kind": "ambito", "query": "¿Quién es la persona nueva del equipo?", "expect": ["eq-11"], "scope": "cierzo/equipo"}
+{"type": "query", "id": "eq-q31", "kind": "ambito", "query": "¿Quién es el becario nuevo del equipo?", "expect": ["eq-e1"], "scope": "cierzo/equipo"}
 {"type": "query", "id": "eq-q32", "kind": "ambito", "query": "¿Qué puesto rechazó en junio?", "expect": ["eq-20"], "scope": "lucia/dev"}
 {"type": "query", "id": "eq-q33", "kind": "episodio", "query": "¿Quién ha empezado hoy y de dónde viene?", "expect": ["eq-e1"]}
 {"type": "query", "id": "eq-q34", "kind": "episodio", "query": "¿Dónde es la comida de equipo y quién no fue?", "expect": ["eq-e2"]}

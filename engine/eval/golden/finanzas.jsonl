@@ -5,13 +5,13 @@
 {"type": "memory", "key": "fin-05", "scope": "lucia/finanzas", "gist": "Está suscrita a Filmin por 8,99 euros al mes y no tiene Netflix.", "days_ago": 60, "details": "Comparte la cuenta con Andrés y alternan las series que ven."}
 {"type": "memory", "key": "fin-06", "scope": "lucia/finanzas", "gist": "Pagó Disney+ tres meses por una promoción de 1,99 euros y lo canceló al acabar.", "days_ago": 175}
 {"type": "memory", "key": "fin-07", "scope": "lucia/finanzas", "gist": "Reparte el sueldo con la regla 50/30/20: mitad para gastos fijos, treinta para caprichos y veinte para ahorro.", "days_ago": 250, "details": "La revisa cada enero con la hoja de cálculo que heredó de su madre."}
-{"type": "memory", "key": "fin-08", "scope": "lucia/finanzas", "gist": "La declaración de la renta la presenta un asesor de Zaragoza, no un programa de autoedición.", "days_ago": 130, "details": "Le cobra 60 euros y le avisa de los borradores."}
-{"type": "memory", "key": "fin-09", "scope": "lucia/hogar", "gist": "El seguro del hogar con Seguros Moncayo le cuesta 180 euros al año y cubre inundación y robo.", "days_ago": 140}
-{"type": "memory", "key": "fin-10", "scope": "lucia/finanzas", "gist": "No tiene coche: va en bici al trabajo y usa el tranvía cuando llueve.", "days_ago": 320, "details": "Vive a tres kilómetros de la oficina y tarda lo mismo en bici que en transporte público."}
+{"type": "memory", "key": "fin-08", "scope": "lucia/finanzas", "gist": "La declaración de la renta la presenta la gestoría del barrio, no un programa de autoedición.", "days_ago": 130, "details": "El asesor le cobra 60 euros y le avisa de los borradores."}
+{"type": "memory", "key": "fin-09", "scope": "lucia/hogar", "gist": "En marzo cambió el seguro del hogar a Seguros Moncayo: paga 180 euros al año y cubre inundación y robo.", "days_ago": 140}
+{"type": "memory", "key": "fin-10", "scope": "lucia/finanzas", "gist": "Tiene un Corsa que usa poco: casi siempre va en bici al trabajo y coge el tranvía cuando llueve.", "days_ago": 320, "details": "Vive a tres kilómetros de la oficina y tarda lo mismo en bici que en transporte público."}
 {"type": "memory", "key": "fin-11", "scope": "lucia/hogar", "gist": "Compró el piso por 168.000 euros en 2023, en el barrio de Delicias, con una entrada de 33.600.", "days_ago": 390, "details": "El piso tiene dos habitaciones y un balcón pequeño al patio interior."}
 {"type": "memory", "key": "fin-12", "scope": "lucia/hogar", "gist": "Paga 320 euros de IBI al año, en dos plazos, en mayo y en noviembre.", "days_ago": 230}
-{"type": "memory", "key": "fin-13", "scope": "lucia/hogar", "gist": "Tiene tarifa eléctrica fija a 0,14 euros el kilovatio hora con Electra del Ebro.", "days_ago": 200, "details": "Cambió en enero porque la anterior le subió el precio sin avisar."}
-{"type": "memory", "key": "fin-14", "scope": "lucia/finanzas", "gist": "En enero amortizó 10.000 euros de hipoteca y pidió reducir plazo, no cuota.", "days_ago": 270, "details": "Le quedan veinticuatro años en lugar de veintiséis."}
+{"type": "memory", "key": "fin-13", "scope": "lucia/hogar", "gist": "Tiene tarifa eléctrica fija a 0,14 euros el kilovatio hora.", "days_ago": 200, "details": "En enero cambió de tarifa porque la anterior le subió el precio sin avisar."}
+{"type": "memory", "key": "fin-14", "scope": "lucia/finanzas", "gist": "En enero amortizó 10.000 euros de hipoteca y pidió reducir plazo, no cuota.", "days_ago": 270, "details": "Le quedan veinticuatro años en lugar de veintisiete."}
 {"type": "memory", "key": "fin-15", "scope": "lucia/finanzas", "gist": "En junio amortizó 5.000 euros más y esta vez eligió bajar la cuota mensual.", "days_ago": 255}
 {"type": "memory", "key": "fin-16", "scope": "lucia/hogar", "gist": "Comparte con Andrés una cuenta para la casa: 700 euros al mes cada uno, de donde salen luz, agua y comunidad.", "days_ago": 240, "details": "La cuenta se revisa en enero y en julio, y el sobrante se queda para reparaciones."}
 {"type": "memory", "key": "fin-17", "scope": "lucia/finanzas", "gist": "No invierte en criptomonedas porque no soporta la volatilidad; prefiere fondos indexados y letras del Tesoro.", "days_ago": 190}
@@ -34,17 +34,17 @@
 {"type": "query", "id": "fin-q07", "kind": "parafrasis", "query": "¿Qué proporciones sigue al distribuir el salario mensual?", "expect": ["fin-07"]}
 {"type": "query", "id": "fin-q08", "kind": "parafrasis", "query": "¿Cómo se mueve por la ciudad y qué hace los días de lluvia?", "expect": ["fin-10"]}
 {"type": "query", "id": "fin-q09", "kind": "parafrasis", "query": "¿Qué productos financieros le dan tranquilidad y cuáles descarta por sus oscilaciones?", "expect": ["fin-17"]}
-{"type": "query", "id": "fin-q10", "kind": "parafrasis", "query": "¿A cuánto le sale la energía y con qué compañía?", "expect": ["fin-13"]}
-{"type": "query", "id": "fin-q11", "kind": "sinonimo", "query": "¿Qué plataforma de cine paga cada mes y cuánto le cuesta?", "expect": ["fin-05"]}
+{"type": "query", "id": "fin-q10", "kind": "parafrasis", "query": "¿A cuánto le sale el kilovatio hora?", "expect": ["fin-13"]}
+{"type": "query", "id": "fin-q11", "kind": "sinonimo", "query": "¿Qué plataforma de cine comparte con Andrés y cuánto le cuesta?", "expect": ["fin-05"]}
 {"type": "query", "id": "fin-q12", "kind": "sinonimo", "query": "¿Cómo reparten los gastos de la casa con su pareja?", "expect": ["fin-16"]}
 {"type": "query", "id": "fin-q13", "kind": "sinonimo", "query": "¿Qué medio de pago usa para comprar y cuál evita?", "expect": ["fin-20"]}
 {"type": "query", "id": "fin-q14", "kind": "sinonimo", "query": "¿Cuánto destina a la jubilación cada mes?", "expect": ["fin-18"]}
 {"type": "query", "id": "fin-q15", "kind": "coloquial", "query": "Oye, ¿cuánto pagas al mes por el gimnasio?", "expect": ["fin-19"]}
 {"type": "query", "id": "fin-q16", "kind": "coloquial", "query": "¿Al final mantuviste la plataforma esa de la promo o la quitaste?", "expect": ["fin-06"]}
 {"type": "query", "id": "fin-q17", "kind": "coloquial", "query": "Cuando amortizaste en junio, ¿qué elegiste, pagar menos cada mes o quitarte años?", "expect": ["fin-15"]}
-{"type": "query", "id": "fin-q18", "kind": "sin_tildes", "query": "cuanto paga de comunidad al mes", "expect": ["fin-04"]}
+{"type": "query", "id": "fin-q18", "kind": "sin_tildes", "query": "cuanto paga de comunidad al mes", "expect": ["fin-04"], "scope": "lucia/hogar"}
 {"type": "query", "id": "fin-q19", "kind": "sin_tildes", "query": "que hizo con la hipoteca en enero", "expect": ["fin-14"]}
-{"type": "query", "id": "fin-q20", "kind": "sin_tildes", "query": "con que compania tiene asegurada la casa", "expect": ["fin-09"]}
+{"type": "query", "id": "fin-q20", "kind": "sin_tildes", "query": "con que compania tiene asegurada la casa", "expect": ["fin-09"], "scope": "lucia/hogar"}
 {"type": "query", "id": "fin-q21", "kind": "errata", "query": "¿Cuanto ahorra al mes y en que fondo lo mete?", "expect": ["fin-02"]}
 {"type": "query", "id": "fin-q22", "kind": "errata", "query": "¿Cunato paga de IBI y en cuantos plazos?", "expect": ["fin-12"]}
 {"type": "query", "id": "fin-q23", "kind": "errata", "query": "¿Quien le hace la declaracion de la renta?", "expect": ["fin-08"]}

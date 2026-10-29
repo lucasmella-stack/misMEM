@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
- * mismem-eval — runs the golden eval and measures recall by kind, domain and globally.
+ * Golden eval — measures recall by kind, domain and globally.
  *
- * The DB lives in memory: the eval never touches `~/.mismem`. Lexical mode forces a null
- * embedder; semantic mode embeds the corpus with the environment config and lets
- * `recallHybrid` decide. `auto` uses semantic only when the embedder answered.
+ * The corpus ships with the repository, not in the npm package, so this runs from a
+ * checkout (`pnpm eval`) instead of a published binary. The DB lives in memory: the
+ * eval never touches `~/.mismem`. Lexical mode forces a null embedder; semantic mode
+ * embeds the corpus with the environment config and lets `recallHybrid` decide. `auto`
+ * uses semantic only when the embedder answered.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -28,7 +30,7 @@ const DEFAULT_DIR = fileURLToPath(new URL("../eval/golden/", import.meta.url));
 const lexicalOnly: EmbedFn = async () => null;
 
 function help(): void {
-  console.log(`mismem-eval [--dir ${DEFAULT_DIR}] [--limit ${EVAL_DEFAULT_LIMIT}]
+  console.log(`pnpm eval [--dir ${DEFAULT_DIR}] [--limit ${EVAL_DEFAULT_LIMIT}]
              [--mode lexico|semantico|auto] [--json]
 
 Corre el eval dorado en castellano: carga los .jsonl de --dir en una base en memoria y

@@ -56,7 +56,7 @@
 {"type": "query", "id": "hog-q29", "kind": "clave", "query": "Bialetti", "expect": ["hog-04"]}
 {"type": "query", "id": "hog-q30", "kind": "clave", "query": "2700 K", "expect": ["hog-20"]}
 {"type": "query", "id": "hog-q31", "kind": "ambito", "query": "¿Qué aparatos no puede encender a la vez sin que salte el diferencial?", "expect": ["hog-13"], "scope": "lucia/hogar"}
-{"type": "query", "id": "hog-q32", "kind": "ambito", "query": "¿Cuánta potencia eléctrica tiene contratada y cuánto paga al mes?", "expect": ["tra-13"], "scope": "lucia/finanzas"}
+{"type": "query", "id": "hog-q32", "kind": "ambito", "query": "¿Dónde guarda los productos de limpieza y cómo los organiza?", "expect": ["hog-14"], "scope": "lucia/hogar"}
 {"type": "query", "id": "hog-q33", "kind": "episodio", "query": "¿Qué se le rompió en el baño y cuándo viene el fontanero?", "expect": ["hog-e1"]}
 {"type": "query", "id": "hog-q34", "kind": "episodio", "query": "¿Qué pasó con las croquetas y con Nube?", "expect": ["hog-e2"]}
 {"type": "query", "id": "hog-q35", "kind": "rasgo", "query": "¿Cómo organiza la comida de la semana para no cocinar cada día?", "expect": ["hog-t1"]}

@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -6,6 +6,7 @@ import type { Database as DB } from "better-sqlite3";
 import { openDb } from "../src/db.js";
 import type { EmbedFn } from "../src/embeddings/provider.js";
 import { loadGolden, parseFloor, parseGolden, runGolden } from "../src/golden.js";
+import { isNoiseGist } from "../src/noise.js";
 
 const DAY_MS = 86_400_000;
 const AT = Date.UTC(2026, 0, 15);
@@ -124,6 +125,36 @@ describe("parseGolden", () => {
     expect(() => parseGolden(files)).toThrow(/fantasma/);
   });
 
+  it("rechaza una expectativa que nombra un id de pregunta, con fichero y línea", () => {
+    const files = [
+      {
+        name: "dev.jsonl",
+        text: [
+          JSON.stringify({ type: "memory", key: "m1", scope: "s", gist: "x", days_ago: 1 }),
+          JSON.stringify({ type: "query", id: "q1", kind: "literal", query: "x", expect: ["m1"] }),
+          JSON.stringify({ type: "query", id: "q2", kind: "literal", query: "y", expect: ["q1"] }),
+        ].join("\n"),
+      },
+    ];
+
+    expect(() => parseGolden(files)).toThrow(/dev\.jsonl:3.*id de pregunta/);
+  });
+
+  it("rechaza una evidencia que nombra un id de pregunta, con fichero y línea", () => {
+    const files = [
+      {
+        name: "dev.jsonl",
+        text: [
+          JSON.stringify({ type: "memory", key: "m1", scope: "s", gist: "x", days_ago: 1 }),
+          JSON.stringify({ type: "trait", key: "t1", scope: "s", name: "x", evidence: ["q1"] }),
+          JSON.stringify({ type: "query", id: "q1", kind: "literal", query: "x", expect: ["m1"] }),
+        ].join("\n"),
+      },
+    ];
+
+    expect(() => parseGolden(files)).toThrow(/dev\.jsonl:2.*id de pregunta/);
+  });
+
   it("rechaza una pregunta ajena que espera algo", () => {
     const files = [
       {
@@ -237,37 +268,97 @@ describe("parseFloor", () => {
   });
 });
 
-// The data files are written by another task; without them there is nothing to audit.
 const goldenDir = fileURLToPath(new URL("../eval/golden/", import.meta.url));
-const dataFiles = existsSync(goldenDir)
-  ? readdirSync(goldenDir)
-      .filter((name) => name.endsWith(".jsonl"))
-      .sort()
-  : [];
-const hasData = dataFiles.length > 0;
 
+// Read the directory directly: a missing or renamed corpus must fail the gate,
+// never skip it, because the gate is the only thing that measures the eval in CI.
 function readGolden(): Array<{ name: string; text: string }> {
-  return dataFiles.map((name) => ({ name, text: readFileSync(join(goldenDir, name), "utf8") }));
+  return readdirSync(goldenDir)
+    .filter((name) => name.endsWith(".jsonl"))
+    .sort()
+    .map((name) => ({ name, text: readFileSync(join(goldenDir, name), "utf8") }));
 }
 
+const EXPECTED_DOMAINS = [
+  "aprendizaje",
+  "cocina-hogar",
+  "desarrollo",
+  "finanzas",
+  "ia-datos",
+  "infraestructura",
+  "ocio-cultura",
+  "preferencias",
+  "salud-deporte",
+  "trabajo-equipo",
+  "tramites",
+  "viajes",
+].sort();
+
+// Every domain carries the same shape, so a missing line cannot hide behind the total.
+const EXPECTED_PER_DOMAIN = { memory: 22, noise: 2, trait: 2, episode: 3, query: 40 } as const;
+
+// The exact question count per kind; changing the corpus without changing the eval
+// distribution is a decision that has to show up here.
+const EXPECTED_KINDS: Record<string, number> = {
+  literal: 48,
+  parafrasis: 72,
+  sinonimo: 48,
+  coloquial: 36,
+  sin_tildes: 36,
+  errata: 36,
+  ingles: 24,
+  larga: 36,
+  clave: 24,
+  ambito: 24,
+  episodio: 24,
+  rasgo: 24,
+  ajena: 48,
+};
+
 describe("eval/golden real", () => {
-  it.skipIf(!hasData)("los ficheros de datos son válidos y completos", () => {
+  it("los doce dominios tienen el reparto esperado", () => {
     const corpus = parseGolden(readGolden());
-    expect(Object.keys(corpus.domains).sort()).toEqual(dataFiles.map((name) => name.replace(/\.jsonl$/, "")).sort());
+
+    expect(Object.keys(corpus.domains).sort()).toEqual(EXPECTED_DOMAINS);
+    for (const [domain, records] of Object.entries(corpus.domains)) {
+      const count = (type: string) => records.filter((record) => record.type === type).length;
+      const memories = records.filter((record) => record.type === "memory");
+      expect(count("memory"), domain).toBe(EXPECTED_PER_DOMAIN.memory);
+      expect(memories.filter((record) => record.type === "memory" && isNoiseGist(record.gist)).length, domain).toBe(
+        EXPECTED_PER_DOMAIN.noise,
+      );
+      expect(count("trait"), domain).toBe(EXPECTED_PER_DOMAIN.trait);
+      expect(count("episode"), domain).toBe(EXPECTED_PER_DOMAIN.episode);
+      expect(count("query"), domain).toBe(EXPECTED_PER_DOMAIN.query);
+    }
   });
 
-  it.skipIf(!hasData)("el modo léxico no baja del suelo por tipo y no devuelve ruido", async () => {
+  it("reparte las preguntas por tipo como espera el suelo", () => {
+    const corpus = parseGolden(readGolden());
+    const kinds = Object.fromEntries(Object.keys(EXPECTED_KINDS).map((kind) => [kind, 0])) as Record<string, number>;
+
+    for (const records of Object.values(corpus.domains)) {
+      for (const record of records) {
+        if (record.type === "query") kinds[record.kind] = (kinds[record.kind] ?? 0) + 1;
+      }
+    }
+
+    expect(kinds).toEqual(EXPECTED_KINDS);
+  });
+
+  it("el modo léxico no baja del suelo por tipo y no devuelve ruido", async () => {
     const floor = parseFloor(readFileSync(join(goldenDir, "floor.json"), "utf8"));
     const corpus = parseGolden(readGolden());
     const ids = loadGolden(db, corpus, AT);
     const report = await runGolden(db, corpus, ids, { limit: floor.limit, embedFn: lexical, at: AT });
 
     expect(report.noiseHits).toBe(0);
-    if (floor.lexico_ajenas_max !== undefined) {
-      expect(report.offTopic.withHits).toBeLessThanOrEqual(floor.lexico_ajenas_max);
-    }
+    expect(report.offTopic.withHits).toBeLessThanOrEqual(floor.lexico_ajenas_max ?? 0);
     for (const [kind, { hits }] of Object.entries(floor.lexico)) {
-      expect(report.kinds[kind]?.hitAtLimit ?? 0).toBeGreaterThanOrEqual(hits);
+      const score = report.kinds[kind];
+      expect(score, `el tipo ${kind} del suelo no aparece en el informe`).toBeDefined();
+      expect(score?.questions, kind).toBe(EXPECTED_KINDS[kind]);
+      expect(score?.hitAtLimit, kind).toBeGreaterThanOrEqual(hits);
     }
   });
 });
