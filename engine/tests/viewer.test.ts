@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { Database as DB } from "better-sqlite3";
 import { openDb } from "../src/db.js";
-import { capture, consolidate } from "../src/tools.js";
+import { capture, consolidate, crystallize } from "../src/tools.js";
 import {
   handleStats,
   handleRecent,
@@ -137,6 +137,32 @@ describe("viewer: /api/recent", () => {
     expect(plain.rows).toHaveLength(2);
   });
 
+  it("recent con layer=trait pagina y devuelve el total del ámbito", () => {
+    crystallize(db, { scope: "a", name: "uno", evidence_memory_ids: ["mem_uno"] });
+    crystallize(db, { scope: "a", name: "dos", evidence_memory_ids: ["mem_dos"] });
+    crystallize(db, { scope: "a", name: "tres", evidence_memory_ids: ["mem_tres"] });
+    crystallize(db, { scope: "b", name: "ajeno", evidence_memory_ids: ["mem_ajeno"] });
+
+    const read = (query: string) => {
+      const res = mockRes();
+      handleRecent(db, res as unknown as import("node:http").ServerResponse, urlFor(`/api/recent?${query}`));
+      return JSON.parse(res.body);
+    };
+
+    const page1 = read("layer=trait&scope=a&limit=2&offset=0");
+    expect(page1.rows).toHaveLength(2);
+    expect(page1.total).toBe(3);
+
+    const page2 = read("layer=trait&scope=a&limit=2&offset=2");
+    expect(page2.rows).toHaveLength(1);
+    expect(page2.total).toBe(3);
+
+    // Las dos páginas juntas traen los tres rasgos del ámbito, sin el de fuera.
+    const names = [...page1.rows, ...page2.rows].map((row: { text: string }) => row.text);
+    expect(new Set(names).size).toBe(3);
+    expect(names).not.toContain("ajeno");
+  });
+
   it("rejects invalid layer", () => {
     const res = mockRes();
     handleRecent(
@@ -159,6 +185,32 @@ describe("viewer: /api/search", () => {
     );
     const j = JSON.parse(res.body);
     expect(j.hits.length).toBe(1);
+  });
+
+  it("marca el corte cuando hay más coincidencias que el tope y no cuando no lo hay", async () => {
+    capture(db, { scope: "x", body: "alpha uno" });
+    capture(db, { scope: "x", body: "alpha dos" });
+    capture(db, { scope: "x", body: "alpha tres" });
+
+    const read = async (query: string) => {
+      const res = mockRes();
+      await handleSearch(
+        db,
+        res as unknown as import("node:http").ServerResponse,
+        urlFor(`/api/search?${query}`),
+      );
+      return JSON.parse(res.body);
+    };
+
+    const cut = await read("q=alpha&limit=2");
+    expect(cut.hits).toHaveLength(2);
+    expect(cut.limit).toBe(2);
+    expect(cut.truncated).toBe(true);
+
+    const whole = await read("q=alpha&limit=10");
+    expect(whole.hits).toHaveLength(3);
+    expect(whole.limit).toBe(10);
+    expect(whole.truncated).toBe(false);
   });
 
   it("rejects empty query", async () => {

@@ -80,6 +80,13 @@ export interface SearchHit {
   via?: "semantic";
 }
 
+/** La respuesta de `/api/search`: el tope aplicado y si quedaron coincidencias fuera. */
+export interface SearchPage {
+  hits: SearchHit[];
+  limit: number;
+  truncated: boolean;
+}
+
 export interface MemoryDetail {
   memory: MemoryItem & { embedding: EmbeddingRecord | null };
   episodes: Array<EpisodeItem | Missing>;
@@ -230,11 +237,15 @@ export const api = {
       { layer: "episode", pending: "1", scope, limit: String(PAGE_SIZE), offset: String(offset) },
       signal,
     ),
-  traits: (scope: string | undefined, signal?: AbortSignal) =>
-    get<{ rows: TraitItem[] }>("recent", { layer: "trait", scope, limit: "200" }, signal),
+  traits: (scope: string | undefined, offset: number, signal?: AbortSignal) =>
+    get<{ rows: TraitItem[]; total: number }>(
+      "recent",
+      { layer: "trait", scope, limit: String(PAGE_SIZE), offset: String(offset) },
+      signal,
+    ),
   // Los 50 mejores: es una lista por relevancia y la cola no aporta.
   search: (q: string, scope: string | undefined, signal?: AbortSignal) =>
-    get<{ hits: SearchHit[] }>("search", { q, scope, limit: "50" }, signal),
+    get<SearchPage>("search", { q, scope, limit: "50" }, signal),
   graph: (scope: string | undefined, episodes: boolean, signal?: AbortSignal) =>
     get<GraphData>("graph", { scope, related: "1", episodes: episodes ? "1" : undefined }, signal),
   memory: (id: string, signal?: AbortSignal) => get<MemoryDetail>(`memory/${encodeURIComponent(id)}`, {}, signal),

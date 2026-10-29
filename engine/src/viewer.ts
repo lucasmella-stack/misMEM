@@ -4,8 +4,8 @@
  * Endpoints (todos detrás de la misma BasicAuth de /mcp):
  *   GET /viewer            → la interfaz compilada (ui/ → dist/ui), ver viewer-static.ts
  *   GET /api/stats         → totales por capa + top scopes
- *   GET /api/recent        → últimas N filas de una capa (?layer=&scope=&limit=)
- *   GET /api/search        → recall híbrido read-only (?q=&scope=&limit=)
+ *   GET /api/recent        → últimas N filas de una capa (?layer=&scope=&limit=&offset=)
+ *   GET /api/search        → recall híbrido read-only (?q=&scope=&limit=), con `truncated`
  *   El resto de GET /api/* (scopes, memories, memory/:id, trait/:id, graph) vive en viewer-api.ts.
  *
  * Nada de acá escribe: las acciones (editar, desconsolidar, los dos forget en dos
@@ -122,14 +122,22 @@ export function handleRecent(db: DB, res: ServerResponse, url: URL): void {
       )
       .all({ scope, limit });
   } else {
+    const offset = parseOffset(url.searchParams.get("offset"));
+    // The total uses the same filter as the rows: the client pages with it, which is how it
+    // tells "nothing else" from "on the next page".
+    const { n: total } = db
+      .prepare("SELECT COUNT(*) AS n FROM traits WHERE (@scope IS NULL OR scope = @scope)")
+      .get({ scope }) as { n: number };
     rows = db
       .prepare(
         `SELECT id, scope, name AS text, strength, polarity, created_at, updated_at
          FROM traits
          WHERE (@scope IS NULL OR scope = @scope)
-         ORDER BY strength DESC, updated_at DESC LIMIT @limit`,
+         ORDER BY strength DESC, updated_at DESC LIMIT @limit OFFSET @offset`,
       )
-      .all({ scope, limit });
+      .all({ scope, limit, offset });
+    json(res, 200, { layer, scope, rows, total });
+    return;
   }
   json(res, 200, { layer, scope, rows });
 }
@@ -155,7 +163,8 @@ export async function handleSearch(
       embedFn,
       { reinforce: false, embeddingModel },
     );
-    json(res, 200, out);
+    // A full page cannot tell "exactly these" from "more below", so the client says it may be cut.
+    json(res, 200, { ...out, limit, truncated: out.hits.length >= limit });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     json(res, 500, { error: message });
