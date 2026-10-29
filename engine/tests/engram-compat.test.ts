@@ -79,6 +79,26 @@ describe("engram-compat: mem_search → recall", () => {
     };
     expect(out.hits.length).toBe(1);
   });
+
+  it("keeps the hits-only shape when it finds something", async () => {
+    capture(db, { scope: "x", body: "alpha beta gamma" });
+    const out = await dispatchEngramTool(db, "mem_search", { query: "alpha" });
+
+    expect(Object.keys(out as Record<string, unknown>)).toEqual(["hits"]);
+  });
+
+  it("adds the scopes that hold content and the hint when it finds nothing", async () => {
+    capture(db, { scope: "p/a", body: "alpha beta gamma" });
+
+    const out = (await dispatchEngramTool(db, "mem_search", {
+      query: "alcachofa",
+      scope: "p/typo",
+    })) as { hits: unknown[]; scopes: string[]; hint?: string };
+
+    expect(out.hits).toEqual([]);
+    expect(out.scopes).toEqual(["p/a"]);
+    expect(out.hint).toContain("p/typo");
+  });
 });
 
 describe("engram-compat: mem_context", () => {

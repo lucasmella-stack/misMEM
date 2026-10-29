@@ -11,7 +11,7 @@ import {
 import type { Database as DB } from "better-sqlite3";
 import { ZodError } from "zod";
 import { capture, recallHybrid, consolidate, crystallize, forget, reinforce } from "./tools.js";
-import { recallForModel, recallMissForModel } from "./recall-view.js";
+import { recallForModel, requestedScope, searchResponse } from "./recall-view.js";
 import { MCP_INSTRUCTIONS } from "./mcp-guide.js";
 import { embedPendingMemories } from "./embeddings/store.js";
 import {
@@ -143,20 +143,15 @@ const { version } = createRequire(import.meta.url)("../package.json") as {
   version: string;
 };
 
-/** The scope of a recall call as it arrived, before validation: the miss view only echoes it. */
-function requestedScope(args: Record<string, unknown> | undefined): string | undefined {
-  const scope = args?.scope;
-  return typeof scope === "string" && scope !== "" ? scope : undefined;
-}
-
 /** What a Zod issue expected, in the words a model reads. */
 function expectedType(expected: string): string {
   switch (expected) {
     case "string":
       return "un texto";
     case "number":
-    case "int":
       return "un número";
+    case "int":
+      return "un número entero";
     case "boolean":
       return "true o false";
     case "array":
@@ -180,12 +175,18 @@ function describeIssue(issue: ZodError["issues"][number]): string {
           ? "no puede estar vacío"
           : `no puede tener menos de ${issue.minimum} caracteres`;
       if (issue.origin === "array" || issue.origin === "set") return "no puede estar vacía";
-      return `no puede ser menor que ${issue.minimum}`;
+      // Zod reports a `.positive()` bound as exclusive: saying "menor que 0" about 0 is false
+      // and sends the model back with the same value, so the wording has to match the bound.
+      return issue.inclusive
+        ? `no puede ser menor que ${issue.minimum}`
+        : `tiene que ser mayor que ${issue.minimum}`;
     case "too_big":
       if (issue.origin === "string") return `no puede pasar de ${issue.maximum} caracteres`;
       if (issue.origin === "array" || issue.origin === "set")
         return `no puede tener más de ${issue.maximum} elementos`;
-      return `no puede ser mayor que ${issue.maximum}`;
+      return issue.inclusive
+        ? `no puede ser mayor que ${issue.maximum}`
+        : `tiene que ser menor que ${issue.maximum}`;
     case "invalid_value":
       return `debe ser uno de: ${issue.values.join(", ")}`;
     default:
@@ -227,14 +228,10 @@ export function createServer(db: DB): Server {
           break;
         case "recall": {
           const { hits } = await recallHybrid(db, args);
-          const view = recallForModel(db, hits);
           // A miss is where a model gives up: say which scopes do hold something, and
           // whether the scope it asked for is the problem. A search that found something
           // keeps its old shape; the model can retry from the hits.
-          result =
-            view.length === 0
-              ? { hits: view, ...recallMissForModel(db, requestedScope(args)) }
-              : { hits: view };
+          result = searchResponse(db, recallForModel(db, hits), requestedScope(args));
           break;
         }
         case "consolidate": {

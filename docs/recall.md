@@ -59,8 +59,8 @@ Una búsqueda con resultados responde `{ hits }`: los traits primero, después l
 episodes, cada uno con su capa, su ámbito, la fecha UTC y `truncated` cuando un texto se recortó (2.000
 caracteres de `text`, 1.200 de `details`). Un hit `truncated` se lee entero con `mem_get_observation` y su id.
 
-Una búsqueda sin resultados añade dos campos, porque un ámbito mal escrito y una memoria vacía se parecen
-demasiado:
+Una búsqueda sin resultados añade dos campos, tanto en `recall` como en el alias `mem_search`,
+porque un ámbito mal escrito y una memoria vacía se parecen demasiado:
 
 - `scopes`: los ámbitos que sí tienen memorias, rasgos o episodios pendientes, de más a menos contenido y
   como mucho 20. Los marcadores de ruido no cuentan.

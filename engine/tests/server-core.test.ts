@@ -225,6 +225,14 @@ describe("MCP guidance", () => {
     expect(instructions).toContain("mem_get_observation");
   });
 
+  it("tells the model that truncated means a clipped field and that mem_search shares the miss view", async () => {
+    const instructions = client.getInstructions() ?? "";
+
+    expect(instructions).toContain("has a field clipped");
+    expect(instructions).toContain("A recall or mem_search with no hits adds scopes");
+    expect(instructions).toContain("hint says it matched nothing");
+  });
+
   it("tells the model when to use each canonical tool", async () => {
     const { tools } = await client.listTools();
 
@@ -284,5 +292,45 @@ describe("MCP guidance", () => {
 
     expect(r.isError).toBe(true);
     expect(r.text).toBe("Error en recall: limit: se esperaba un número");
+  });
+
+  it("reports a non-integer number as such, not as a number", async () => {
+    const r = await call("recall", { query: "x", limit: 2.5 });
+
+    expect(r.isError).toBe(true);
+    expect(r.text).toBe("Error en recall: limit: se esperaba un número entero");
+  });
+
+  it("reports a value below an exclusive minimum as greater than it", async () => {
+    const r = await call("recall", { query: "x", limit: 0 });
+
+    expect(r.isError).toBe(true);
+    expect(r.text).toBe("Error en recall: limit: tiene que ser mayor que 0");
+  });
+
+  it("reports a value above an inclusive maximum as a cap, not as a range", async () => {
+    const r = await call("capture", { scope: "x".repeat(200), body: "a" });
+
+    expect(r.isError).toBe(true);
+    expect(r.text).toBe("Error en capture: scope: no puede pasar de 128 caracteres");
+  });
+
+  it("reports a value outside an enum as one of its choices", async () => {
+    const r = await call("crystallize", {
+      scope: "p/a",
+      name: "prefers small PRs",
+      evidence_memory_ids: ["m1"],
+      polarity: "grey",
+    });
+
+    expect(r.isError).toBe(true);
+    expect(r.text).toBe("Error en crystallize: polarity: debe ser uno de: shadow, light, neutral");
+  });
+
+  it("reports missing arguments as a problem with the arguments themselves", async () => {
+    const res = (await client.callTool({ name: "capture" })) as ToolResult;
+
+    expect(res.isError).toBe(true);
+    expect(res.content[0]?.text).toBe("Error en capture: argumentos: se esperaba un objeto");
   });
 });

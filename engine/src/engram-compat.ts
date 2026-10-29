@@ -21,6 +21,7 @@
  */
 import type { Database as DB } from "better-sqlite3";
 import { capture, pendingEpisodes, recallHybrid } from "./tools.js";
+import { requestedScope, searchResponse } from "./recall-view.js";
 import type { EmbedFn } from "./embeddings/provider.js";
 
 export interface EngramToolDef {
@@ -217,7 +218,7 @@ export function dispatchEngramTool(
     case "mem_search": {
       return recallHybrid(db, args, searchOptions.embedFn, {
         embeddingModel: searchOptions.embeddingModel,
-      });
+      }).then((result) => searchResponse(db, result.hits, requestedScope(args)));
     }
 
     case "mem_context": {

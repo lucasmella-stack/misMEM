@@ -12,9 +12,9 @@ A scope namespaces everything: "<person or team>/<project>". Use the same scope 
 
 capture when the user states a decision and why, when you find the root cause of a failure, or when the user corrects you. One idea per call. Never capture secrets or third-party data.
 
-recall before asking the user something that may already be stored. Pass the scope when you know it. A hit with truncated true holds only a prefix: read it in full with mem_get_observation and its id.
+recall before asking the user something that may already be stored. Pass the scope when you know it. A hit with truncated true has a field clipped: read it in full with mem_get_observation and its id.
 
-A recall with no hits lists in scopes the scopes that do hold content. If one was asked for and the hint names it, do not conclude the memory is empty: retry another scope or without one.
+A recall or mem_search with no hits adds scopes: the scopes that do hold content. When a scope was asked for, hint says it matched nothing: retry without it or with another.
 
 reinforce after answering, with the ids the answer actually relied on, not every hit.
 

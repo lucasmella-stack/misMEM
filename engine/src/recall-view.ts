@@ -144,3 +144,27 @@ export function recallMissForModel(db: DB, scope?: string): RecallMissView {
     hint: `El ámbito "${scope}" no tiene nada que coincida. Repite la búsqueda sin scope o usa uno de los que aparecen en scopes.`,
   };
 }
+
+/**
+ * The scope of a search as it arrived, before validation: the miss view only echoes it.
+ * Shared by `recall` and `mem_search` so both read it the same way.
+ */
+export function requestedScope(args: unknown): string | undefined {
+  if (args === null || typeof args !== "object") return undefined;
+  const scope = (args as Record<string, unknown>).scope;
+  return typeof scope === "string" && scope !== "" ? scope : undefined;
+}
+
+/**
+ * What a search answers: the hits, and on a miss the scopes that do hold content plus the
+ * hint about the requested scope. `recall` and `mem_search` share it, so a client that still
+ * uses the Engram alias gets the same way out of an empty answer as one on the canonical tool.
+ */
+export function searchResponse<T>(
+  db: DB,
+  hits: T[],
+  scope: string | undefined,
+): { hits: T[]; scopes?: string[]; hint?: string } {
+  if (hits.length > 0) return { hits };
+  return { hits, ...recallMissForModel(db, scope) };
+}
