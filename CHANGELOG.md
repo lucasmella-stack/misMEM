@@ -2,6 +2,8 @@
 
 ## Sin publicar
 
+- La respuesta MCP de `recall` llega como el modelo la necesita: cada hit trae `date` legible en UTC, los `details` de una memoria, la `polarity` de un rasgo cuando no es neutra y `truncated` si el texto se recortó (2.000 caracteres de `text`, 1.200 de `details`), sin indentación y sin hits de 80.000 caracteres. Los alias `mem_*`, el visor y la API no cambian.
+
 ## 0.6.0 — 2026-10-29
 
 ### El olvido respeta `before_days` también al borrar memorias

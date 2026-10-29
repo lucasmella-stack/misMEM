@@ -10,6 +10,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Database as DB } from "better-sqlite3";
 import { capture, recallHybrid, consolidate, crystallize, forget, reinforce } from "./tools.js";
+import { recallForModel } from "./recall-view.js";
 import { embedPendingMemories } from "./embeddings/store.js";
 import {
   ENGRAM_TOOLS,
@@ -36,7 +37,7 @@ export const CANONICAL_TOOLS = [
   {
     name: "recall",
     description:
-      "Hybrid search: FTS5 across all layers plus semantic ranking for memories. Reinforces returned memories (Hebbian) unless MISMEM_REINFORCE_ON_RECALL=off.",
+      "Hybrid search: FTS5 across all layers plus semantic ranking for memories. Reinforces returned memories (Hebbian) unless MISMEM_REINFORCE_ON_RECALL=off. Each hit carries its layer, the UTC date (YYYY-MM-DD), the details of a memory, the polarity of a trait when it is not neutral, and truncated when a string was clipped to fit the reply.",
     inputSchema: {
       type: "object",
       required: ["query"],
@@ -158,9 +159,11 @@ export function createServer(db: DB): Server {
         case "capture":
           result = capture(db, args);
           break;
-        case "recall":
-          result = await recallHybrid(db, args);
+        case "recall": {
+          const { hits } = await recallHybrid(db, args);
+          result = { hits: recallForModel(db, hits) };
           break;
+        }
         case "consolidate": {
           result = consolidate(db, args);
           // Best-effort: si hay embedder local, la memoria nueva queda
@@ -189,7 +192,7 @@ export function createServer(db: DB): Server {
           throw new Error(`Herramienta desconocida: ${name}`);
       }
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(result) }],
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

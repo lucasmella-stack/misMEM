@@ -77,6 +77,32 @@ describe("MCP tool dispatch", () => {
     expect(JSON.stringify(r.hits[0])).toContain("zanahoria");
   });
 
+  it("recall answers with the model view, unindented", async () => {
+    const ep = await ok<{ id: string }>("capture", { scope: "p/a", body: "zanahoria growth schedule" });
+    await ok("consolidate", {
+      scope: "p/a",
+      gist: "zanahoria schedule",
+      details: "water weekly",
+      source_episode_ids: [ep.id],
+    });
+
+    const r = await call("recall", { query: "zanahoria" });
+    expect(r.isError, r.text).toBe(false);
+    expect(r.text).not.toContain("\n");
+
+    const parsed = JSON.parse(r.text) as {
+      hits: Array<{ layer: string; date?: string; created_at?: number; details?: string }>;
+    };
+    const memory = parsed.hits.find((h) => h.layer === "memory");
+    expect(memory?.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(memory?.created_at).toBeTypeOf("number");
+    expect(memory?.details).toBe("water weekly");
+
+    const captured = await call("capture", { scope: "p/a", body: "another note" });
+    expect(captured.isError).toBe(false);
+    expect(captured.text).not.toContain("\n");
+  });
+
   it("consolidate creates the memory and marks its source episodes", async () => {
     const ep = await ok<{ id: string }>("capture", { scope: "p/a", body: "raw note" });
     const r = await ok<{ memory_id: string; consolidated: number }>("consolidate", {
