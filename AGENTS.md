@@ -29,6 +29,7 @@ la interfaz es React, Vite y Tailwind. Gestor de paquetes: pnpm, nunca npm.
 | `engine/src/noise.ts`, `engine/src/terms.ts`, `engine/src/hash.ts` | Marcadores de ruido, tokenización compartida por la búsqueda y la medición de uso, hash del contenido (dedup de `capture`) | cambia uno de esos tres criterios |
 | `engine/src/relations.ts` | Lecturas que comparten el visor y la exportación a Obsidian (memorias parecidas por vector) | cambia cómo se relacionan las memorias |
 | `engine/src/server-core.ts` | Descriptores de las herramientas MCP y su despacho; lo usan `server.ts` (stdio) y `server-http.ts` | se añade o cambia una herramienta |
+| `engine/src/recall-view.ts`, `engine/src/mcp-guide.ts` | Lo que el modelo lee por MCP: la forma de cada hit de `recall` (fecha, detalles, polaridad, topes, ámbitos ante un vacío) y las `instructions` del servidor | cambia lo que el modelo recibe |
 | `engine/src/engram-compat.ts` | Los alias `mem_*` y su mapeo a las seis herramientas | cambia la compatibilidad con Engram |
 | `engine/src/server-http.ts` | Servidor HTTP: `/mcp`, `/healthz`, `/viewer` y `/api/*` | se añade una ruta; la lógica va a otro módulo |
 | `engine/src/http-guard.ts`, `engine/src/http-host.ts`, `engine/src/http-body.ts` | Dirección de enlace y BasicAuth, guarda de `Host`, lectura del cuerpo con tope | cambia qué petición se atiende |

@@ -63,6 +63,7 @@ quedan fuera (`engine/src/noise.ts`).
 | Pieza | Qué es |
 |---|---|
 | `engine/src/server.ts` | Servidor MCP por stdio, para uso local |
+| `engine/src/server-core.ts`, `mcp-guide.ts` | Las seis herramientas MCP y su despacho, lo que el servidor anuncia al inicializar (`instructions` y una frase "Use when" por herramienta) y los errores de validación como una línea por campo |
 | `engine/src/server-http.ts` | Streamable HTTP para despliegue remoto: BasicAuth opcional y `/healthz`. Ver [DEPLOY.md](../DEPLOY.md) |
 | `engine/ui/` | La interfaz (React y Vite, compilada a `dist/ui/`) que `server-http` sirve en `/viewer`: memorias por saliencia de hoy, rasgos, lo pendiente y de dónde sale cada recuerdo. `pnpm dev:ui` la levanta en desarrollo contra un servidor en `:3200` |
 | `engine/src/viewer.ts`, `viewer-api.ts` | Su API de sólo lectura: `/api/{stats,recent,search,scopes,memories,graph}` y `/api/{memory,trait}/:id`. La saliencia que devuelven es la efectiva, con el decay aplicado a hoy, la misma que usa el recall |

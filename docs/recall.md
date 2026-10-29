@@ -53,6 +53,22 @@ backfill (`mismem-embed`); cambiar un prefijo no se detecta y exige `mismem-embe
 variables, con sus defaults, están en
 [DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única).
 
+## Qué devuelve
+
+Una búsqueda con resultados responde `{ hits }`: los traits primero, después las memories y después los
+episodes, cada uno con su capa, su ámbito, la fecha UTC y `truncated` cuando un texto se recortó (2.000
+caracteres de `text`, 1.200 de `details`). Un hit `truncated` se lee entero con `mem_get_observation` y su id.
+
+Una búsqueda sin resultados añade dos campos, tanto en `recall` como en el alias `mem_search`,
+porque un ámbito mal escrito y una memoria vacía se parecen demasiado:
+
+- `scopes`: los ámbitos que sí tienen memorias, rasgos o episodios pendientes, de más a menos contenido y
+  como mucho 20. Los marcadores de ruido no cuentan.
+- `hint`: sólo cuando se pidió un `scope`. Dice que ese ámbito no tiene nada que coincida, y que se repita la
+  búsqueda sin él o con otro de los de `scopes`.
+
+Con resultados la respuesta no cambia: no lleva `scopes` ni `hint`.
+
 ## Medirlo
 
 `mismem-bench` informa la posición del acierto (MRR, 1ª, entre las 3), los recuerdos devueltos por

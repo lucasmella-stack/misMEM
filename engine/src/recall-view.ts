@@ -1,5 +1,6 @@
 import type { Database as DB } from "better-sqlite3";
 import type { RecallHit } from "./schema.js";
+import { excludeNoiseSql } from "./noise.js";
 
 /**
  * Cap on the `text` of a hit, in code points. One episode can hold tens of thousands of
@@ -102,4 +103,68 @@ export function recallForModel(db: DB, hits: readonly RecallHit[]): RecallHitVie
     };
     return text.truncated || details?.truncated ? { ...view, truncated: true } : view;
   });
+}
+
+/** Cap on the scopes listed by a recall with no hits: enough to spot a typo, not a catalogue. */
+const MAX_SCOPES = 20;
+
+/** What `recall` adds when it found nothing: which scopes do hold something. */
+export interface RecallMissView {
+  /** Scopes with memories, traits or pending episodes, most populated first. */
+  scopes: string[];
+  /** Present only when a scope was asked for: the miss belongs to that scope, not to the search. */
+  hint?: string;
+}
+
+/**
+ * A recall that found nothing is usually a scope written from memory, not an empty memory: a
+ * misspelled scope and a scope nobody used look the same. The miss view lists the scopes that
+ * do hold something so the model can retry instead of telling the user there is nothing.
+ *
+ * One query over the three layers, because this path already costs the model a turn. Noise
+ * markers are excluded: they are bookkeeping for `forget`, not content.
+ */
+export function recallMissForModel(db: DB, scope?: string): RecallMissView {
+  const rows = db
+    .prepare(
+      `SELECT scope, SUM(n) AS n FROM (
+         SELECT scope, COUNT(*) AS n FROM memories m WHERE ${excludeNoiseSql("m")} GROUP BY scope
+         UNION ALL
+         SELECT scope, COUNT(*) AS n FROM traits GROUP BY scope
+         UNION ALL
+         SELECT scope, COUNT(*) AS n FROM episodes WHERE consolidated_into IS NULL GROUP BY scope
+       ) GROUP BY scope ORDER BY n DESC, scope ASC LIMIT ${MAX_SCOPES}`,
+    )
+    .all() as Array<{ scope: string }>;
+
+  const scopes = rows.map((row) => row.scope);
+  if (scope === undefined) return { scopes };
+  return {
+    scopes,
+    hint: `El ámbito "${scope}" no tiene nada que coincida. Repite la búsqueda sin scope o usa uno de los que aparecen en scopes.`,
+  };
+}
+
+/**
+ * The scope of a search as it arrived, before validation: the miss view only echoes it.
+ * Shared by `recall` and `mem_search` so both read it the same way.
+ */
+export function requestedScope(args: unknown): string | undefined {
+  if (args === null || typeof args !== "object") return undefined;
+  const scope = (args as Record<string, unknown>).scope;
+  return typeof scope === "string" && scope !== "" ? scope : undefined;
+}
+
+/**
+ * What a search answers: the hits, and on a miss the scopes that do hold content plus the
+ * hint about the requested scope. `recall` and `mem_search` share it, so a client that still
+ * uses the Engram alias gets the same way out of an empty answer as one on the canonical tool.
+ */
+export function searchResponse<T>(
+  db: DB,
+  hits: T[],
+  scope: string | undefined,
+): { hits: T[]; scopes?: string[]; hint?: string } {
+  if (hits.length > 0) return { hits };
+  return { hits, ...recallMissForModel(db, scope) };
 }
