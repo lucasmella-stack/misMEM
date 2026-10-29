@@ -212,3 +212,77 @@ describe("MCP tool dispatch", () => {
     expect(count("SELECT COUNT(*) AS n FROM episodes")).toBe(0);
   });
 });
+
+describe("MCP guidance", () => {
+  it("announces usage instructions on initialize, within the cap", async () => {
+    const instructions = client.getInstructions();
+
+    expect(instructions).toBeTruthy();
+    expect((instructions ?? "").length).toBeLessThanOrEqual(1500);
+    for (const term of ["episodes", "memories", "traits", "scope", "reinforce", "truncated"]) {
+      expect(instructions).toContain(term);
+    }
+    expect(instructions).toContain("mem_get_observation");
+  });
+
+  it("tells the model when to use each canonical tool", async () => {
+    const { tools } = await client.listTools();
+
+    for (const name of ["capture", "recall", "reinforce", "consolidate", "crystallize", "forget"]) {
+      expect(tools.find((tool) => tool.name === name)?.description).toMatch(/Use when /);
+    }
+  });
+
+  it("recall without hits names the scopes that do hold something, without noise", async () => {
+    await ok("capture", { scope: "p/a", body: "zanahoria growth schedule" });
+    await ok("capture", { scope: "p/b", body: "other note" });
+    db.prepare(
+      `INSERT INTO memories (id, scope, gist, source_episode_ids, salience, created_at)
+       VALUES ('n1', 'p/noise', '[noise] dropped', '[]', 1, 1)`,
+    ).run();
+
+    const r = await ok<{ hits: unknown[]; scopes: string[] }>("recall", { query: "alcachofa" });
+
+    expect(r.hits).toEqual([]);
+    expect(r.scopes).toEqual(["p/a", "p/b"]);
+  });
+
+  it("recall says the scope it was asked for has nothing that matches", async () => {
+    await ok("capture", { scope: "p/a", body: "zanahoria growth schedule" });
+
+    const r = await ok<{ scopes: string[]; hint?: string }>("recall", {
+      query: "alcachofa",
+      scope: "p/typo",
+    });
+
+    expect(r.scopes).toEqual(["p/a"]);
+    expect(r.hint).toContain("p/typo");
+    expect(r.hint).toMatch(/no tiene/);
+  });
+
+  it("recall with hits answers exactly as before, without scopes or hint", async () => {
+    await ok("capture", { scope: "p/a", body: "zanahoria growth schedule" });
+
+    const r = await ok<Record<string, unknown>>("recall", { query: "zanahoria" });
+
+    expect(Object.keys(r)).toEqual(["hits"]);
+  });
+
+  it("reports a missing field as one readable line per problem, not the Zod JSON", async () => {
+    const r = await call("capture", {});
+
+    expect(r.isError).toBe(true);
+    const lines = r.text.split("\n");
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toBe("Error en capture: scope: se esperaba un texto");
+    expect(lines[1]).toBe("Error en capture: body: se esperaba un texto");
+    expect(r.text).not.toContain("{");
+  });
+
+  it("reports a wrong argument type with the field and what was expected", async () => {
+    const r = await call("recall", { query: "x", limit: "ten" });
+
+    expect(r.isError).toBe(true);
+    expect(r.text).toBe("Error en recall: limit: se esperaba un número");
+  });
+});

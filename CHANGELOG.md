@@ -2,6 +2,7 @@
 
 ## Sin publicar
 
+- El servidor MCP le dice al modelo cuándo usar cada herramienta y qué hacer cuando algo falla. Al inicializar anuncia unas `instructions` de menos de 1.500 caracteres con las tres capas, el formato del ámbito (`<persona o equipo>/<proyecto>`, el mismo al guardar y al buscar), cuándo capturar (una decisión con su porqué, la causa raíz de un fallo, una corrección del usuario, una idea por llamada, nunca secretos ni datos de terceros), buscar antes de preguntar al usuario algo que quizá ya esté guardado, reforzar con los ids que de verdad se usaron y leer entero con `mem_get_observation` un hit `truncated`. Las seis descripciones dicen en una frase "Use when"; un `recall` sin resultados añade `scopes` (los ámbitos que tienen contenido, 20 como mucho) y, si se pidió un `scope`, un `hint` que lo nombra; y un `ZodError` llega como una línea por campo (`Error en capture: body: se esperaba un texto`) en vez del JSON de Zod.
 - La respuesta MCP de `recall` llega como el modelo la necesita: cada hit trae `date` legible en UTC, los `details` de una memoria, la `polarity` de un rasgo cuando no es neutra y `truncated` si el texto se recortó (2.000 caracteres de `text`, 1.200 de `details`), sin indentación y sin hits de 80.000 caracteres. Los alias `mem_*`, el visor y la API no cambian.
 
 ## 0.6.0 — 2026-10-29
