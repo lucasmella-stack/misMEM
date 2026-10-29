@@ -2,6 +2,8 @@
 
 ## Sin publicar
 
+- Un vector inválido del servidor de embeddings (`NaN`, `Infinity`, norma cero o dimensiones mezcladas) ya no deja una memoria invisible para siempre: se valida y normaliza a norma 1 al entrar, un lote inválido cuenta como fallido en el backfill y la consulta degrada a búsqueda por palabras (#155).
+
 ## 0.6.0 — 2026-10-29
 
 ### El olvido respeta `before_days` también al borrar memorias

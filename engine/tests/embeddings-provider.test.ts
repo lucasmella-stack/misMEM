@@ -158,6 +158,27 @@ describe("embedTexts con un servidor compatible con OpenAI", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("boom", { status: 500 })));
     expect(await embedTexts(["a"], loadEmbeddingConfig(), "query")).toBeNull();
   });
+
+  it("normaliza lo que devuelve el servidor", async () => {
+    setEnv(GEMMA_ENV);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(openAiResponse([[3, 4]])));
+
+    const vecs = await embedTexts(["a"], loadEmbeddingConfig(), "query");
+
+    expect(vecs?.[0]?.[0]).toBeCloseTo(0.6);
+    expect(vecs?.[0]?.[1]).toBeCloseTo(0.8);
+  });
+
+  it.each([
+    { label: "norma cero", vector: [0, 0] },
+    // 1e39 desborda Float32Array y llega como Infinity: JSON no puede llevar NaN.
+    { label: "un componente no finito", vector: [1e39, 1] },
+  ])("un lote con $label es null, igual que un servidor caído", async ({ vector }) => {
+    setEnv(GEMMA_ENV);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(openAiResponse([vector])));
+
+    expect(await embedTexts(["a"], loadEmbeddingConfig(), "query")).toBeNull();
+  });
 });
 
 describe("Ollama no cambia", () => {

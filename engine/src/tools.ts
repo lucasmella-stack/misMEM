@@ -14,6 +14,7 @@ import { registerTurn } from "./connectome.js";
 import { CANDIDATE_POOL_LIMIT, fuseMemories, hasComparableVectors, lexicalCandidates } from "./search.js";
 import { embedTexts, loadEmbeddingConfig, type EmbedFn } from "./embeddings/provider.js";
 import { semanticSearchMemories } from "./embeddings/store.js";
+import { checkedUnitVectors } from "./embeddings/vector.js";
 import {
   decayMemories,
   effectiveSalience,
@@ -219,7 +220,9 @@ export async function recallHybrid(
     embedFn ?? ((texts: string[]) => embedTexts(texts, cfg, "query"));
 
   const vecs = await actualEmbedFn([input.query]);
-  const queryVec = vecs?.[0];
+  // The query vector goes through the same check as a stored one: an injected embedFn or a
+  // broken provider must degrade to lexical search, not carry NaN into the cosine.
+  const queryVec = checkedUnitVectors(vecs ?? [])?.[0];
   const semanticModel = options.embeddingModel ?? (embedFn ? undefined : cfg.model);
   const semantic = queryVec
     ? semanticSearchMemories(db, queryVec, {

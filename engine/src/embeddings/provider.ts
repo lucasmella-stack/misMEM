@@ -7,6 +7,7 @@
  */
 
 import { envPositiveNumber } from "../env.js";
+import { checkedUnitVectors } from "./vector.js";
 
 type EmbeddingProvider = "ollama" | "openai";
 export type EmbedKind = "query" | "document";
@@ -93,7 +94,9 @@ export async function embedTexts(
   try {
     const vectors = await requestVectors(texts.map((t) => prefix + t), cfg);
     if (!vectors || vectors.length !== texts.length) return null;
-    return vectors.map((e) => Float32Array.from(e));
+    // A poisoned batch is a failed batch, like a server that does not answer: storing a
+    // NaN vector would drop that memory from search with no warning at all.
+    return checkedUnitVectors(vectors);
   } catch {
     return null;
   }

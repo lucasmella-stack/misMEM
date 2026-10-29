@@ -173,6 +173,37 @@ describe("embedPendingMemories", () => {
     expect(stored.model).toBe("modelo-a");
   });
 
+  it.each([
+    { label: "NaN", batch: [[1, 0, 0], [Number.NaN, 0, 0]] },
+    { label: "Infinity", batch: [[1, 0, 0], [Number.POSITIVE_INFINITY, 0, 0]] },
+    { label: "norma cero", batch: [[1, 0, 0], [0, 0, 0]] },
+    { label: "dimensiones mezcladas", batch: [[1, 0, 0], [1, 0]] },
+  ])("un lote con $label no escribe nada y cuenta como fallido", async ({ batch }) => {
+    makeMemory("vida", "uno");
+    makeMemory("vida", "dos");
+    const poisoned: EmbedFn = async () => batch.map((v) => Float32Array.from(v));
+
+    const r = await embedPendingMemories(db, { embedFn: poisoned, model: "fake" });
+
+    expect(r).toMatchObject({ pending: 2, embedded: 0, failed: 2 });
+    const stored = db.prepare("SELECT COUNT(*) AS n FROM memory_embeddings").get() as { n: number };
+    expect(stored.n).toBe(0);
+  });
+
+  it("guarda con norma 1 un vector válido que llega sin normalizar", async () => {
+    const memoryId = makeMemory("vida", "cashflow del mes");
+    const unnormalized: EmbedFn = async () => [new Float32Array([3, 4, 0])];
+
+    await embedPendingMemories(db, { embedFn: unnormalized, model: "fake" });
+
+    const row = db
+      .prepare("SELECT vec FROM memory_embeddings WHERE memory_id = ?")
+      .get(memoryId) as { vec: Buffer };
+    const stored = new Float32Array(row.vec.buffer, row.vec.byteOffset, row.vec.byteLength / 4);
+    expect(Math.hypot(...stored)).toBeCloseTo(1);
+    expect(Array.from(stored).map((v) => Number(v.toFixed(3)))).toEqual([0.6, 0.8, 0]);
+  });
+
   it("permite reindexar explícitamente el mismo modelo con --force", async () => {
     makeMemory("vida", "cashflow del mes");
     await embedPendingMemories(db, {
@@ -248,6 +279,21 @@ describe("recallHybrid", () => {
       { reinforce: false, embeddingModel: "modelo-b" },
     );
     expect(hybrid.hits).toHaveLength(0);
+  });
+
+  it("una consulta con vector inválido degrada a léxico sin lanzar", async () => {
+    makeMemory("vida", "cashflow apretado");
+    await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+    // Sólo el rescate léxico lo encuentra: es la prueba de que la capa semántica está apagada.
+    const rescatado = capture(db, { scope: "vida", body: "configurar servidor nginx" }).id;
+    const poisonedQuery: EmbedFn = async () => [new Float32Array([Number.NaN, 0, 0])];
+
+    const hybrid = await recallHybrid(db, { query: "configurando servidores nginx" }, poisonedQuery, {
+      reinforce: false,
+      embeddingModel: "fake",
+    });
+
+    expect(hybrid.hits.map((hit) => hit.id)).toContain(rescatado);
   });
 
   it("descarta dimensiones incompatibles sin comparar vectores", async () => {

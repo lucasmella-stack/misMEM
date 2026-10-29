@@ -9,7 +9,7 @@
 import type { Database as DB } from "better-sqlite3";
 import { excludeNoiseSql } from "../noise.js";
 import { embedTexts, loadEmbeddingConfig, type EmbedFn } from "./provider.js";
-import { cosine } from "./vector.js";
+import { cosine, checkedUnitVectors } from "./vector.js";
 
 const MAX_CONSECUTIVE_FAILURES = 2;
 
@@ -171,7 +171,10 @@ export async function embedPendingMemories(
     const texts = batch.map((m) =>
       (m.details ? `${m.gist}\n${m.details}` : m.gist).slice(0, maxChars),
     );
-    const vecs = await embedFn(texts);
+    const raw = await embedFn(texts);
+    // An injected embedFn reaches this point without going through `embedTexts`, so the
+    // vectors are validated here too: a bad batch counts as a failure, never as embedded.
+    const vecs = raw ? checkedUnitVectors(raw) : null;
     if (!vecs) {
       // Una tanda lenta o rara no condena al resto; dos seguidas, sí: el embedder está caído.
       consecutiveFailures++;
