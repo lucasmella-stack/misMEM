@@ -16,3 +16,11 @@ export function mergePages<T extends { id: string }>(pages: ReadonlyArray<Readon
   }
   return merged;
 }
+
+/**
+ * The offset of the next page, or nothing once the loaded rows reach the total. A short page
+ * still continues while rows remain, because the total is the authority on what is left.
+ */
+export function nextPageOffset(lastOffset: number, loaded: number, total: number): number | undefined {
+  return lastOffset + loaded < total ? lastOffset + loaded : undefined;
+}
