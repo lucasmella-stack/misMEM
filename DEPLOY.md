@@ -417,7 +417,7 @@ Sin default: si falta una de las dos (como variable o como parámetro del script
 | `MISMEM_OLLAMA_URL` | — | Nombre anterior de la URL; sólo vale para `ollama` |
 | `MISMEM_EMBEDDING_MODEL` | `nomic-embed-text` | Modelo. Cambiarlo reindexa solo |
 | `MISMEM_EMBEDDING_QUERY_PREFIX` / `_DOC_PREFIX` | vacío | Prefijos que algunos modelos piden para consulta y documento. Cambiarlos exige `mismem-embed --force` |
-| `MISMEM_EMBEDDING_MIN_SCORE` | `0.65` con `nomic-embed-text`; `0.5` con cualquier otro modelo | Parecido mínimo (coseno) para que una memoria cuente. Depende del modelo: 0,65 para EmbeddingGemma 2 (con 0,68 sale casi igual); `0` trae todo. Un valor explícito gana siempre al default |
+| `MISMEM_EMBEDDING_MIN_SCORE` | `0.65` con `nomic-embed-text` y con `embeddinggemma`; `0.5` con cualquier otro modelo | Parecido mínimo (coseno) para que una memoria cuente. Depende del modelo; `0` trae todo. Un valor explícito gana siempre al default |
 | `MISMEM_EMBEDDING_MAX_CHARS` | `4000` | Tope del texto de cada memoria al indexar. Cambiarlo exige `--force` |
 | `MISMEM_EMBEDDING_TIMEOUT_MS` | `3000` | Espera por consulta (el reindexado usa 120 s) |
 
