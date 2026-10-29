@@ -2,7 +2,7 @@
 
 ## Sin publicar
 
-- Un vector inválido del servidor de embeddings (`NaN`, `Infinity`, norma cero o dimensiones mezcladas) ya no deja una memoria invisible para siempre: se valida y normaliza a norma 1 al entrar, un lote inválido cuenta como fallido en el backfill y la consulta degrada a búsqueda por palabras (#155).
+- Un vector inválido del servidor de embeddings (`NaN`, `Infinity`, un componente nulo o no numérico, norma cero o dimensiones mezcladas) ya no deja una memoria invisible para siempre: se valida y normaliza a norma 1 al entrar, un vector malo sólo se pierde a sí mismo sin arrastrar a sus compañeros de lote, y el backfill reescribe los que una versión anterior guardó inválidos. Un lote con dimensiones mezcladas cuenta como fallido, y la consulta degrada a búsqueda por palabras cuando su propio vector no es válido (#155).
 
 ## 0.6.0 — 2026-10-29
 

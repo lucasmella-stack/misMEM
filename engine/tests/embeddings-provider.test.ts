@@ -138,7 +138,7 @@ describe("embedTexts con un servidor compatible con OpenAI", () => {
       model: "embeddinggemma-2",
       input: ["task: search result | query: a", "task: search result | query: b"],
     });
-    expect(vecs?.map((v) => Array.from(v))).toEqual([[1, 0], [0, 1]]);
+    expect(vecs?.map((v) => (v ? Array.from(v) : null))).toEqual([[1, 0], [0, 1]]);
   });
 
   it("a los documentos les pone el prefijo de documento", async () => {
@@ -173,11 +173,18 @@ describe("embedTexts con un servidor compatible con OpenAI", () => {
     { label: "norma cero", vector: [0, 0] },
     // 1e39 desborda Float32Array y llega como Infinity: JSON no puede llevar NaN.
     { label: "un componente no finito", vector: [1e39, 1] },
-  ])("un lote con $label es null, igual que un servidor caído", async ({ vector }) => {
+    { label: "un componente null", vector: [1, null, 2] },
+  ])("un vector con $label es null, pero no arrastra al resto del lote", async ({ vector }) => {
     setEnv(GEMMA_ENV);
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(openAiResponse([vector])));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(openAiResponse([[1, 0, 0], vector as unknown as number[]])),
+    );
 
-    expect(await embedTexts(["a"], loadEmbeddingConfig(), "query")).toBeNull();
+    const vecs = await embedTexts(["a", "b"], loadEmbeddingConfig(), "query");
+
+    expect(vecs?.[0]?.length).toBe(3);
+    expect(vecs?.[1]).toBeNull();
   });
 });
 

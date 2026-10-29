@@ -21,35 +21,55 @@ export function cosine(a: Float32Array, b: Float32Array): number {
 }
 
 /**
- * Copies of `vectors` scaled to unit L2 norm, or null when the batch cannot be trusted.
+ * Copy of `vector` scaled to unit L2 norm, or null when that one vector cannot be trusted.
  *
  * One NaN component makes every cosine NaN, and `NaN >= minScore` is false: that memory
  * vanishes from semantic search for good while the backfill already counts it as embedded.
- * The batch is validated as a whole because a half-written batch leaves the rest without a
- * vector for this run, so callers treat null exactly like an unreachable server.
+ * `Number.isFinite` catches a sparse hole, a JSON `null` and any non-numeric value before
+ * it is copied, because `copy[i] = null` would silently store a zero.
  */
-export function checkedUnitVectors(vectors: ArrayLike<number>[]): Float32Array[] | null {
-  const first = vectors[0];
-  if (!first || first.length === 0) return null;
-  const dims = first.length;
-  const unit: Float32Array[] = [];
-  for (const vector of vectors) {
-    if (vector.length !== dims) return null;
-    const copy = new Float32Array(dims);
-    let squares = 0;
-    for (let i = 0; i < dims; i++) {
-      const value = vector[i];
-      if (value === undefined) return null;
-      copy[i] = value;
-      // The sum is taken from the stored copy: 1e39 is finite as a double and becomes
-      // Infinity here, and any non-finite component leaves `squares` non-finite as well.
-      const stored = copy[i] ?? 0;
-      squares += stored * stored;
-    }
-    const norm = Math.sqrt(squares);
-    if (!Number.isFinite(norm) || norm === 0) return null;
-    for (let i = 0; i < dims; i++) copy[i] = (copy[i] ?? 0) / norm;
-    unit.push(copy);
+export function unitVector(vector: ArrayLike<number>): Float32Array | null {
+  const dims = vector.length;
+  if (dims === 0) return null;
+  const copy = new Float32Array(dims);
+  let squares = 0;
+  for (let i = 0; i < dims; i++) {
+    // `?? NaN` because a sparse hole arrives as undefined and null is not a number either.
+    const value = vector[i] ?? Number.NaN;
+    if (!Number.isFinite(value)) return null;
+    copy[i] = value;
+    // The sum is taken from the stored copy: 1e39 is finite as a double and becomes
+    // Infinity here, and any non-finite component leaves `squares` non-finite as well.
+    const stored = copy[i] ?? 0;
+    squares += stored * stored;
   }
-  return unit;
+  const norm = Math.sqrt(squares);
+  if (!Number.isFinite(norm) || norm === 0) return null;
+  for (let i = 0; i < dims; i++) copy[i] = (copy[i] ?? 0) / norm;
+  return copy;
+}
+
+/**
+ * Copies of `vectors` scaled to unit L2 norm, one entry per input, with `null` for each
+ * vector that cannot be trusted. Returns null only when the batch shape itself is impossible.
+ *
+ * A bad vector only loses itself: rejecting the whole batch would make its good neighbours
+ * pending forever, because the pending order is stable across runs and they would always
+ * land in the same poisoned batch. The batch is null for an empty list, a vector without
+ * dimensions, or valid vectors with different dimensions; callers treat that exactly like
+ * an unreachable server.
+ */
+export function checkedUnitVectors(
+  vectors: readonly (ArrayLike<number> | null | undefined)[],
+): Array<Float32Array | null> | null {
+  if (vectors.length === 0) return null;
+  if (vectors.some((vector) => vector !== null && vector !== undefined && vector.length === 0)) {
+    return null;
+  }
+  const unit = vectors.map((vector) => (vector ? unitVector(vector) : null));
+  const dims = new Set<number>();
+  vectors.forEach((vector, i) => {
+    if (vector && unit[i]) dims.add(vector.length);
+  });
+  return dims.size > 1 ? null : unit;
 }

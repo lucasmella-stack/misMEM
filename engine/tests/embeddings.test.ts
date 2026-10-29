@@ -6,6 +6,7 @@ import {
   saveMemoryEmbedding,
   semanticSearchMemories,
   embedPendingMemories,
+  getEmbeddingIndexStatus,
 } from "../src/embeddings/store.js";
 import type { EmbedFn } from "../src/embeddings/provider.js";
 
@@ -173,21 +174,110 @@ describe("embedPendingMemories", () => {
     expect(stored.model).toBe("modelo-a");
   });
 
+  // The batch used to be all-or-nothing. That pinned the healthy neighbour as pending forever,
+  // because the pending order is stable across runs and it always met the same poisoned batch.
   it.each([
-    { label: "NaN", batch: [[1, 0, 0], [Number.NaN, 0, 0]] },
-    { label: "Infinity", batch: [[1, 0, 0], [Number.POSITIVE_INFINITY, 0, 0]] },
-    { label: "norma cero", batch: [[1, 0, 0], [0, 0, 0]] },
-    { label: "dimensiones mezcladas", batch: [[1, 0, 0], [1, 0]] },
-  ])("un lote con $label no escribe nada y cuenta como fallido", async ({ batch }) => {
+    { label: "NaN", bad: [Number.NaN, 0, 0] },
+    { label: "Infinity", bad: [Number.POSITIVE_INFINITY, 0, 0] },
+    { label: "norma cero", bad: [0, 0, 0] },
+    { label: "desbordamiento a Float32", bad: [1e39, 0, 0] },
+  ])("un vector con $label se pierde solo y su compañero se guarda", async ({ bad }) => {
     makeMemory("vida", "uno");
     makeMemory("vida", "dos");
-    const poisoned: EmbedFn = async () => batch.map((v) => Float32Array.from(v));
+    const poisoned: EmbedFn = async () => [Float32Array.from([1, 0, 0]), Float32Array.from(bad)];
+
+    const r = await embedPendingMemories(db, { embedFn: poisoned, model: "fake" });
+
+    expect(r).toMatchObject({ pending: 2, embedded: 1, failed: 1 });
+    const stored = db.prepare("SELECT COUNT(*) AS n FROM memory_embeddings").get() as { n: number };
+    expect(stored.n).toBe(1);
+  });
+
+  it("un lote con dimensiones mezcladas no escribe nada y cuenta como fallido", async () => {
+    makeMemory("vida", "uno");
+    makeMemory("vida", "dos");
+    const poisoned: EmbedFn = async () => [
+      Float32Array.from([1, 0, 0]),
+      Float32Array.from([1, 0]),
+    ];
 
     const r = await embedPendingMemories(db, { embedFn: poisoned, model: "fake" });
 
     expect(r).toMatchObject({ pending: 2, embedded: 0, failed: 2 });
     const stored = db.prepare("SELECT COUNT(*) AS n FROM memory_embeddings").get() as { n: number };
     expect(stored.n).toBe(0);
+  });
+
+  it("un vector inválido no condena a su compañero de lote", async () => {
+    for (const gist of ["cashflow uno", "cashflow dos", "veneno", "cashflow cuatro"]) {
+      makeMemory("vida", gist);
+    }
+    const poisoned: EmbedFn = async (texts) =>
+      texts.map((text) =>
+        text.includes("veneno") ? new Float32Array([Number.NaN, 0, 0]) : fakeVec(text),
+      );
+
+    const r = await embedPendingMemories(db, { embedFn: poisoned, model: "fake", batchSize: 2 });
+
+    expect(r).toMatchObject({ pending: 4, embedded: 3, failed: 1 });
+    const stored = db.prepare("SELECT COUNT(*) AS n FROM memory_embeddings").get() as { n: number };
+    expect(stored.n).toBe(3);
+  });
+
+  it("un embedFn que devuelve menos vectores que textos es un lote nulo", async () => {
+    makeMemory("vida", "cashflow uno");
+    makeMemory("vida", "cashflow dos");
+    const short: EmbedFn = async (texts) => texts.slice(0, 1).map(fakeVec);
+
+    const r = await embedPendingMemories(db, { embedFn: short, model: "fake" });
+
+    expect(r).toMatchObject({ pending: 2, embedded: 0, failed: 2 });
+    const stored = db.prepare("SELECT COUNT(*) AS n FROM memory_embeddings").get() as { n: number };
+    expect(stored.n).toBe(0);
+  });
+
+  it("dos lotes de forma imposible seguidos abortan la corrida", async () => {
+    for (const gist of ["a", "b", "c", "d"]) makeMemory("vida", gist);
+    let calls = 0;
+    const short: EmbedFn = async () => {
+      calls++;
+      return [];
+    };
+
+    const r = await embedPendingMemories(db, { embedFn: short, model: "fake", batchSize: 1 });
+
+    expect(calls).toBe(2);
+    expect(r).toMatchObject({ embedded: 0, failed: 4 });
+  });
+
+  it("un vector inválido no cuenta como lote nulo para el aborto", async () => {
+    for (const gist of ["a", "b", "c"]) makeMemory("vida", gist);
+    let calls = 0;
+    const poisoned: EmbedFn = async () => {
+      calls++;
+      return [new Float32Array([Number.NaN, 0, 0])];
+    };
+
+    const r = await embedPendingMemories(db, { embedFn: poisoned, model: "fake", batchSize: 1 });
+
+    expect(calls).toBe(3);
+    expect(r).toMatchObject({ embedded: 0, failed: 3 });
+  });
+
+  it("el backfill cura una fila inválida que guardó una versión anterior", async () => {
+    const memoryId = makeMemory("vida", "cashflow del mes");
+    saveMemoryEmbedding(db, memoryId, "fake", new Float32Array([Number.NaN, 0, 0]));
+    expect(getEmbeddingIndexStatus(db, "fake").invalid).toBe(1);
+
+    const r = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+
+    expect(r).toMatchObject({ pending: 1, embedded: 1, reembedded: 1, failed: 0 });
+    expect(getEmbeddingIndexStatus(db, "fake").invalid).toBe(0);
+    const row = db
+      .prepare("SELECT vec FROM memory_embeddings WHERE memory_id = ?")
+      .get(memoryId) as { vec: Buffer };
+    const stored = new Float32Array(row.vec.buffer, row.vec.byteOffset, row.vec.byteLength / 4);
+    expect(Array.from(stored).every(Number.isFinite)).toBe(true);
   });
 
   it("guarda con norma 1 un vector válido que llega sin normalizar", async () => {

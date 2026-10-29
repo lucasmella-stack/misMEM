@@ -105,6 +105,30 @@ export interface BackfillStats {
 }
 
 /**
+ * True when a stored BLOB can still score: every component is finite and the norm is not zero.
+ * Rows written before validation existed can carry NaN, and `hasComparableVectors` ignores
+ * their content, so they would keep the lexical rescue off while matching nothing.
+ */
+function isValidStoredVector(vec: Buffer): boolean {
+  const values = new Float32Array(vec.buffer, vec.byteOffset, vec.byteLength / 4);
+  let squares = 0;
+  for (let i = 0; i < values.length; i++) {
+    const value = values[i] ?? 0;
+    if (!Number.isFinite(value)) return false;
+    squares += value * value;
+  }
+  return Number.isFinite(squares) && squares > 0;
+}
+
+/** Ids of the active model's rows that a previous version stored unusable. */
+function invalidEmbeddingIds(db: DB, model: string): string[] {
+  const rows = db
+    .prepare("SELECT memory_id, vec FROM memory_embeddings WHERE model = ?")
+    .all(model) as Array<{ memory_id: string; vec: Buffer }>;
+  return rows.filter((row) => !isValidStoredVector(row.vec)).map((row) => row.memory_id);
+}
+
+/**
  * Embebe memories sin vector o con un modelo obsoleto (idempotente).
  * Cubre cualquier write path pendiente y permite reindexado explícito.
  */
@@ -138,12 +162,20 @@ export async function embedPendingMemories(
     .filter((value): value is string => value !== null)
     .join(" OR ");
 
+  // Rows the previous version saved with NaN or a zero norm stay "compatible" for the SQL
+  // filter, so they are collected here and treated as pending. Only the backfill pays for
+  // walking these BLOBs; the recall path never does.
+  const invalidIds = opts.force ? [] : invalidEmbeddingIds(db, model);
   const pendingRows = db
     .prepare(
       `SELECT m.id, m.gist, m.details, e.memory_id IS NOT NULL AS had_embedding
        FROM memories m
        LEFT JOIN memory_embeddings e ON e.memory_id = m.id
-       WHERE (${opts.force ? "1 = 1" : needsEmbedding})
+       WHERE (${
+         opts.force
+           ? "1 = 1"
+           : `(${needsEmbedding} OR m.id IN (SELECT value FROM json_each(@invalidIds)))`
+       })
          AND ${excludeNoiseSql("m")}
          ${opts.scope ? "AND m.scope = @scope" : ""}`,
     )
@@ -151,6 +183,7 @@ export async function embedPendingMemories(
       scope: opts.scope,
       model,
       expectedDims: opts.expectedDims,
+      invalidIds: JSON.stringify(invalidIds),
     }) as Array<{
     id: string;
     gist: string;
@@ -173,8 +206,9 @@ export async function embedPendingMemories(
     );
     const raw = await embedFn(texts);
     // An injected embedFn reaches this point without going through `embedTexts`, so the
-    // vectors are validated here too: a bad batch counts as a failure, never as embedded.
-    const vecs = raw ? checkedUnitVectors(raw) : null;
+    // vectors are validated here too. A short response is a failed batch; inside a batch
+    // with the right shape, each bad vector is counted alone and its neighbours are saved.
+    const vecs = raw && raw.length === batch.length ? checkedUnitVectors(raw) : null;
     if (!vecs) {
       // Una tanda lenta o rara no condena al resto; dos seguidas, sí: el embedder está caído.
       consecutiveFailures++;
@@ -189,7 +223,11 @@ export async function embedPendingMemories(
     for (let j = 0; j < batch.length; j++) {
       const vec = vecs[j];
       const mem = batch[j];
-      if (!vec || !mem) continue;
+      if (!mem) continue;
+      if (!vec) {
+        stats.failed++;
+        continue;
+      }
       saveMemoryEmbedding(db, mem.id, model, vec);
       stats.embedded++;
       if (mem.had_embedding) stats.reembedded++;
@@ -204,6 +242,8 @@ export interface EmbeddingIndexStatus {
   missing: number;
   compatible: number;
   stale_model: number;
+  /** Active-model rows a previous version stored with a non-finite component or a zero norm. */
+  invalid: number;
   models: Array<{ model: string; dims: number; count: number }>;
 }
 
@@ -241,6 +281,7 @@ export function getEmbeddingIndexStatus(
     missing: memories - embedded,
     compatible,
     stale_model: embedded - compatible,
+    invalid: invalidEmbeddingIds(db, activeModel).length,
     models,
   };
 }

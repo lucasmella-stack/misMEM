@@ -222,7 +222,7 @@ export async function recallHybrid(
   const vecs = await actualEmbedFn([input.query]);
   // The query vector goes through the same check as a stored one: an injected embedFn or a
   // broken provider must degrade to lexical search, not carry NaN into the cosine.
-  const queryVec = checkedUnitVectors(vecs ?? [])?.[0];
+  const queryVec = checkedUnitVectors(vecs ?? [])?.[0] ?? undefined;
   const semanticModel = options.embeddingModel ?? (embedFn ? undefined : cfg.model);
   const semantic = queryVec
     ? semanticSearchMemories(db, queryVec, {

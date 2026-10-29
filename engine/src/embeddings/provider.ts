@@ -60,7 +60,9 @@ export function loadEmbeddingConfig(): EmbeddingConfig {
   };
 }
 
-export type EmbedFn = (texts: string[]) => Promise<Float32Array[] | null>;
+export type EmbedFn = (
+  texts: string[],
+) => Promise<Array<Float32Array | null> | null>;
 
 async function requestVectors(
   input: string[],
@@ -88,14 +90,14 @@ export async function embedTexts(
   texts: string[],
   cfg: EmbeddingConfig = loadEmbeddingConfig(),
   kind: EmbedKind = "document",
-): Promise<Float32Array[] | null> {
+): Promise<Array<Float32Array | null> | null> {
   if (!cfg.enabled || texts.length === 0) return null;
   const prefix = kind === "query" ? cfg.queryPrefix : cfg.docPrefix;
   try {
     const vectors = await requestVectors(texts.map((t) => prefix + t), cfg);
     if (!vectors || vectors.length !== texts.length) return null;
-    // A poisoned batch is a failed batch, like a server that does not answer: storing a
-    // NaN vector would drop that memory from search with no warning at all.
+    // A missing vector is a failed batch; a poisoned one is a null slot, so the backfill can
+    // still store its good neighbours instead of retrying them forever.
     return checkedUnitVectors(vectors);
   } catch {
     return null;
