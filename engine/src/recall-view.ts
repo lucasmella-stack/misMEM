@@ -5,6 +5,10 @@ import type { RecallHit } from "./schema.js";
  * Cap on the `text` of a hit, in code points. One episode can hold tens of thousands of
  * characters, and a single hit that size pushes every other memory out of the model's
  * context. The cut keeps enough to recognise the hit; `id` still leads to the full copy.
+ *
+ * `mismem-used` measures usage over the `text` the model saw, so a long gist (over 2000
+ * code points, possible through `mem_update`) is measured on the cut text, which raises the
+ * overlap for the same matches. It is rare enough to accept and keep the cap here.
  */
 export const MAX_TEXT_CHARS = 2000;
 
@@ -13,8 +17,12 @@ export const MAX_DETAILS_CHARS = 1200;
 
 /** What `recall` returns to a model: the search hit plus the columns only its table knows. */
 export interface RecallHitView extends RecallHit {
-  /** `created_at` as YYYY-MM-DD in UTC: a model reads a date, not an epoch. */
-  date: string;
+  /**
+   * `created_at` as YYYY-MM-DD in UTC: a model reads a date, not an epoch. Absent when
+   * `created_at` is not a usable epoch (a restored or hand-edited row), so one bad row
+   * cannot fail the whole recall.
+   */
+  date?: string;
   /** The distilled detail of a memory, absent when it holds nothing. */
   details?: string;
   /** A trait's polarity, absent when it is `neutral`: the absence is the neutral case. */
@@ -54,8 +62,9 @@ function selectColumn(
 
 /**
  * Shapes the hits of `recall` for the model that reads them: a readable date, the details of
- * a memory and the polarity of a trait (columns the search rows do not carry), a rounded
- * salience, and per-string caps. Order is preserved: the ranking is the search's decision.
+ * a memory and the polarity of a trait (columns the search rows do not carry), and
+ * per-string caps. `salience` and `created_at` pass through untouched. Order is preserved:
+ * the ranking is the search's decision.
  */
 export function recallForModel(db: DB, hits: readonly RecallHit[]): RecallHitView[] {
   const memoryIds = hits.filter((hit) => hit.layer === "memory").map((hit) => hit.id);
@@ -72,15 +81,21 @@ export function recallForModel(db: DB, hits: readonly RecallHit[]): RecallHitVie
         : undefined;
     const rawPolarity = hit.layer === "trait" ? polarityById.get(hit.id) : undefined;
     const polarity = rawPolarity === "shadow" || rawPolarity === "light" ? rawPolarity : undefined;
+    // A restored or hand-edited row can hold a non-finite or out-of-range epoch, and
+    // toISOString throws on both; the hit is still useful without its date.
+    const at = new Date(hit.created_at);
+    const date = Number.isFinite(hit.created_at) && !Number.isNaN(at.getTime())
+      ? at.toISOString().slice(0, 10)
+      : undefined;
 
     const view: RecallHitView = {
       layer: hit.layer,
       id: hit.id,
       scope: hit.scope,
       text: text.text,
-      ...(hit.salience === undefined ? {} : { salience: Math.round(hit.salience * 100) / 100 }),
+      ...(hit.salience === undefined ? {} : { salience: hit.salience }),
       created_at: hit.created_at,
-      date: new Date(hit.created_at).toISOString().slice(0, 10),
+      ...(date === undefined ? {} : { date }),
       ...(hit.via === undefined ? {} : { via: hit.via }),
       ...(details === undefined ? {} : { details: details.text }),
       ...(polarity === undefined ? {} : { polarity }),

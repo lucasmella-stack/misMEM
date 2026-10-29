@@ -182,6 +182,23 @@ describe("MCP tool dispatch", () => {
     expect(found.hits).toHaveLength(1);
   });
 
+  it("mem_search keeps the raw hits, without date, details or truncated", async () => {
+    const ep = await ok<{ id: string }>("capture", { scope: "p/a", body: "zanahoria growth schedule" });
+    await ok("consolidate", {
+      scope: "p/a",
+      gist: "zanahoria schedule",
+      details: "water weekly",
+      source_episode_ids: [ep.id],
+    });
+
+    const found = await ok<{ hits: Array<Record<string, unknown>> }>("mem_search", { query: "zanahoria" });
+    const memory = found.hits.find((h) => h.layer === "memory");
+    expect(memory?.created_at).toBeTypeOf("number");
+    expect(memory).not.toHaveProperty("date");
+    expect(memory).not.toHaveProperty("details");
+    expect(memory).not.toHaveProperty("truncated");
+  });
+
   it("reports an unknown tool as an error result instead of throwing", async () => {
     const r = await call("no_such_tool", {});
     expect(r.isError).toBe(true);

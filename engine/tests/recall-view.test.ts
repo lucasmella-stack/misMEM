@@ -9,8 +9,9 @@ import {
 } from "../src/recall-view.js";
 import type { RecallHit } from "../src/schema.js";
 
-// Fixed clock: the view only formats `created_at`, so a constant is enough to pin the date.
-const AT = Date.UTC(2026, 9, 30, 8, 15);
+// Fixed clock near midnight UTC: a local-time formatter would report the next day in
+// UTC+1 or further east, so this instant pins the date to UTC rather than to the host zone.
+const AT = Date.UTC(2026, 9, 30, 23, 30);
 
 function insertMemory(
   db: DB,
@@ -65,10 +66,26 @@ describe("recallForModel", () => {
       expect(h.date).toBe("2026-10-30");
       expect(h.created_at).toBe(AT);
     }
-    expect(hits[0]?.salience).toBe(0.83);
+    expect(hits[0]?.salience).toBe(0.834);
     expect(hits[0]?.via).toBe("semantic");
     expect(hits[1]?.salience).toBeUndefined();
     expect(hits[2]?.salience).toBeUndefined();
+    db.close();
+  });
+
+  it("omits date when created_at is not a usable epoch, without failing the whole recall", () => {
+    const db = openDb(":memory:");
+    const hits = recallForModel(db, [
+      // Not finite: the historical shape of a row written in seconds by hand or by a third party.
+      hit({ layer: "episode", id: "nan", created_at: Number.NaN }),
+      // Finite but out of Date's range, so toISOString would throw RangeError.
+      hit({ layer: "episode", id: "huge", created_at: Number.MAX_VALUE }),
+    ]);
+
+    for (const view of hits) expect(view).not.toHaveProperty("date");
+    expect(hits[0]?.created_at).toBeNaN();
+    expect(hits[1]?.created_at).toBe(Number.MAX_VALUE);
+    expect(hits[0]?.text).toBe("text");
     db.close();
   });
 
