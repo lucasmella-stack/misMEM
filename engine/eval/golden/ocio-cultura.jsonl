@@ -1,0 +1,67 @@
+{"type": "memory", "key": "oci-01", "scope": "lucia/ocio", "gist": "Va al cine Lumière los martes, día del espectador, y paga 5,50 euros por entrada.", "days_ago": 60, "details": "Es el único día que le cuadra con el trabajo. Suele ir sola y se queda a los créditos."}
+{"type": "memory", "key": "oci-02", "scope": "lucia/ocio", "gist": "Ve las series en versión original con subtítulos porque el doblaje le distrae.", "days_ago": 330}
+{"type": "memory", "key": "oci-03", "scope": "lucia/ocio", "gist": "Terminó la serie El faro de Kvar en dos semanas y ahora espera la segunda temporada.", "days_ago": 40, "details": "La vio del tirón en tres noches. Dice que el final queda abierto y que eso le molesta."}
+{"type": "memory", "key": "oci-04", "scope": "lucia/ocio", "gist": "Lee unas 30 novelas al año, casi todas negras y de autores nórdicos.", "days_ago": 120, "details": "Lleva la cuenta en un cuaderno y se pone un objetivo de dos o tres al mes."}
+{"type": "memory", "key": "oci-05", "scope": "lucia/ocio", "gist": "Su libro favorito es El invierno de los relojeros, que ha releído tres veces.", "days_ago": 280}
+{"type": "memory", "key": "oci-06", "scope": "lucia/ocio", "gist": "Va al club de lectura de la biblioteca el último jueves de cada mes.", "days_ago": 200, "details": "Lo lleva desde 2023. El grupo lo forman diez lectores y cada uno propone un título por turnos."}
+{"type": "memory", "key": "oci-07", "scope": "lucia/ocio", "gist": "Toca la guitarra eléctrica desde los 16 y ensaya los miércoles con dos amigos.", "days_ago": 400, "details": "El local está en el barrio de la Magdalena y pagan 40 euros al mes entre los tres."}
+{"type": "memory", "key": "oci-08", "scope": "lucia/ocio", "gist": "Tiene una guitarra acústica que casi no usa desde que comparte local con el grupo.", "days_ago": 150}
+{"type": "memory", "key": "oci-09", "scope": "lucia/ocio", "gist": "Fue al festival Ebro Sonoro en julio y vio doce conciertos en tres días.", "days_ago": 100, "details": "El abono de tres días costó 145 euros. Durmió en casa de Pablo, que vive a veinte minutos del recinto."}
+{"type": "memory", "key": "oci-10", "scope": "lucia/ocio", "gist": "Compró el abono del ciclo de jazz de otoño: cuatro conciertos en la sala Zeta.", "days_ago": 20}
+{"type": "memory", "key": "oci-11", "scope": "lucia/ocio", "gist": "Hizo el camino de Santiago desde Sarria en cinco etapas con Andrés.", "days_ago": 300, "details": "Fueron 115 kilómetros en abril. Llegaron a Santiago el viernes y volvieron en tren."}
+{"type": "memory", "key": "oci-12", "scope": "lucia/ocio", "gist": "Viajó a Oporto en Semana Santa y se trajo tres botellas de vino de la región.", "days_ago": 170, "details": "Estuvo cuatro días y comió en un restaurante junto al río. Repetiría el viaje sin pensarlo."}
+{"type": "memory", "key": "oci-13", "scope": "lucia/ocio", "gist": "En 2024 subió al mirador de Santa Lucía en Lisboa y se hizo una foto con Andrés.", "days_ago": 340}
+{"type": "memory", "key": "oci-14", "scope": "lucia/ocio", "gist": "Hace fotografía analógica con una Olympus OM-10 y revela en un laboratorio del centro.", "days_ago": 250, "details": "Compra los carretes en una tienda de la calle Mayor. Cada revelado le cuesta 12 euros."}
+{"type": "memory", "key": "oci-15", "scope": "lucia/ocio", "gist": "Paga 8 euros al mes por una plataforma de cine de autor que solo tiene películas antiguas.", "days_ago": 80}
+{"type": "memory", "key": "oci-16", "scope": "lucia/ocio", "gist": "Juega al Catan con Pablo y Andrés casi todos los domingos por la tarde.", "days_ago": 240}
+{"type": "memory", "key": "oci-17", "scope": "lucia/ocio", "gist": "Visita un museo distinto cada mes; el último fue el de cerámica de Zaragoza.", "days_ago": 35}
+{"type": "memory", "key": "oci-18", "scope": "lucia/ocio", "gist": "Fue al teatro a ver una obra de una compañía aragonesa y se quedó a charlar con los actores.", "days_ago": 15, "details": "La obra era un drama sobre un pueblo inundado. Le impresionó el trabajo de luces."}
+{"type": "memory", "key": "oci-19", "scope": "lucia/ocio", "gist": "Escucha vinilos los domingos por la mañana, sobre todo jazz de los años sesenta.", "days_ago": 180, "details": "Heredó la colección de su padre: unos 200 discos. El tocadiscos lo compró en 2019."}
+{"type": "memory", "key": "oci-20", "scope": "lucia/ocio", "gist": "Se apuntó a un taller de cerámica de seis semanas que se da los jueves por la tarde.", "days_ago": 45, "details": "Empieza la semana que viene en el centro cívico. Paga 45 euros por todo el trimestre."}
+{"type": "memory", "key": "oci-n1", "scope": "lucia/ocio", "gist": "[noise] saludo y charla sobre el cine, el festival y los libros", "days_ago": 2}
+{"type": "memory", "key": "oci-n2", "scope": "lucia/ocio", "gist": "[pareto:l0] repaso rápido del club de lectura y del taller", "days_ago": 7}
+{"type": "trait", "key": "oci-t1", "scope": "lucia/ocio", "name": "Prefiere las salas de cine y los conciertos en directo antes que ver lo mismo en casa.", "evidence": ["oci-01", "oci-09", "oci-10"]}
+{"type": "trait", "key": "oci-t2", "scope": "lucia/ocio", "name": "Nunca sale de viaje sin la cámara analógica y una libreta para apuntar lo que ve.", "evidence": ["oci-11", "oci-14", "oci-17"]}
+{"type": "episode", "key": "oci-e1", "scope": "lucia/ocio", "body": "Anoche fuimos al cine a ver una película sueca y la sala estaba casi vacía, seríamos ocho. Al salir Andrés quería tomar algo y acabamos en una terraza del Tubo hasta la una, con el fresco que hacía. Hoy me he levantado arrastrando.", "days_ago": 1}
+{"type": "episode", "key": "oci-e2", "scope": "lucia/ocio", "body": "He reservado dos entradas para el concierto de diciembre en la sala Zeta y me han cobrado doce euros de gastos. No me acordaba de que el abono de otoño no cubría esa fecha. A ver cómo se lo digo a Andrés, que ya contaba con ir gratis.", "days_ago": 3}
+{"type": "episode", "key": "oci-e3", "scope": "lucia/ocio", "body": "Se me ha roto la correa de la guitarra en mitad del ensayo y he tocado el resto sentada en un taburete. Pablo dice que así suena mejor; yo creo que desafiné en dos canciones y que se me notó bastante.", "days_ago": 5}
+{"type": "query", "id": "oci-q01", "kind": "literal", "query": "¿Qué día va al cine y cuánto paga la entrada?", "expect": ["oci-01"]}
+{"type": "query", "id": "oci-q02", "kind": "literal", "query": "¿Cuántas novelas lee al año y de qué género?", "expect": ["oci-04"]}
+{"type": "query", "id": "oci-q03", "kind": "literal", "query": "¿Desde dónde hizo el camino de Santiago y en cuántas etapas?", "expect": ["oci-11"]}
+{"type": "query", "id": "oci-q04", "kind": "literal", "query": "¿Con qué cámara hace fotografía analógica y dónde revela?", "expect": ["oci-14"]}
+{"type": "query", "id": "oci-q05", "kind": "parafrasis", "query": "¿Qué ficción por capítulos se ha ventilado y aguarda la continuación?", "expect": ["oci-03"]}
+{"type": "query", "id": "oci-q06", "kind": "parafrasis", "query": "¿Dónde comenta libros con otras personas una vez al mes?", "expect": ["oci-06"]}
+{"type": "query", "id": "oci-q07", "kind": "parafrasis", "query": "¿Qué entretenimiento de mesa comparte con su hermano y su pareja?", "expect": ["oci-16"]}
+{"type": "query", "id": "oci-q08", "kind": "parafrasis", "query": "¿Qué espacio expositivo descubrió la vez pasada?", "expect": ["oci-17"]}
+{"type": "query", "id": "oci-q09", "kind": "parafrasis", "query": "¿Qué representación presenció y con quién habló al acabar?", "expect": ["oci-18"]}
+{"type": "query", "id": "oci-q10", "kind": "parafrasis", "query": "¿Qué música pincha al empezar el fin de semana?", "expect": ["oci-19"]}
+{"type": "query", "id": "oci-q11", "kind": "sinonimo", "query": "¿Por qué prefiere las series sin doblar?", "expect": ["oci-02"]}
+{"type": "query", "id": "oci-q12", "kind": "sinonimo", "query": "¿Qué instrumento tiene guardado y apenas toca?", "expect": ["oci-08"]}
+{"type": "query", "id": "oci-q13", "kind": "sinonimo", "query": "¿Cuánto le cuesta la plataforma de cine de autor?", "expect": ["oci-15"]}
+{"type": "query", "id": "oci-q14", "kind": "sinonimo", "query": "¿A qué taller creativo se apuntó los jueves?", "expect": ["oci-20"]}
+{"type": "query", "id": "oci-q15", "kind": "coloquial", "query": "¿Cuántos bolos se metió en el festival de julio?", "expect": ["oci-09"]}
+{"type": "query", "id": "oci-q16", "kind": "coloquial", "query": "¿Y de Oporto qué se trajo?", "expect": ["oci-12"]}
+{"type": "query", "id": "oci-q17", "kind": "coloquial", "query": "¿Cuál es ese libro que se ha leído tres veces?", "expect": ["oci-05"]}
+{"type": "query", "id": "oci-q18", "kind": "sin_tildes", "query": "desde cuando toca la guitarra electrica y cuando ensaya", "expect": ["oci-07"]}
+{"type": "query", "id": "oci-q19", "kind": "sin_tildes", "query": "que mirador subio en lisboa", "expect": ["oci-13"]}
+{"type": "query", "id": "oci-q20", "kind": "sin_tildes", "query": "cuantos conciertos entran en el abono de jazz", "expect": ["oci-10"]}
+{"type": "query", "id": "oci-q21", "kind": "errata", "query": "¿Que dia va al cien y cuanto paga?", "expect": ["oci-01"]}
+{"type": "query", "id": "oci-q22", "kind": "errata", "query": "¿A que juego de mesa juega los domingso?", "expect": ["oci-16"]}
+{"type": "query", "id": "oci-q23", "kind": "errata", "query": "¿Cuantas nobelas lee al año?", "expect": ["oci-04"]}
+{"type": "query", "id": "oci-q24", "kind": "ingles", "query": "How many stages did the Camino de Santiago take her?", "expect": ["oci-11"]}
+{"type": "query", "id": "oci-q25", "kind": "ingles", "query": "How much does she pay for the arthouse streaming service?", "expect": ["oci-15"]}
+{"type": "query", "id": "oci-q26", "kind": "larga", "query": "Andrés quiere repetir el viaje de primavera y no recuerda a qué ciudad fueron ni qué compraron allí; Lucía tiene el dato apuntado y quiere cerrar la escapada este fin de semana.", "expect": ["oci-12"]}
+{"type": "query", "id": "oci-q27", "kind": "larga", "query": "Estamos montando un resumen del verano y necesito saber a cuántos conciertos fue durante la cita de julio y cuántos días duró el evento completo.", "expect": ["oci-09"]}
+{"type": "query", "id": "oci-q28", "kind": "larga", "query": "En la biblioteca le han pedido que confirme su asistencia al grupo que se reúne una vez al mes para comentar novelas; quiero saber qué día de la semana queda fijado.", "expect": ["oci-06"]}
+{"type": "query", "id": "oci-q29", "kind": "clave", "query": "OM-10", "expect": ["oci-14"]}
+{"type": "query", "id": "oci-q30", "kind": "clave", "query": "Catan", "expect": ["oci-16"]}
+{"type": "query", "id": "oci-q31", "kind": "ambito", "query": "¿Qué plataforma de cine tiene suscrita y cuánto paga?", "expect": ["oci-15"], "scope": "lucia/ocio"}
+{"type": "query", "id": "oci-q32", "kind": "ambito", "query": "¿Cuánto paga al año por el cine?", "expect": ["tra-09"], "scope": "lucia/finanzas"}
+{"type": "query", "id": "oci-q33", "kind": "episodio", "query": "¿Qué película vio anoche y dónde acabó la noche?", "expect": ["oci-e1"]}
+{"type": "query", "id": "oci-q34", "kind": "episodio", "query": "¿Qué se le rompió en el ensayo y cómo lo resolvió?", "expect": ["oci-e3"]}
+{"type": "query", "id": "oci-q35", "kind": "rasgo", "query": "¿Qué disfruta más, ver una película en una sala o en su sofá?", "expect": ["oci-t1"]}
+{"type": "query", "id": "oci-q36", "kind": "rasgo", "query": "¿Qué se lleva siempre cuando viaja?", "expect": ["oci-t2"]}
+{"type": "query", "id": "oci-q37", "kind": "ajena", "query": "¿Qué función cumplían los arbotantes en las catedrales góticas?", "expect": []}
+{"type": "query", "id": "oci-q38", "kind": "ajena", "query": "¿Cómo se calcula la energía de un fotón a partir de su frecuencia?", "expect": []}
+{"type": "query", "id": "oci-q39", "kind": "ajena", "query": "¿Qué planta tropical produce el fruto del que sale la vainilla?", "expect": []}
+{"type": "query", "id": "oci-q40", "kind": "ajena", "query": "¿Cómo se gobernaba un feudo en la Europa medieval?", "expect": []}

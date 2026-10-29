@@ -1,0 +1,67 @@
+{"type": "memory", "key": "sal-01", "scope": "lucia/salud", "gist": "Corre tres días por semana, martes, jueves y domingo, unos ocho kilómetros por salida.", "days_ago": 240, "details": "Los domingos suele ir por la ribera del Ebro y los otros dos días por el parque."}
+{"type": "memory", "key": "sal-02", "scope": "lucia/salud", "gist": "Entrena fuerza en el gimnasio Fuerza Norte, en el barrio de Delicias, los lunes y los viernes.", "days_ago": 190, "details": "Va a primera hora porque a las ocho la sala se llena y no hay bancos libres."}
+{"type": "memory", "key": "sal-03", "scope": "lucia/salud", "gist": "Hasta febrero entrenaba en el gimnasio Vía Verde, al otro lado del río, y lo dejó por los horarios.", "days_ago": 330}
+{"type": "memory", "key": "sal-04", "scope": "lucia/salud", "gist": "Su mejor marca en diez kilómetros es 48:20, en la carrera de Zaragoza de abril de 2025.", "days_ago": 150, "details": "Bajó de cincuenta minutos por primera vez y se compró unas zapatillas nuevas para celebrarlo."}
+{"type": "memory", "key": "sal-05", "scope": "lucia/salud", "gist": "Corrió su primera media maratón en Huesca en 1h52 y acabó con agujetas durante tres días.", "days_ago": 360}
+{"type": "memory", "key": "sal-06", "scope": "lucia/salud", "gist": "Arrastra una fascitis plantar en el pie derecho desde otoño y va a fisioterapia cada dos semanas.", "days_ago": 80, "details": "La fisioterapeuta se llama Marta y le mandó estiramientos de gemelo todos los días."}
+{"type": "memory", "key": "sal-07", "scope": "lucia/salud", "gist": "Hace cien largos de piscina los miércoles, unos dos kilómetros y medio, en la piscina municipal.", "days_ago": 210}
+{"type": "memory", "key": "sal-08", "scope": "lucia/salud", "gist": "Duerme siete horas de media y no quiere bajar de ahí porque nota el cansancio al entrenar.", "days_ago": 270, "details": "Se acuesta a las once y deja el móvil fuera del dormitorio."}
+{"type": "memory", "key": "sal-09", "scope": "lucia/salud", "gist": "Tuvo una tendinitis en el tendón de Aquiles izquierdo en primavera y paró de correr tres semanas.", "days_ago": 100}
+{"type": "memory", "key": "sal-10", "scope": "lucia/salud", "gist": "Sigue una dieta vegetariana desde 2021 y toma hierro porque tiene anemia ferropénica.", "days_ago": 400, "details": "La analítica de mayo salió baja en ferritina y el médico le subió la dosis."}
+{"type": "memory", "key": "sal-11", "scope": "lucia/salud", "gist": "Levanta sesenta kilos en sentadilla y setenta en peso muerto, con series de cinco repeticiones.", "days_ago": 130}
+{"type": "memory", "key": "sal-12", "scope": "lucia/salud", "gist": "En press de banca se queda en treinta y cinco kilos, que es su punto flojo.", "days_ago": 125}
+{"type": "memory", "key": "sal-13", "scope": "lucia/salud", "gist": "Usa un Garmin Forerunner 255 para medir los entrenamientos y sincroniza con Strava.", "days_ago": 170, "details": "El reloj anterior, un 235, se le quedó sin batería a mitad de una carrera."}
+{"type": "memory", "key": "sal-14", "scope": "lucia/salud", "gist": "Su compañera le recomendó el Forerunner 265 por la pantalla, pero ella no lo ha comprado.", "days_ago": 165}
+{"type": "memory", "key": "sal-15", "scope": "lucia/salud", "gist": "Se apuntó a yoga los lunes en el centro cívico, una hora de clase, para compensar la carrera.", "days_ago": 55, "details": "La profesora se llama Carmen y nunca repite la misma secuencia dos semanas seguidas."}
+{"type": "memory", "key": "sal-16", "scope": "lucia/salud", "gist": "Quiere bajar de 1h45 en la media maratón de Valencia de octubre, su segundo intento.", "days_ago": 20, "details": "Sigue un plan de doce semanas con tiradas largas los domingos."}
+{"type": "memory", "key": "sal-17", "scope": "lucia/salud", "gist": "No corre en ayunas: desayuna tostada con tomate y un café antes de salir.", "days_ago": 145}
+{"type": "memory", "key": "sal-18", "scope": "lucia/salud", "gist": "Pasó la revisión médica anual en mayo y le salió el colesterol justo en el límite.", "days_ago": 110}
+{"type": "memory", "key": "sal-19", "scope": "lucia/salud", "gist": "Los sábados sale con la bici gravel, unos cuarenta kilómetros siguiendo el Ebro.", "days_ago": 195, "details": "Va con dos compañeros del trabajo y paran a almorzar en un pueblo del camino."}
+{"type": "memory", "key": "sal-20", "scope": "lucia/salud", "gist": "Pesa 62 kilos y mide 1,68; el nutricionista le pidió mantener el peso hasta la maratón.", "days_ago": 230}
+{"type": "memory", "key": "sal-n1", "scope": "lucia/salud", "gist": "[noise] saludo y charla sobre el gimnasio y la carrera del domingo", "days_ago": 3}
+{"type": "memory", "key": "sal-n2", "scope": "lucia/salud", "gist": "[pareto:l0] repaso de la lesión y los estiramientos de la semana", "days_ago": 6}
+{"type": "trait", "key": "sal-t1", "scope": "lucia/salud", "name": "Prefiere entrenar por la mañana temprano y con un plan escrito antes que improvisar sobre la marcha.", "evidence": ["sal-02", "sal-16"]}
+{"type": "trait", "key": "sal-t2", "scope": "lucia/salud", "name": "Cuida la recuperación, con fisioterapia, estiramientos y sueño, antes que apretar el ritmo.", "evidence": ["sal-06", "sal-08"]}
+{"type": "episode", "key": "sal-e1", "scope": "lucia/salud", "body": "Hoy he salido a correr sin mirar el reloj y he acabado en el parque del Agua, que hacía meses que no pisaba. Había un grupo de señoras haciendo tai chi y me he quedado mirando como una tonta. Mañana me toca gimnasio y creo que voy a bajar el peso de la sentadilla.", "days_ago": 1}
+{"type": "episode", "key": "sal-e2", "scope": "lucia/salud", "body": "He ido a la farmacia a por la receta nueva del hierro y me han dicho que hasta el martes no llega el pedido. Menos mal que aún me quedan cápsulas para una semana. Aprovecharé para comprar también las plantillas que me recomendó Marta.", "days_ago": 3}
+{"type": "episode", "key": "sal-e3", "scope": "lucia/salud", "body": "Recién llegada de la piscina. He hecho cuarenta largos en vez de cien porque había cursillo infantil y no cabíamos. Al salir me he cruzado con Pablo, que venía de jugar al pádel, y hemos tomado un café en la esquina.", "days_ago": 0}
+{"type": "query", "id": "sal-q01", "kind": "literal", "query": "¿Qué lesión arrastra en el pie derecho y cada cuánto va a fisioterapia?", "expect": ["sal-06"]}
+{"type": "query", "id": "sal-q02", "kind": "literal", "query": "¿Cuánto levanta en sentadilla y en peso muerto?", "expect": ["sal-11"]}
+{"type": "query", "id": "sal-q03", "kind": "literal", "query": "¿Qué reloj usa para medir los entrenamientos?", "expect": ["sal-13"]}
+{"type": "query", "id": "sal-q04", "kind": "literal", "query": "¿Qué hace los sábados con la bici?", "expect": ["sal-19"]}
+{"type": "query", "id": "sal-q05", "kind": "parafrasis", "query": "¿Con qué frecuencia calza las zapatillas y qué distancia hace en cada sesión?", "expect": ["sal-01"]}
+{"type": "query", "id": "sal-q06", "kind": "parafrasis", "query": "¿Dónde se ejercitaba antes de que el calendario la obligara a mudarse?", "expect": ["sal-03"]}
+{"type": "query", "id": "sal-q07", "kind": "parafrasis", "query": "¿Qué pauta alimenticia mantiene y qué suplemento necesita por prescripción médica?", "expect": ["sal-10"]}
+{"type": "query", "id": "sal-q08", "kind": "parafrasis", "query": "¿En qué ejercicio se siente más débil y con cuánto peso trabaja?", "expect": ["sal-12"]}
+{"type": "query", "id": "sal-q09", "kind": "parafrasis", "query": "¿Qué toma al levantarse los días de trote?", "expect": ["sal-17"]}
+{"type": "query", "id": "sal-q10", "kind": "parafrasis", "query": "¿Qué actividad elige al empezar la semana y así equilibrar el desgaste de tanto kilómetro?", "expect": ["sal-15"]}
+{"type": "query", "id": "sal-q11", "kind": "sinonimo", "query": "¿Cuál es su registro más rápido en una prueba de diez kilómetros?", "expect": ["sal-04"]}
+{"type": "query", "id": "sal-q12", "kind": "sinonimo", "query": "¿Cuánto marca la báscula y cuánto mide?", "expect": ["sal-20"]}
+{"type": "query", "id": "sal-q13", "kind": "sinonimo", "query": "¿Cómo salió el reconocimiento clínico de mayo?", "expect": ["sal-18"]}
+{"type": "query", "id": "sal-q14", "kind": "sinonimo", "query": "¿Cuántas horas descansa por noche?", "expect": ["sal-08"]}
+{"type": "query", "id": "sal-q15", "kind": "coloquial", "query": "Oye, ¿al final te compraste el reloj que te recomendó la compañera o sigues con el de siempre?", "expect": ["sal-14"]}
+{"type": "query", "id": "sal-q16", "kind": "coloquial", "query": "¿Cómo te fue en tu primera media, la de Huesca?", "expect": ["sal-05"]}
+{"type": "query", "id": "sal-q17", "kind": "coloquial", "query": "¿Cuántos largos te marcas los miércoles en la piscina?", "expect": ["sal-07"]}
+{"type": "query", "id": "sal-q18", "kind": "sin_tildes", "query": "donde entrena fuerza y que dias va", "expect": ["sal-02"]}
+{"type": "query", "id": "sal-q19", "kind": "sin_tildes", "query": "que tiempo quiere hacer en la media maraton de Valencia", "expect": ["sal-16"]}
+{"type": "query", "id": "sal-q20", "kind": "sin_tildes", "query": "que lesion tuvo en el tendon de Aquiles izquierdo", "expect": ["sal-09"]}
+{"type": "query", "id": "sal-q21", "kind": "errata", "query": "¿Cuantos kilometros corre a la semana?", "expect": ["sal-01"]}
+{"type": "query", "id": "sal-q22", "kind": "errata", "query": "¿Cuanto levanta en centadilla y en peso muerto?", "expect": ["sal-11"]}
+{"type": "query", "id": "sal-q23", "kind": "errata", "query": "¿Que reloj usa para medir los entrnamientos?", "expect": ["sal-13"]}
+{"type": "query", "id": "sal-q24", "kind": "ingles", "query": "Which injury is she treating with physiotherapy and how often does she go?", "expect": ["sal-06"]}
+{"type": "query", "id": "sal-q25", "kind": "ingles", "query": "What does she do on Saturdays with her gravel bike?", "expect": ["sal-19"]}
+{"type": "query", "id": "sal-q26", "kind": "larga", "query": "Lucía quiere correr la media de Valencia en octubre y me ha preguntado si el plan de doce semanas que está siguiendo le va a servir para el objetivo que se ha puesto, así que necesito recordar qué tiempo pretende hacer.", "expect": ["sal-16"]}
+{"type": "query", "id": "sal-q27", "kind": "larga", "query": "Mi hermana quiere dejar de comer carne igual que Lucía y me ha pedido que le pregunte desde cuándo lo hace y qué le pasa con el hierro, porque se ha hecho una analítica y le ha salido baja la ferritina.", "expect": ["sal-10"]}
+{"type": "query", "id": "sal-q28", "kind": "larga", "query": "Tengo que quedar con Lucía el lunes a primera hora y no sé si le viene bien, porque entrena fuerza en algún sitio del barrio y no quiero hacerle perder la sesión; dime dónde va y qué días.", "expect": ["sal-02"]}
+{"type": "query", "id": "sal-q29", "kind": "clave", "query": "fascitis plantar", "expect": ["sal-06"]}
+{"type": "query", "id": "sal-q30", "kind": "clave", "query": "Forerunner 255", "expect": ["sal-13"]}
+{"type": "query", "id": "sal-q31", "kind": "ambito", "query": "¿Qué días entrena en el gimnasio?", "expect": ["sal-02"], "scope": "lucia/salud"}
+{"type": "query", "id": "sal-q32", "kind": "ambito", "query": "¿Con qué frecuencia va a la piscina?", "expect": ["sal-07"], "scope": "lucia/salud"}
+{"type": "query", "id": "sal-q33", "kind": "episodio", "query": "¿Qué problema hay con la receta del hierro esta semana?", "expect": ["sal-e2"]}
+{"type": "query", "id": "sal-q34", "kind": "episodio", "query": "¿Por qué hizo menos largos en la piscina?", "expect": ["sal-e3"]}
+{"type": "query", "id": "sal-q35", "kind": "rasgo", "query": "¿Cómo organiza los entrenamientos, con plan o sobre la marcha?", "expect": ["sal-t1"]}
+{"type": "query", "id": "sal-q36", "kind": "rasgo", "query": "¿Qué hace para recuperarse cuando el cuerpo se queja?", "expect": ["sal-t2"]}
+{"type": "query", "id": "sal-q37", "kind": "ajena", "query": "¿Qué diferencia hay entre una garza real y una garza imperial?", "expect": []}
+{"type": "query", "id": "sal-q38", "kind": "ajena", "query": "¿Qué indica una marca de agua en el reverso de un sello?", "expect": []}
+{"type": "query", "id": "sal-q39", "kind": "ajena", "query": "¿Qué diferencia hay entre una cornamusa y un escálamo en un velero?", "expect": []}
+{"type": "query", "id": "sal-q40", "kind": "ajena", "query": "¿Cómo se forma una columna de basalto como las de la calzada del Gigante?", "expect": []}

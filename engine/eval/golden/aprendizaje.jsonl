@@ -1,0 +1,67 @@
+{"type": "memory", "key": "apr-01", "scope": "lucia/aprendizaje", "gist": "Terminó en marzo el curso de Kubernetes para administradores y aprobó el examen CKA al primer intento.", "days_ago": 210, "details": "El curso tenía 40 horas y lo hizo compaginándolo con el trabajo. Estudió tres meses antes de presentarse."}
+{"type": "memory", "key": "apr-02", "scope": "lucia/aprendizaje", "gist": "Empezó el curso de Kubernetes para desarrolladores (CKAD) en septiembre y va por el módulo cuatro de doce.", "days_ago": 45, "details": "Lo paga la empresa con el presupuesto anual. Le queda hasta enero para terminarlo."}
+{"type": "memory", "key": "apr-03", "scope": "lucia/aprendizaje", "gist": "Practica italiano con una aplicación 20 minutos cada noche desde enero, justo antes de dormir.", "days_ago": 100, "details": "Empezó por curiosidad y ya lleva una racha de 180 días. Quiere leer novelas sin diccionario."}
+{"type": "memory", "key": "apr-04", "scope": "lucia/aprendizaje", "gist": "Estudia portugués los sábados por la mañana con una profesora nativa por videollamada.", "days_ago": 260, "details": "La profesora vive en Braga y cobra 18 euros la hora. Las clases duran una hora y media."}
+{"type": "memory", "key": "apr-05", "scope": "lucia/aprendizaje", "gist": "Lee un paper de arXiv sobre recuperación de información cada viernes y apunta las ideas en Obsidian.", "days_ago": 30}
+{"type": "memory", "key": "apr-06", "scope": "lucia/aprendizaje", "gist": "Guarda los apuntes del máster en Obsidian, con una carpeta por asignatura y enlaces entre conceptos.", "days_ago": 180, "details": "El máster lo hizo a distancia entre 2024 y 2025. Dice que los enlaces le sirven más que los índices."}
+{"type": "memory", "key": "apr-07", "scope": "lucia/aprendizaje", "gist": "Repasa el vocabulario técnico en Anki 10 minutos al día, casi siempre en el autobús.", "days_ago": 70}
+{"type": "memory", "key": "apr-08", "scope": "lucia/aprendizaje", "gist": "Está preparando el examen de inglés C1 y el listening es la parte que peor lleva.", "days_ago": 130}
+{"type": "memory", "key": "apr-09", "scope": "lucia/aprendizaje", "gist": "Resolvió 120 katas de algoritmos en LeetCode durante el invierno de 2020, sin faltar un día.", "days_ago": 400}
+{"type": "memory", "key": "apr-10", "scope": "lucia/aprendizaje", "gist": "Aprende Rust con el libro oficial y va por el capítulo 10, el de genéricos y rasgos.", "days_ago": 25, "details": "Lee una hora antes de cenar y hace los ejercicios en un cuaderno. No piensa tocar un proyecto hasta terminar el libro."}
+{"type": "memory", "key": "apr-11", "scope": "lucia/aprendizaje", "gist": "En el curso de embeddings de Hugging Face ya ha terminado el módulo de sentence-transformers.", "days_ago": 80}
+{"type": "memory", "key": "apr-12", "scope": "lucia/ia", "gist": "En Cierzo usa sentence-transformers con el modelo paraphrase-multilingual para los embeddings del buscador.", "days_ago": 40}
+{"type": "memory", "key": "apr-13", "scope": "lucia/aprendizaje", "gist": "Refuerza las matemáticas del aprendizaje automático con el curso de Stanford y hace los ejercicios en papel.", "days_ago": 220}
+{"type": "memory", "key": "apr-14", "scope": "lucia/aprendizaje", "gist": "Mantiene un repositorio de notas de charlas técnicas, con una entrada por conferencia y la fecha.", "days_ago": 90, "details": "Van 34 entradas. Las escribe el mismo día para no perder los detalles del directo."}
+{"type": "memory", "key": "apr-15", "scope": "lucia/aprendizaje", "gist": "Cierzo Software le aprueba 600 euros al año para formación y ella los gasta en cursos largos.", "days_ago": 190, "details": "Tiene que presentar la factura antes de diciembre. El presupuesto no se acumula de un año a otro."}
+{"type": "memory", "key": "apr-16", "scope": "lucia/aprendizaje", "gist": "Sacó un 78 sobre 100 en el examen de italiano de la escuela oficial de idiomas de Zaragoza.", "days_ago": 150, "details": "El oral le fue mejor que la comprensión lectora. Repetirá el año que viene para subir nota."}
+{"type": "memory", "key": "apr-17", "scope": "lucia/aprendizaje", "gist": "Hace un repaso semanal los domingos con un resumen de media página de lo estudiado.", "days_ago": 12}
+{"type": "memory", "key": "apr-18", "scope": "lucia/aprendizaje", "gist": "Estudia con bloques de 25 minutos y descansos de 5, siguiendo el método Pomodoro.", "days_ago": 200, "details": "Lo probó en la época del máster y le funciona mejor que estudiar tres horas seguidas."}
+{"type": "memory", "key": "apr-19", "scope": "lucia/aprendizaje", "gist": "Escucha el pódcast de ingeniería Compilando en el trayecto al trabajo.", "days_ago": 55}
+{"type": "memory", "key": "apr-20", "scope": "lucia/aprendizaje", "gist": "Desde que leyó la documentación de Vitest escribe el test antes que el código.", "days_ago": 240, "details": "Le costó un mes acostumbrarse. Ahora no abre una tarea sin un test que falle primero."}
+{"type": "memory", "key": "apr-n1", "scope": "lucia/aprendizaje", "gist": "[noise] saludo y charla sobre el curso, los apuntes y el examen", "days_ago": 2}
+{"type": "memory", "key": "apr-n2", "scope": "lucia/ia", "gist": "[pareto:l0] repaso rápido del máster y de las tarjetas de vocabulario", "days_ago": 5}
+{"type": "trait", "key": "apr-t1", "scope": "lucia/aprendizaje", "name": "Prefiere estudiar un poco cada día antes que dejar todo para una sesión larga.", "evidence": ["apr-03", "apr-07", "apr-18"]}
+{"type": "trait", "key": "apr-t2", "scope": "lucia/aprendizaje", "name": "Nunca se presenta a un examen sin haber hecho antes un simulacro cronometrado.", "evidence": ["apr-01", "apr-16"]}
+{"type": "episode", "key": "apr-e1", "scope": "lucia/aprendizaje", "body": "Hoy he empezado el módulo de redes del curso de Kubernetes y no me entero de nada de los servicios. He apuntado las dudas para preguntarlas el lunes en el grupo de Cierzo; si no, me quedo atascada otra semana y luego no hay quien recupere el ritmo.", "days_ago": 0}
+{"type": "episode", "key": "apr-e2", "scope": "lucia/aprendizaje", "body": "Ayer perdí dos horas ordenando las tarjetas de Anki por etiquetas y al final borré cuarenta que estaban repetidas. Menos mal, porque el mazo tenía ya 1.900 y no acababa nunca el repaso diario. Hoy he vuelto a los diez minutos de siempre.", "days_ago": 2}
+{"type": "episode", "key": "apr-e3", "scope": "lucia/aprendizaje", "body": "Me han propuesto dar una charla interna de veinte minutos sobre pruebas automáticas y he dicho que sí sin pensarlo. Ahora tengo que prepararla y no sé por dónde empezar; creo que la haré con ejemplos del repositorio de Cierzo y un par de fallos reales.", "days_ago": 4}
+{"type": "query", "id": "apr-q01", "kind": "literal", "query": "¿Qué examen de Kubernetes aprobó al primer intento?", "expect": ["apr-01"]}
+{"type": "query", "id": "apr-q02", "kind": "literal", "query": "¿Dónde guarda los apuntes del máster y cómo los organiza?", "expect": ["apr-06"]}
+{"type": "query", "id": "apr-q03", "kind": "literal", "query": "¿Cuántas katas de algoritmos resolvió en LeetCode?", "expect": ["apr-09"]}
+{"type": "query", "id": "apr-q04", "kind": "literal", "query": "¿Cuánto dinero le aprueba Cierzo al año para formación?", "expect": ["apr-15"]}
+{"type": "query", "id": "apr-q05", "kind": "parafrasis", "query": "¿Cuánto le falta de la formación sobre contenedores que arrancó en otoño?", "expect": ["apr-02"]}
+{"type": "query", "id": "apr-q06", "kind": "parafrasis", "query": "¿Qué destreza del idioma le cuesta más de cara a la titulación?", "expect": ["apr-08"]}
+{"type": "query", "id": "apr-q07", "kind": "parafrasis", "query": "¿Por qué punto del manual de ese lenguaje de sistemas va?", "expect": ["apr-10"]}
+{"type": "query", "id": "apr-q08", "kind": "parafrasis", "query": "¿Qué biblioteca y qué red preentrenada emplea al generar vectores en el trabajo?", "expect": ["apr-12"]}
+{"type": "query", "id": "apr-q09", "kind": "parafrasis", "query": "¿Qué rutina sigue cada siete días para no olvidar lo aprendido?", "expect": ["apr-17"]}
+{"type": "query", "id": "apr-q10", "kind": "parafrasis", "query": "¿Con qué técnica organiza el tiempo de concentración?", "expect": ["apr-18"]}
+{"type": "query", "id": "apr-q11", "kind": "sinonimo", "query": "¿Qué calificación obtuvo en la prueba oficial de italiano?", "expect": ["apr-16"]}
+{"type": "query", "id": "apr-q12", "kind": "sinonimo", "query": "¿Qué programa de audio escucha de camino a la oficina?", "expect": ["apr-19"]}
+{"type": "query", "id": "apr-q13", "kind": "sinonimo", "query": "¿En qué orden trabaja cuando programa con pruebas?", "expect": ["apr-20"]}
+{"type": "query", "id": "apr-q14", "kind": "sinonimo", "query": "¿Con qué material estudia los fundamentos matemáticos del aprendizaje automático?", "expect": ["apr-13"]}
+{"type": "query", "id": "apr-q15", "kind": "coloquial", "query": "¿Y el italiano? ¿Lo lleva al día?", "expect": ["apr-03"]}
+{"type": "query", "id": "apr-q16", "kind": "coloquial", "query": "¿Y los papers, qué hace con ellos los viernes?", "expect": ["apr-05"]}
+{"type": "query", "id": "apr-q17", "kind": "coloquial", "query": "¿Dónde repasa el vocabulario en el bus?", "expect": ["apr-07"]}
+{"type": "query", "id": "apr-q18", "kind": "sin_tildes", "query": "que modulo del curso de embeddings ha terminado", "expect": ["apr-11"]}
+{"type": "query", "id": "apr-q19", "kind": "sin_tildes", "query": "donde guarda las notas de las charlas tecnicas", "expect": ["apr-14"]}
+{"type": "query", "id": "apr-q20", "kind": "sin_tildes", "query": "como aprendio a escribir primero la prueba", "expect": ["apr-20"]}
+{"type": "query", "id": "apr-q21", "kind": "errata", "query": "¿Que dia da portugues por videollamda?", "expect": ["apr-04"]}
+{"type": "query", "id": "apr-q22", "kind": "errata", "query": "¿Cuantos minutos dedica a las tarjetas de Anky?", "expect": ["apr-07"]}
+{"type": "query", "id": "apr-q23", "kind": "errata", "query": "¿Cuanto presupuesto de fromacion le aprovaron?", "expect": ["apr-15"]}
+{"type": "query", "id": "apr-q24", "kind": "ingles", "query": "What does she do with the research papers she reads every Friday?", "expect": ["apr-05"]}
+{"type": "query", "id": "apr-q25", "kind": "ingles", "query": "Which module of the embeddings course has she already finished?", "expect": ["apr-11"]}
+{"type": "query", "id": "apr-q26", "kind": "larga", "query": "En una conversación sobre certificaciones, alguien pregunta qué título de Kubernetes tiene Lucía y en cuántos intentos lo consiguió; quiero responder con el dato exacto que ella guardó.", "expect": ["apr-01"]}
+{"type": "query", "id": "apr-q27", "kind": "larga", "query": "Está preparando la matrícula del año que viene y necesita recordar cómo le fue en la última convocatoria oficial de italiano, con la nota exacta que le dieron.", "expect": ["apr-16"]}
+{"type": "query", "id": "apr-q28", "kind": "larga", "query": "Para montar el mismo buscador en otro servicio, un compañero quiere saber qué biblioteca y qué modelo concreto emplea Lucía para convertir texto en vectores dentro del proyecto de Cierzo.", "expect": ["apr-12"]}
+{"type": "query", "id": "apr-q29", "kind": "clave", "query": "CKA", "expect": ["apr-01"]}
+{"type": "query", "id": "apr-q30", "kind": "clave", "query": "Pomodoro", "expect": ["apr-18"]}
+{"type": "query", "id": "apr-q31", "kind": "ambito", "query": "¿Qué módulo del curso de embeddings ha terminado?", "expect": ["apr-11"], "scope": "lucia/aprendizaje"}
+{"type": "query", "id": "apr-q32", "kind": "ambito", "query": "¿Qué modelo de embeddings usa en el proyecto de Cierzo?", "expect": ["apr-12"], "scope": "lucia/ia"}
+{"type": "query", "id": "apr-q33", "kind": "episodio", "query": "¿Qué pasó con las tarjetas de Anki que borró?", "expect": ["apr-e2"]}
+{"type": "query", "id": "apr-q34", "kind": "episodio", "query": "¿Qué módulo del curso de Kubernetes empezó y qué le cuesta?", "expect": ["apr-e1"]}
+{"type": "query", "id": "apr-q35", "kind": "rasgo", "query": "¿Cómo reparte el esfuerzo de estudio a lo largo de la semana?", "expect": ["apr-t1"]}
+{"type": "query", "id": "apr-q36", "kind": "rasgo", "query": "¿Qué hace siempre antes de presentarse a una prueba?", "expect": ["apr-t2"]}
+{"type": "query", "id": "apr-q37", "kind": "ajena", "query": "¿Cómo se calcula la energía de un fotón a partir de su frecuencia?", "expect": []}
+{"type": "query", "id": "apr-q38", "kind": "ajena", "query": "¿Qué efecto tiene la observación sobre el resultado en un experimento cuántico?", "expect": []}
+{"type": "query", "id": "apr-q39", "kind": "ajena", "query": "¿En qué año se firmó la Carta Magna en Inglaterra?", "expect": []}
+{"type": "query", "id": "apr-q40", "kind": "ajena", "query": "¿Cómo se poliniza la vainilla fuera de su zona tropical de origen?", "expect": []}

@@ -1,0 +1,67 @@
+{"type": "memory", "key": "via-01", "scope": "lucia/viajes", "gist": "Viajó a Lisboa en mayo de 2025, cuatro días, con vuelo desde Madrid y un apartamento en Alfama.", "days_ago": 330, "details": "Cenó dos noches en el mismo sitio, un restaurante de bacalao junto al castillo."}
+{"type": "memory", "key": "via-02", "scope": "lucia/viajes", "gist": "Hizo un Interrail por Italia en 2019: Roma, Florencia y Venecia en tres semanas.", "days_ago": 400, "details": "Durmió en albergues y viajó casi siempre en trenes regionales."}
+{"type": "memory", "key": "via-03", "scope": "lucia/viajes", "gist": "Prefiere el tren al avión en trayectos de menos de seiscientos kilómetros.", "days_ago": 180, "details": "Suma el tiempo de ir al aeropuerto y esperar, y casi nunca le sale a cuenta volar."}
+{"type": "memory", "key": "via-04", "scope": "lucia/viajes", "gist": "Viaja siempre con equipaje de mano y una mochila de cuarenta litros.", "days_ago": 150, "details": "Una vez perdió una maleta facturada en Roma y desde entonces no factura."}
+{"type": "memory", "key": "via-05", "scope": "lucia/viajes", "gist": "Estuvo diez días en Escocia en 2024, con coche de alquiler y base en la isla de Skye.", "days_ago": 300, "details": "Condujo por la izquierda sin incidentes, pero aparcar en Portree le costó un disgusto."}
+{"type": "memory", "key": "via-06", "scope": "lucia/viajes", "gist": "Se marea en los ferris largos, así que evita las travesías de más de dos horas.", "days_ago": 210}
+{"type": "memory", "key": "via-07", "scope": "lucia/viajes", "gist": "Calcula un presupuesto de setenta euros al día en destino, sin contar los vuelos.", "days_ago": 120}
+{"type": "memory", "key": "via-08", "scope": "lucia/viajes", "gist": "Tiene pendiente un viaje a Japón en primavera de 2027, tres semanas entre Tokio y Kioto.", "days_ago": 40, "details": "Quiere ver los cerezos en flor y ya ha mirado los precios de los vuelos."}
+{"type": "memory", "key": "via-09", "scope": "lucia/viajes", "gist": "Renovó el pasaporte en 2018 y le caduca en 2028; lleva una copia en el móvil.", "days_ago": 290}
+{"type": "memory", "key": "via-10", "scope": "lucia/viajes", "gist": "Duerme en apartamentos con cocina siempre que puede, y evita los hoteles con desayuno incluido.", "days_ago": 240, "details": "Le gusta desayunar en casa y no depender del horario del bufet."}
+{"type": "memory", "key": "via-11", "scope": "lucia/viajes", "gist": "Viajó a Berlín en diciembre con Andrés para ver los mercadillos de Navidad.", "days_ago": 220}
+{"type": "memory", "key": "via-12", "scope": "lucia/viajes", "gist": "En octubre fue a Oporto con su hermano Pablo, no con Andrés, y volvió encantada.", "days_ago": 85, "details": "Comieron francesinha dos días seguidos y subieron a la torre de los Clérigos."}
+{"type": "memory", "key": "via-13", "scope": "lucia/viajes", "gist": "Cuando viaja, Nube se queda en casa de Pablo, que tiene un patio y otro perro.", "days_ago": 100, "details": "Le manda fotos cada día y Nube apenas la echa de menos."}
+{"type": "memory", "key": "via-14", "scope": "lucia/viajes", "gist": "Paga un seguro de viaje anual de 45 euros que cubre cancelación y equipaje.", "days_ago": 160}
+{"type": "memory", "key": "via-15", "scope": "lucia/viajes", "gist": "Se maneja con Organic Maps descargando los mapas sin conexión, y no usa Google Maps.", "days_ago": 95}
+{"type": "memory", "key": "via-16", "scope": "lucia/viajes", "gist": "Tramitó la autorización electrónica británica para entrar en Reino Unido y le costó 16 libras.", "days_ago": 130}
+{"type": "memory", "key": "via-17", "scope": "lucia/viajes", "gist": "Hizo una ruta de tres días por los Picos de Europa en 2025, durmiendo en dos refugios.", "days_ago": 250}
+{"type": "memory", "key": "via-18", "scope": "lucia/viajes", "gist": "Reserva vuelos con una sola escala como máximo y nunca con escala de menos de hora y media.", "days_ago": 110, "details": "Perdió un enlace en Lisboa por cincuenta minutos y desde entonces aplica la regla."}
+{"type": "memory", "key": "via-19", "scope": "lucia/viajes", "gist": "Compra una postal en cada ciudad que visita y las guarda en una caja de zapatos.", "days_ago": 200, "details": "Tiene más de sesenta y las ordena por año."}
+{"type": "memory", "key": "via-20", "scope": "lucia/viajes", "gist": "En Portugal repitió el pastel de nata del mismo horno tres días seguidos.", "days_ago": 30}
+{"type": "memory", "key": "via-n1", "scope": "lucia/viajes", "gist": "[noise] saludo y charla sobre el viaje a Lisboa y el equipaje", "days_ago": 1}
+{"type": "memory", "key": "via-n2", "scope": "lucia/viajes", "gist": "[pareto:l0] repaso de los vuelos y del seguro del próximo viaje", "days_ago": 3}
+{"type": "trait", "key": "via-t1", "scope": "lucia/viajes", "name": "Prefiere viajar ligera, sin facturar y con los mapas descargados antes de salir.", "evidence": ["via-04", "via-15"]}
+{"type": "trait", "key": "via-t2", "scope": "lucia/viajes", "name": "Nunca reserva un viaje sin haber calculado el gasto diario y comprobado la caducidad de los documentos.", "evidence": ["via-07", "via-09"]}
+{"type": "episode", "key": "via-e1", "scope": "lucia/viajes", "body": "Acabo de mirar vuelos para Japón y me he asustado: mil cien euros ida y vuelta en abril. Le he mandado la captura a Andrés y me ha dicho que espere a enero. Mientras tanto he apuntado tres barrios de Tokio en el cuaderno.", "days_ago": 1}
+{"type": "episode", "key": "via-e2", "scope": "lucia/viajes", "body": "Ayer saqué la mochila del armario y encontré un billete de tranvía de Lisboa de hace un año. También había una postal sin escribir de Oporto. La he puesto en el corcho y he decidido que la próxima la mando yo, no la compro de recuerdo.", "days_ago": 3}
+{"type": "episode", "key": "via-e3", "scope": "lucia/viajes", "body": "Hoy he acompañado a Pablo a la estación porque se va a un congreso a Sevilla. Me ha dejado las llaves de su casa para que riegue las plantas y le dé de comer a su perro. Nube se ha puesto contentísima cuando ha olido las llaves.", "days_ago": 0}
+{"type": "query", "id": "via-q01", "kind": "literal", "query": "¿Qué viaje tiene pendiente para 2027 y cuántas semanas?", "expect": ["via-08"]}
+{"type": "query", "id": "via-q02", "kind": "literal", "query": "¿Con cuánto equipaje viaja siempre?", "expect": ["via-04"]}
+{"type": "query", "id": "via-q03", "kind": "literal", "query": "¿Dónde estuvo diez días en Escocia y con qué coche?", "expect": ["via-05"]}
+{"type": "query", "id": "via-q04", "kind": "literal", "query": "¿Qué presupuesto diario calcula en destino?", "expect": ["via-07"]}
+{"type": "query", "id": "via-q05", "kind": "parafrasis", "query": "¿Qué medio elige para distancias cortas y cuál es su límite?", "expect": ["via-03"]}
+{"type": "query", "id": "via-q06", "kind": "parafrasis", "query": "¿Qué problema tiene en el mar y qué rutas descarta por ello?", "expect": ["via-06"]}
+{"type": "query", "id": "via-q07", "kind": "parafrasis", "query": "¿Quién cuida de la mascota mientras ella está fuera?", "expect": ["via-13"]}
+{"type": "query", "id": "via-q08", "kind": "parafrasis", "query": "¿Qué caminata de montaña completó el año pasado y dónde descansó?", "expect": ["via-17"]}
+{"type": "query", "id": "via-q09", "kind": "parafrasis", "query": "¿Qué condiciones pone al comprar billetes de avión con paradas?", "expect": ["via-18"]}
+{"type": "query", "id": "via-q10", "kind": "parafrasis", "query": "¿Qué recuerdo trae de los lugares que conoce y dónde lo acumula?", "expect": ["via-19"]}
+{"type": "query", "id": "via-q11", "kind": "sinonimo", "query": "¿Qué recorrido ferroviario hizo por Italia y en qué año?", "expect": ["via-02"]}
+{"type": "query", "id": "via-q12", "kind": "sinonimo", "query": "¿Hasta cuándo tiene vigente el documento de identidad para salir del país?", "expect": ["via-09"]}
+{"type": "query", "id": "via-q13", "kind": "sinonimo", "query": "¿Cuánto le cuesta la póliza que cubre cancelaciones?", "expect": ["via-14"]}
+{"type": "query", "id": "via-q14", "kind": "sinonimo", "query": "¿Qué permiso electrónico pagó para cruzar el canal?", "expect": ["via-16"]}
+{"type": "query", "id": "via-q15", "kind": "coloquial", "query": "¿Con quién te fuiste a Oporto en octubre, con Andrés?", "expect": ["via-12"]}
+{"type": "query", "id": "via-q16", "kind": "coloquial", "query": "¿Qué aplicación usas para moverte cuando no hay cobertura?", "expect": ["via-15"]}
+{"type": "query", "id": "via-q17", "kind": "coloquial", "query": "¿Cuántos días seguidos te comiste el pastel de nata del mismo horno?", "expect": ["via-20"]}
+{"type": "query", "id": "via-q18", "kind": "sin_tildes", "query": "cuando fuiste a Berlin y con quien", "expect": ["via-11"]}
+{"type": "query", "id": "via-q19", "kind": "sin_tildes", "query": "donde duerme cuando viaja y que tipo de alojamiento busca", "expect": ["via-10"]}
+{"type": "query", "id": "via-q20", "kind": "sin_tildes", "query": "cuanto tiempo estuviste en Lisboa y donde te alojaste", "expect": ["via-01"]}
+{"type": "query", "id": "via-q21", "kind": "errata", "query": "¿Con cuanto equipaje viaja y que tamano tiene la mochila?", "expect": ["via-04"]}
+{"type": "query", "id": "via-q22", "kind": "errata", "query": "¿Que presupuesto diario calclula en destino?", "expect": ["via-07"]}
+{"type": "query", "id": "via-q23", "kind": "errata", "query": "¿Quien cuida de Nube mientars ella viaja?", "expect": ["via-13"]}
+{"type": "query", "id": "via-q24", "kind": "ingles", "query": "How long was she in Scotland and where did she stay?", "expect": ["via-05"]}
+{"type": "query", "id": "via-q25", "kind": "ingles", "query": "Does she prefer the train or the plane for short trips?", "expect": ["via-03"]}
+{"type": "query", "id": "via-q26", "kind": "larga", "query": "Lucía lleva meses hablando del viaje que quiere hacer cuando cumpla los treinta y cinco y todavía no ha reservado nada, así que necesito saber a qué país piensa ir, en qué estación y cuánto tiempo estará.", "expect": ["via-08"]}
+{"type": "query", "id": "via-q27", "kind": "larga", "query": "Antes de reservar el próximo viaje quiero comprobar si Lucía ya tiene alguna póliza que cubra una cancelación de última hora, porque no quiero duplicar el gasto ni contratar dos veces lo mismo.", "expect": ["via-14"]}
+{"type": "query", "id": "via-q28", "kind": "larga", "query": "Voy a comprar los billetes para el viaje de otoño y Lucía me ha dicho que tiene una norma sobre las escalas y los tiempos mínimos, pero no recuerdo los detalles ni cuánto tiempo exige entre un avión y el siguiente.", "expect": ["via-18"]}
+{"type": "query", "id": "via-q29", "kind": "clave", "query": "Organic Maps", "expect": ["via-15"]}
+{"type": "query", "id": "via-q30", "kind": "clave", "query": "Interrail", "expect": ["via-02"]}
+{"type": "query", "id": "via-q31", "kind": "ambito", "query": "¿Cuánto cuesta la póliza anual del viaje?", "expect": ["via-14"], "scope": "lucia/viajes"}
+{"type": "query", "id": "via-q32", "kind": "ambito", "query": "¿Qué mapa usa sin cobertura?", "expect": ["via-15"], "scope": "lucia/viajes"}
+{"type": "query", "id": "via-q33", "kind": "episodio", "query": "¿Cuánto costaban los vuelos a Japón que miró el otro día?", "expect": ["via-e1"]}
+{"type": "query", "id": "via-q34", "kind": "episodio", "query": "¿Qué encontró en la mochila al sacarla del armario?", "expect": ["via-e2"]}
+{"type": "query", "id": "via-q35", "kind": "rasgo", "query": "¿Cómo le gusta salir de casa cuando hace un viaje largo?", "expect": ["via-t1"]}
+{"type": "query", "id": "via-q36", "kind": "rasgo", "query": "¿Qué comprueba siempre antes de cerrar una reserva?", "expect": ["via-t2"]}
+{"type": "query", "id": "via-q37", "kind": "ajena", "query": "¿Qué es la derrota de un buque en náutica?", "expect": []}
+{"type": "query", "id": "via-q38", "kind": "ajena", "query": "¿Qué tipo de roca es el granito y cómo se forma?", "expect": []}
+{"type": "query", "id": "via-q39", "kind": "ajena", "query": "¿Cuántos huevos pone una lechuza común en cada puesta?", "expect": []}
+{"type": "query", "id": "via-q40", "kind": "ajena", "query": "¿Cómo se conserva un sello de valor en un álbum de filatelia?", "expect": []}

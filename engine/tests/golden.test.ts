@@ -263,6 +263,9 @@ describe("eval/golden real", () => {
     const report = await runGolden(db, corpus, ids, { limit: floor.limit, embedFn: lexical, at: AT });
 
     expect(report.noiseHits).toBe(0);
+    if (floor.lexico_ajenas_max !== undefined) {
+      expect(report.offTopic.withHits).toBeLessThanOrEqual(floor.lexico_ajenas_max);
+    }
     for (const [kind, { hits }] of Object.entries(floor.lexico)) {
       expect(report.kinds[kind]?.hitAtLimit ?? 0).toBeGreaterThanOrEqual(hits);
     }

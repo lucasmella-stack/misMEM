@@ -92,6 +92,8 @@ export interface GoldenCorpus {
 const FloorSchema = z.object({
   limit: z.number().int().positive(),
   lexico: z.record(z.string(), z.object({ hits: z.number().int().nonnegative() })),
+  /** Off-topic questions allowed to bring anything back: a looser rescue must not slip past CI. */
+  lexico_ajenas_max: z.number().int().nonnegative().optional(),
 });
 
 export type GoldenFloor = z.infer<typeof FloorSchema>;
