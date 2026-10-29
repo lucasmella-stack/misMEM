@@ -119,6 +119,34 @@ CREATE TABLE IF NOT EXISTS memory_embeddings (
   vec        BLOB NOT NULL,
   created_at INTEGER NOT NULL
 );
+
+-- Traits and pending episodes have no id of their own to hang a foreign key from, so this
+-- table keys on (layer, item_id) and the triggers below keep it in step with both sources.
+-- Without it, recall would embed the whole layer pool on every query.
+CREATE TABLE IF NOT EXISTS layer_embeddings (
+  layer      TEXT NOT NULL,
+  item_id    TEXT NOT NULL,
+  model      TEXT NOT NULL,
+  dims       INTEGER NOT NULL,
+  vec        BLOB NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (layer, item_id)
+);
+
+CREATE TRIGGER IF NOT EXISTS layer_embeddings_episode_ad AFTER DELETE ON episodes BEGIN
+  DELETE FROM layer_embeddings WHERE layer = 'episode' AND item_id = old.id;
+END;
+-- A consolidated episode no longer competes in recall, so its vector is dead weight. If the
+-- memory that absorbed it is later deleted, consolidated_into returns to NULL and the next
+-- backfill re-embeds it.
+CREATE TRIGGER IF NOT EXISTS layer_embeddings_episode_au
+AFTER UPDATE OF consolidated_into ON episodes
+WHEN new.consolidated_into IS NOT NULL BEGIN
+  DELETE FROM layer_embeddings WHERE layer = 'episode' AND item_id = new.id;
+END;
+CREATE TRIGGER IF NOT EXISTS layer_embeddings_trait_ad AFTER DELETE ON traits BEGIN
+  DELETE FROM layer_embeddings WHERE layer = 'trait' AND item_id = old.id;
+END;
 `;
 
 // Additive migrations over DBs created before the column/index existed.

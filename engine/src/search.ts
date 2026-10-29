@@ -13,6 +13,24 @@ const RRF_K = 60;
 // sólo desempata. Más abajo los puestos se achican (≈ 0.00008 al final de los 50
 // candidatos) y una saliencia alta puede adelantar dos o tres lugares.
 const SALIENCE_RRF_WEIGHT = 0.0002;
+// The rescue is a weaker signal than an exact match, so the fusion needs its weight.
+export const RESCUED_SOURCE_WEIGHT = 0.6;
+// A trait condenses many memories into one line, so a match answers more with less text.
+// The boost keeps it visible when a memory and a trait describe the same thing, without
+// turning traits into a fixed first tier: a memory that matches both signals still wins.
+const TRAIT_SOURCE_WEIGHT = 1.15;
+// A memory is already distilled and curated; an episode is raw and a trait is a compressed
+// rule. On near-equal cosine, prefer the consolidated record. A layer still wins when its
+// meaning is clearly closer, so this is a tie-break, not a restored layer order.
+export const CONSOLIDATED_SEMANTIC_PRIOR = 0.05;
+// A trait is one short, broad rule, so its cosine with any on-topic question runs high even
+// when the rule is not what was asked. It must clear the shared threshold by a margin;
+// episodes are long and specific enough to need a smaller one. Measured on the golden
+// corpus: without either margin, general traits and long unrelated episodes made off-topic
+// questions return something; 0.06 keeps 21/24 trait hits and 0.01 keeps 23/24 episode hits
+// without raising the off-topic count.
+export const TRAIT_SCORE_MARGIN = 0.06;
+export const EPISODE_SCORE_MARGIN = 0.01;
 
 const quoteFts = (term: string): string => `"${term.replace(/"/g, '""')}"`;
 
@@ -311,9 +329,11 @@ export function lexicalCandidates(
   /** Sin capa semántica que responda, el rescate es lo único que encuentra una frase natural. */
   { rescue = true }: { rescue?: boolean } = {},
 ): {
-  traits: TraitCandidate[];
+  traits: RecallHit[];
   memories: RecallHit[];
-  episodes: EpisodeCandidate[];
+  episodes: RecallHit[];
+  /** True when the lists came from the relaxed query, so the fusion can down-weight them. */
+  rescued: boolean;
 } {
   const strict = escapeFts(input.query);
   const scopeFilter = input.scope ? "AND t.scope = @scope" : "";
@@ -382,16 +402,22 @@ export function lexicalCandidates(
       rescuedWordCount = Math.min(wordCount, RELAXED_MAX_TERMS);
     }
   }
-  const traitRows: TraitCandidate[] = (
+  const traits: RecallHit[] = (
     rescuedTerms
       ? relaxRows(rows.traits, rescuedTerms, rescuedWordCount)
       : rows.traits
-  ).map(({ fts_rank: _ftsRank, ...row }) => row);
-  const episodeRows: EpisodeCandidate[] = (
+  ).map(({ fts_rank: _ftsRank, ...row }) => ({
+    layer: "trait" as const,
+    ...row,
+  }));
+  const episodes: RecallHit[] = (
     rescuedTerms
       ? relaxRows(rows.episodes, rescuedTerms, rescuedWordCount)
       : rows.episodes
-  ).map(({ fts_rank: _ftsRank, ...row }) => row);
+  ).map(({ fts_rank: _ftsRank, ...row }) => ({
+    layer: "episode" as const,
+    ...row,
+  }));
 
   // El rescate ya viene ordenado por coincidencias y recortado a RELAXED_MAX_RESULTS. El
   // estricto conserva el orden de FTS5 y desempata por la saliencia ya decaída: la cruda
@@ -416,13 +442,14 @@ export function lexicalCandidates(
     }));
 
   return {
-    traits: traitRows,
+    traits,
     memories,
-    episodes: episodeRows,
+    episodes,
+    rescued: rescuedTerms !== null,
   };
 }
 
-function semanticHitToRecall(hit: SemanticHit, at: number): RecallHit {
+export function semanticHitToRecall(hit: SemanticHit, at: number): RecallHit {
   return {
     layer: "memory",
     id: hit.id,
@@ -464,41 +491,37 @@ export function hasComparableVectors(
   );
 }
 
-export function fuseMemories(
-  lexical: RecallHit[],
-  semantic: SemanticHit[],
-  at: number,
-): RecallHit[] {
-  const candidates = new Map<
-    string,
-    { hit: RecallHit; rrf: number }
-  >();
+export interface RankedSource {
+  hits: readonly RecallHit[];
+  /** Relative weight of the source in the fusion; 1 for the words of the query. */
+  weight: number;
+}
 
-  lexical.forEach((hit, index) => {
-    candidates.set(hit.id, {
-      hit,
-      rrf: 1 / (RRF_K + index + 1),
-    });
-  });
+/**
+ * One list for all three layers: each source contributes 1/(K + rank), so a hit found by
+ * several signals (exact words, meaning, the rescue) rises, and no layer keeps a fixed
+ * step over another. Salience only breaks ties, as it did among memories.
+ */
+export function fuseHits(sources: readonly RankedSource[]): RecallHit[] {
+  const candidates = new Map<string, { hit: RecallHit; rrf: number }>();
 
-  semantic.forEach((row, index) => {
-    const current = candidates.get(row.id);
-    if (current) {
-      current.rrf += 1 / (RRF_K + index + 1);
-      return;
-    }
-    candidates.set(row.id, {
-      hit: semanticHitToRecall(row, at),
-      rrf: 1 / (RRF_K + index + 1),
+  for (const source of sources) {
+    source.hits.forEach((hit, index) => {
+      const layerWeight = hit.layer === "trait" ? TRAIT_SOURCE_WEIGHT : 1;
+      const contribution = (source.weight * layerWeight) / (RRF_K + index + 1);
+      const current = candidates.get(hit.id);
+      if (current) {
+        current.rrf += contribution;
+        return;
+      }
+      candidates.set(hit.id, { hit, rrf: contribution });
     });
-  });
+  }
 
   return [...candidates.values()]
     .sort((a, b) => {
-      const scoreA =
-        a.rrf + (a.hit.salience ?? 0) * SALIENCE_RRF_WEIGHT;
-      const scoreB =
-        b.rrf + (b.hit.salience ?? 0) * SALIENCE_RRF_WEIGHT;
+      const scoreA = a.rrf + (a.hit.salience ?? 0) * SALIENCE_RRF_WEIGHT;
+      const scoreB = b.rrf + (b.hit.salience ?? 0) * SALIENCE_RRF_WEIGHT;
       return (
         scoreB - scoreA ||
         (b.hit.salience ?? 0) - (a.hit.salience ?? 0) ||

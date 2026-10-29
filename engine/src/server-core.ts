@@ -10,7 +10,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Database as DB } from "better-sqlite3";
 import { capture, recallHybrid, consolidate, crystallize, forget, reinforce } from "./tools.js";
-import { embedPendingMemories } from "./embeddings/store.js";
+import { embedLayerItem, embedPendingMemories, type LayerName } from "./embeddings/store.js";
 import {
   ENGRAM_TOOLS,
   dispatchEngramTool,
@@ -36,7 +36,7 @@ export const CANONICAL_TOOLS = [
   {
     name: "recall",
     description:
-      "Hybrid search: FTS5 across all layers plus semantic ranking for memories. Reinforces returned memories (Hebbian) unless MISMEM_REINFORCE_ON_RECALL=off.",
+      "Hybrid search: FTS5 across all layers plus semantic ranking for memories, traits and pending episodes. Reinforces returned memories (Hebbian) unless MISMEM_REINFORCE_ON_RECALL=off.",
     inputSchema: {
       type: "object",
       required: ["query"],
@@ -140,6 +140,18 @@ const { version } = createRequire(import.meta.url)("../package.json") as {
   version: string;
 };
 
+/**
+ * Embedding the new item right away is optional: if the embedder is down the next backfill
+ * picks it up and the write path never notices.
+ */
+async function embedLayerQuietly(db: DB, layer: LayerName, itemId: string): Promise<void> {
+  try {
+    await embedLayerItem(db, layer, itemId);
+  } catch {
+    /* semantic ranking is optional; a dead embedder must not break the write */
+  }
+}
+
 export function createServer(db: DB): Server {
   const server = new Server(
     { name: "mismem", version },
@@ -155,9 +167,12 @@ export function createServer(db: DB): Server {
     try {
       let result: unknown;
       switch (name) {
-        case "capture":
-          result = capture(db, args);
+        case "capture": {
+          const captured = capture(db, args);
+          result = captured;
+          await embedLayerQuietly(db, "episode", captured.id);
           break;
+        }
         case "recall":
           result = await recallHybrid(db, args);
           break;
@@ -175,9 +190,12 @@ export function createServer(db: DB): Server {
         case "reinforce":
           result = reinforce(db, args);
           break;
-        case "crystallize":
-          result = crystallize(db, args);
+        case "crystallize": {
+          const trait = crystallize(db, args);
+          result = trait;
+          await embedLayerQuietly(db, "trait", trait.trait_id);
           break;
+        }
         case "forget":
           result = forget(db, args);
           break;

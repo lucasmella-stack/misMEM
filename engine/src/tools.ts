@@ -11,9 +11,14 @@ import {
 } from "./schema.js";
 import { contentHash } from "./hash.js";
 import { registerTurn } from "./connectome.js";
-import { CANDIDATE_POOL_LIMIT, fuseMemories, hasComparableVectors, lexicalCandidates } from "./search.js";
+import { CANDIDATE_POOL_LIMIT, CONSOLIDATED_SEMANTIC_PRIOR, EPISODE_SCORE_MARGIN, RESCUED_SOURCE_WEIGHT, TRAIT_SCORE_MARGIN, fuseHits, hasComparableVectors, lexicalCandidates, semanticHitToRecall, type RankedSource } from "./search.js";
 import { embedTexts, loadEmbeddingConfig, type EmbedFn } from "./embeddings/provider.js";
-import { semanticSearchMemories } from "./embeddings/store.js";
+import {
+  hasComparableLayerVectors,
+  semanticSearchLayer,
+  semanticSearchMemories,
+  type LayerSemanticHit,
+} from "./embeddings/store.js";
 import {
   decayMemories,
   effectiveSalience,
@@ -87,25 +92,18 @@ export interface RecallOptions {
 }
 
 /**
- * Both recall paths rank traits first, then memories, then episodes, and cut to the limit;
- * the hit shape is built here so the two paths cannot drift apart.
+ * Both recall paths hand over one already-ranked list: the layers compete instead of
+ * being concatenated, so the limit cannot cut off a whole layer that no longer has a
+ * fixed position. The hit shape and the reinforcement stay here so the paths cannot drift.
  */
 function finalizeHits(
   db: DB,
-  layers: {
-    traits: readonly Omit<RecallHit, "layer">[];
-    memories: readonly RecallHit[];
-    episodes: readonly Omit<RecallHit, "layer">[];
-  },
+  ranked: readonly RecallHit[],
   limit: number,
   options: RecallOptions,
   at: number,
 ): { hits: RecallHit[] } {
-  const hits: RecallHit[] = [
-    ...layers.traits.map((r) => ({ ...r, layer: "trait" as const })),
-    ...layers.memories,
-    ...layers.episodes.map((r) => ({ ...r, layer: "episode" as const })),
-  ].slice(0, limit);
+  const hits = ranked.slice(0, limit);
 
   if (options.reinforce ?? reinforcesOnRecall()) {
     reinforceMemories(
@@ -192,13 +190,30 @@ export function recall(
   const input = RecallInput.parse(raw);
   const at = options.at ?? now();
   const lexical = lexicalCandidates(db, input, at);
+  const weight = lexical.rescued ? RESCUED_SOURCE_WEIGHT : 1;
+  const ranked = fuseHits([
+    { hits: lexical.traits, weight },
+    { hits: lexical.memories, weight },
+    { hits: lexical.episodes, weight },
+  ]);
   return finalizeHits(
     db,
-    { traits: lexical.traits, memories: lexical.memories, episodes: lexical.episodes },
+    ranked,
     input.limit,
     { ...options, reinforce: options.reinforce ?? input.reinforce },
     at,
   );
+}
+
+function layerHitToRecall(hit: LayerSemanticHit, layer: "trait" | "episode"): RecallHit {
+  return {
+    layer,
+    id: hit.id,
+    scope: hit.scope,
+    text: hit.text,
+    created_at: hit.created_at,
+    via: "semantic",
+  };
 }
 
 /**
@@ -230,18 +245,63 @@ export async function recallHybrid(
       })
     : [];
   // El rescate léxico sólo entra cuando no hay capa semántica: embeddings apagados, el
-  // embedder sin responder o ningún vector del modelo activo. Medido con 2.527 memorias, con
-  // embeddings el rescate apenas suma aciertos y en cambio empuja la respuesta buena hacia
-  // abajo y trae recuerdos a preguntas ajenas; sin ellos, es lo que lleva el recall de 0,1 a
-  // 2,5 recuerdos por pregunta.
+  // embedder sin responder o ningún vector del modelo activo en ninguna capa. Medido con
+  // 2.527 memorias, con embeddings el rescate apenas suma aciertos y en cambio empuja la
+  // respuesta buena hacia abajo y trae recuerdos a preguntas ajenas; sin ellos, es lo que
+  // lleva el recall de 0,1 a 2,5 recuerdos por pregunta.
   const semanticLayer =
     queryVec !== undefined &&
-    hasComparableVectors(db, { model: semanticModel, dims: queryVec.length, scope: input.scope });
+    (hasComparableVectors(db, { model: semanticModel, dims: queryVec.length, scope: input.scope }) ||
+      hasComparableLayerVectors(db, {
+        model: semanticModel,
+        dims: queryVec.length,
+        scope: input.scope,
+      }));
   const lexical = lexicalCandidates(db, input, at, { rescue: !semanticLayer });
-  const memories = queryVec ? fuseMemories(lexical.memories, semantic, at) : lexical.memories;
+  const lexicalWeight = lexical.rescued ? RESCUED_SOURCE_WEIGHT : 1;
+
+  // Every signal is a source in one RRF fusion: an exact word match, a stored memory
+  // vector, and the stored vectors of traits and pending episodes. A hit found by several
+  // signals rises; no layer keeps a fixed step over another.
+  const sources: RankedSource[] = [
+    { hits: lexical.traits, weight: lexicalWeight },
+    { hits: lexical.memories, weight: lexicalWeight },
+    { hits: lexical.episodes, weight: lexicalWeight },
+  ];
+  if (queryVec) {
+    // One semantic ranking for the three layers: a trait or pending episode must beat a
+    // memory on cosine to pass it, instead of inheriting a full rank-1 share from its own
+    // short list. That keeps the layers competing by meaning, not by list membership.
+    const traits = semanticSearchLayer(db, "trait", queryVec, {
+      scope: input.scope,
+      limit: CANDIDATE_POOL_LIMIT,
+      minScore: cfg.minScore + TRAIT_SCORE_MARGIN,
+      model: semanticModel,
+    });
+    const episodes = semanticSearchLayer(db, "episode", queryVec, {
+      scope: input.scope,
+      limit: CANDIDATE_POOL_LIMIT,
+      minScore: cfg.minScore + EPISODE_SCORE_MARGIN,
+      model: semanticModel,
+    });
+    // Stable on purpose: an exact tie keeps the source order, which already applies
+    // salience for memories and id for layer rows. Re-sorting by id would erase that.
+    const byMeaning = [
+      ...semantic.map((hit) => ({
+        hit: semanticHitToRecall(hit, at),
+        score: hit.score + CONSOLIDATED_SEMANTIC_PRIOR,
+      })),
+      ...traits.map((hit) => ({ hit: layerHitToRecall(hit, "trait"), score: hit.score })),
+      ...episodes.map((hit) => ({ hit: layerHitToRecall(hit, "episode"), score: hit.score })),
+    ]
+      .sort((a, b) => b.score - a.score)
+      .map((entry) => entry.hit);
+    sources.push({ hits: byMeaning, weight: 1 });
+  }
+
   return finalizeHits(
     db,
-    { traits: lexical.traits, memories, episodes: lexical.episodes },
+    fuseHits(sources),
     input.limit,
     { ...options, reinforce: options.reinforce ?? input.reinforce },
     at,

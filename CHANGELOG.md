@@ -2,6 +2,20 @@
 
 ## Sin publicar
 
+### Recall híbrido: las tres capas compiten en un solo ranking (#154)
+
+- Con embeddings, `recall` devolvía cero episodios pendientes y cero rasgos: las memorias llenaban el tope y
+  el rescate léxico se apagaba. Ahora rasgos, memorias y episodios pendientes se fusionan en un único ranking
+  RRF, y rasgos y episodios se puntúan también por coseno. En el eval dorado el modo semántico pasa de
+  370/432 a 411/432, con episodio de 0/24 a 23/24 y rasgo de 0/24 a 21/24; las preguntas ajenas siguen en
+  11/48 y ningún tipo pierde más de un acierto.
+- Los vectores de rasgos y episodios pendientes viven en la tabla aditiva `layer_embeddings`, con borrado por
+  disparador al consolidar o borrar el item. `mismem-embed`, `consolidate` y el backfill los reindexan igual
+  que las memorias; `capture` y `crystallize` por MCP los embeben en el acto, sin romper la escritura si el
+  embedder falla.
+- `docs/recall.md` y `docs/architecture.md` describen el ranking nuevo y la línea base del 2026-10-30. Tests
+  en `engine/tests/hybrid-layers.test.ts` y `engine/tests/recall-relaxed.test.ts`.
+
 ### Un eval dorado público en castellano, con suelo en CI
 
 - `pnpm eval` mide el recall sobre un corpus sintético de doce dominios con preguntas literales, paráfrasis,
