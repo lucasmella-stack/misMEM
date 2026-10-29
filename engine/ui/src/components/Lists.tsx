@@ -9,7 +9,7 @@ import type { Selection } from "../App";
 import { ago, percent } from "../format";
 import { errorMessage } from "../lib/errors";
 import { inkPercent } from "../lib/ink";
-import { mergePages } from "../lib/pages";
+import { mergePages, nextPageOffset } from "../lib/pages";
 import { SearchHeader } from "./SearchHeader";
 
 interface ListProps {
@@ -197,12 +197,13 @@ export function MemoryList({
     queryFn: ({ pageParam, signal }) => api.memories(scope, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (last, _pages, lastOffset) =>
-      lastOffset + last.memories.length < last.total ? lastOffset + last.memories.length : undefined,
+      nextPageOffset(lastOffset, last.memories.length, last.total),
   });
 
   if (query.isPending) return <Loading label="Cargando las memorias…" />;
   const rows = mergePages(query.data?.pages.map((page) => page.memories) ?? []);
-  const total = query.data?.pages[0]?.total ?? 0;
+  // The total comes from the last page so the header and "load more" agree on what is left.
+  const total = query.data?.pages.at(-1)?.total ?? 0;
   const remaining = Math.max(0, total - rows.length);
 
   return (
@@ -270,12 +271,13 @@ export function TraitList({ scope, selected, onSelect }: ListProps) {
     queryFn: ({ pageParam, signal }) => api.traits(scope, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (last, _pages, lastOffset) =>
-      lastOffset + last.rows.length < last.total ? lastOffset + last.rows.length : undefined,
+      nextPageOffset(lastOffset, last.rows.length, last.total),
   });
 
   if (query.isPending) return <Loading label="Cargando los rasgos…" />;
   const rows = mergePages(query.data?.pages.map((page) => page.rows) ?? []);
-  const total = query.data?.pages[0]?.total ?? 0;
+  // The total comes from the last page so the header and "load more" agree on what is left.
+  const total = query.data?.pages.at(-1)?.total ?? 0;
   const remaining = Math.max(0, total - rows.length);
 
   return (
@@ -323,12 +325,13 @@ export function PendingList({ scope, selected, onSelect }: ListProps) {
     queryFn: ({ pageParam, signal }) => api.pendingEpisodes(scope, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (last, _pages, lastOffset) =>
-      lastOffset + last.rows.length < last.total ? lastOffset + last.rows.length : undefined,
+      nextPageOffset(lastOffset, last.rows.length, last.total),
   });
 
   if (query.isPending) return <Loading label="Cargando los episodios sin consolidar…" />;
   const rows = mergePages(query.data?.pages.map((page) => page.rows) ?? []);
-  const total = query.data?.pages[0]?.total ?? 0;
+  // The total comes from the last page so the header and "load more" agree on what is left.
+  const total = query.data?.pages.at(-1)?.total ?? 0;
   const remaining = Math.max(0, total - rows.length);
 
   return (

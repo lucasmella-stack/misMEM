@@ -4,7 +4,8 @@
  * Endpoints (todos detrás de la misma BasicAuth de /mcp):
  *   GET /viewer            → la interfaz compilada (ui/ → dist/ui), ver viewer-static.ts
  *   GET /api/stats         → totales por capa + top scopes
- *   GET /api/recent        → últimas N filas de una capa (?layer=&scope=&limit=&offset=)
+ *   GET /api/recent        → últimas N filas de una capa (?layer=&scope=&limit=&offset=);
+ *                            `offset` sólo aplica a rasgos y a episodios con pending=1
  *   GET /api/search        → recall híbrido read-only (?q=&scope=&limit=), con `truncated`
  *   El resto de GET /api/* (scopes, memories, memory/:id, trait/:id, graph) vive en viewer-api.ts.
  *
@@ -128,12 +129,14 @@ export function handleRecent(db: DB, res: ServerResponse, url: URL): void {
     const { n: total } = db
       .prepare("SELECT COUNT(*) AS n FROM traits WHERE (@scope IS NULL OR scope = @scope)")
       .get({ scope }) as { n: number };
+    // `id` breaks the tie: traits crystallized in the same millisecond share strength and
+    // updated_at, and a partial order can make two pages repeat one row and skip another.
     rows = db
       .prepare(
         `SELECT id, scope, name AS text, strength, polarity, created_at, updated_at
          FROM traits
          WHERE (@scope IS NULL OR scope = @scope)
-         ORDER BY strength DESC, updated_at DESC LIMIT @limit OFFSET @offset`,
+         ORDER BY strength DESC, updated_at DESC, id DESC LIMIT @limit OFFSET @offset`,
       )
       .all({ scope, limit, offset });
     json(res, 200, { layer, scope, rows, total });

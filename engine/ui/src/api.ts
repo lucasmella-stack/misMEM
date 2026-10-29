@@ -80,7 +80,7 @@ export interface SearchHit {
   via?: "semantic";
 }
 
-/** La respuesta de `/api/search`: el tope aplicado y si quedaron coincidencias fuera. */
+/** The `/api/search` response: the applied cap and whether matches were left out. */
 export interface SearchPage {
   hits: SearchHit[];
   limit: number;

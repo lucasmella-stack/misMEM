@@ -12,6 +12,21 @@ describe("SearchHeader", () => {
     expect(html).toContain("50 resultados, puede haber más: afina la consulta o elige un ámbito");
   });
 
+  it("con un ámbito elegido no manda elegir otro", () => {
+    const html = renderToStaticMarkup(
+      createElement(SearchHeader, {
+        term: "deploy",
+        scope: "trabajo",
+        count: 50,
+        truncated: true,
+        fetching: false,
+      }),
+    );
+
+    expect(html).toContain("afina la consulta o busca en toda la memoria");
+    expect(html).not.toContain("elige un ámbito");
+  });
+
   it("no avisa del corte cuando la lista está completa", () => {
     const html = renderToStaticMarkup(
       createElement(SearchHeader, { term: "alpha", count: 3, truncated: false, fetching: false }),

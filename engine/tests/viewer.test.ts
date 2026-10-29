@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { Database as DB } from "better-sqlite3";
 import { openDb } from "../src/db.js";
 import { capture, consolidate, crystallize } from "../src/tools.js";
@@ -157,10 +157,35 @@ describe("viewer: /api/recent", () => {
     expect(page2.rows).toHaveLength(1);
     expect(page2.total).toBe(3);
 
-    // Las dos páginas juntas traen los tres rasgos del ámbito, sin el de fuera.
+    // Both pages together bring the three traits of the scope, without the foreign one.
     const names = [...page1.rows, ...page2.rows].map((row: { text: string }) => row.text);
     expect(new Set(names).size).toBe(3);
     expect(names).not.toContain("ajeno");
+
+    // Without a scope the default view counts every trait and still paginates.
+    const all = read("layer=trait&limit=2&offset=0");
+    expect(all.rows).toHaveLength(2);
+    expect(all.total).toBe(4);
+  });
+
+  it("con fuerza y fecha empatadas desempata por id para que las páginas no se pisen", () => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+    const ids = ["uno", "dos", "tres"].map(
+      (name) => crystallize(db, { scope: "a", name, evidence_memory_ids: [`mem_${name}`] }).trait_id,
+    );
+    clock.mockRestore();
+
+    const read = (query: string) => {
+      const res = mockRes();
+      handleRecent(db, res as unknown as import("node:http").ServerResponse, urlFor(`/api/recent?${query}`));
+      return JSON.parse(res.body);
+    };
+
+    const rows = [
+      ...read("layer=trait&scope=a&limit=2&offset=0").rows,
+      ...read("layer=trait&scope=a&limit=2&offset=2").rows,
+    ];
+    expect(rows.map((row: { id: string }) => row.id)).toEqual([...ids].sort().reverse());
   });
 
   it("rejects invalid layer", () => {
