@@ -10,6 +10,12 @@ export interface ScopeCount {
   traits: number;
 }
 
+interface EmbeddingRecord {
+  model: string;
+  dims: number;
+  created_at: number;
+}
+
 interface MemoryItem {
   id: string;
   scope: string;
@@ -17,12 +23,26 @@ interface MemoryItem {
   details: string | null;
   salience: number;
   stored_salience: number;
+  use_count: number;
   created_at: number;
   last_accessed_at: number | null;
   noise: boolean;
   sources?: number;
   episodes_left?: number;
   traits?: number;
+}
+
+/** El estado del índice semántico; nunca incluye la URL del proveedor. */
+export interface EmbeddingStatus {
+  enabled: boolean;
+  provider: "ollama" | "openai";
+  model: string;
+  memories: number;
+  embedded: number;
+  missing: number;
+  compatible: number;
+  stale_model: number;
+  models: Array<{ model: string; dims: number; count: number }>;
 }
 
 export interface TraitItem {
@@ -60,7 +80,7 @@ export interface SearchHit {
 }
 
 export interface MemoryDetail {
-  memory: MemoryItem;
+  memory: MemoryItem & { embedding: EmbeddingRecord | null };
   episodes: Array<EpisodeItem | Missing>;
   traits: TraitItem[];
 }
@@ -199,6 +219,7 @@ export const actions = {
 
 export const api = {
   scopes: (signal?: AbortSignal) => get<{ scopes: ScopeCount[] }>("scopes", {}, signal),
+  embeddings: (signal?: AbortSignal) => get<EmbeddingStatus>("embeddings", {}, signal),
   consolidation: (signal?: AbortSignal) => get<ConsolidationState>("consolidate", {}, signal),
   memories: (scope: string | undefined, offset: number, signal?: AbortSignal) =>
     get<MemoriesPage>("memories", { scope, limit: String(PAGE_SIZE), offset: String(offset) }, signal),

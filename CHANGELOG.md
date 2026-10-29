@@ -2,6 +2,8 @@
 
 ## Sin publicar
 
+- El visor avisa cuando el índice semántico tiene memorias sin vector o con vectores de otro modelo, con las cifras y la orden `mismem-embed` para reindexar, y el detalle de cada memoria enseña sus usos, su modelo y dimensiones, y las fechas absolutas junto a las relativas.
+
 ## 0.6.0 — 2026-10-29
 
 ### El olvido respeta `before_days` también al borrar memorias

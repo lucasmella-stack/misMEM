@@ -36,6 +36,7 @@ import {
   json,
 } from "./viewer.js";
 import {
+  handleEmbeddings,
   handleGraph,
   handleMemories,
   handleMemory,
@@ -208,6 +209,7 @@ const httpServer = createHttpServer(async (req, res) => {
         return;
       }
       if (url.pathname === "/api/scopes") return handleScopes(db, res);
+      if (url.pathname === "/api/embeddings") return handleEmbeddings(db, res);
       if (url.pathname === "/api/consolidate") {
         res.statusCode = 200;
         res.setHeader("content-type", "application/json; charset=utf-8");

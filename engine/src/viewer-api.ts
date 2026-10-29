@@ -3,6 +3,7 @@
  *
  * Endpoints (misma auth y mismo filtro de Host que el resto de /api):
  *   GET /api/scopes          → ámbitos con sus conteos por capa
+ *   GET /api/embeddings      → estado del índice semántico, sin hablar con el proveedor
  *   GET /api/memories        → memorias por salience efectiva (?scope=&limit=&offset=&noise=1)
  *   GET /api/memory/:id      → la memoria, sus episodios de origen y los rasgos que la citan
  *   GET /api/trait/:id       → el rasgo y las memorias que lo sostienen
@@ -21,6 +22,8 @@ import { excludeNoiseSql, isNoiseGist } from "./noise.js";
 import { coUseLinks, parseIds, relatedLinks, type GraphLink } from "./relations.js";
 import { hubs, turnsRegistered } from "./connectome.js";
 import { effectiveSalience, type SalienceRow } from "./salience.js";
+import { getEmbeddingIndexStatus } from "./embeddings/store.js";
+import { loadEmbeddingConfig } from "./embeddings/provider.js";
 import { clampLimit, json, parseOffset } from "./viewer.js";
 
 interface MemoryRow extends SalienceRow {
@@ -29,6 +32,7 @@ interface MemoryRow extends SalienceRow {
   gist: string;
   details: string | null;
   source_episode_ids: string;
+  use_count: number;
 }
 
 interface TraitRow {
@@ -51,7 +55,7 @@ interface EpisodeRow {
 }
 
 const MEMORY_COLUMNS =
-  "id, scope, gist, details, source_episode_ids, salience, created_at, last_accessed_at, salience_updated_at";
+  "id, scope, gist, details, source_episode_ids, salience, use_count, created_at, last_accessed_at, salience_updated_at";
 const GRAPH_MAX_MEMORIES = 400;
 const GRAPH_MAX_TRAITS = 200;
 const GRAPH_MAX_EPISODES = 2000;
@@ -115,6 +119,7 @@ function memoryView(row: MemoryRow, at: number) {
     details: row.details,
     salience: effectiveSalience(row, at),
     stored_salience: row.salience,
+    use_count: row.use_count,
     created_at: row.created_at,
     last_accessed_at: row.last_accessed_at,
     noise: isNoiseGist(row.gist),
@@ -131,6 +136,21 @@ function traitView(row: TraitRow) {
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
+}
+
+/**
+ * Read-only view of the semantic index. It reads the config and the database only: the
+ * provider URL may carry credentials, so it never leaves the server and no request is made.
+ */
+export function handleEmbeddings(db: DB, res: ServerResponse): void {
+  const cfg = loadEmbeddingConfig();
+  const status = getEmbeddingIndexStatus(db, cfg.model);
+  json(res, 200, {
+    enabled: cfg.enabled,
+    provider: cfg.provider,
+    model: cfg.model,
+    ...status,
+  });
 }
 
 export function handleScopes(db: DB, res: ServerResponse): void {
@@ -238,7 +258,17 @@ export function handleMemory(db: DB, res: ServerResponse, id: string, at = Date.
       .all(id) as TraitRow[]
   ).map(traitView);
 
-  json(res, 200, { memory: memoryView(row, at), episodes, traits });
+  // Only the detail needs the vector metadata: the lists would pay one query per row for
+  // something they do not show.
+  const embedding = db
+    .prepare("SELECT model, dims, created_at FROM memory_embeddings WHERE memory_id = ?")
+    .get(id) as { model: string; dims: number; created_at: number } | undefined;
+
+  json(res, 200, {
+    memory: { ...memoryView(row, at), embedding: embedding ?? null },
+    episodes,
+    traits,
+  });
 }
 
 export function handleTrait(db: DB, res: ServerResponse, id: string, at = Date.now()): void {

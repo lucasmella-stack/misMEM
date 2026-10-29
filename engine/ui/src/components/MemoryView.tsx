@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { actions, api, isMissing, type ForgetChallenge, type MemoryDetail } from "../api";
-import { ago, exact, percent } from "../format";
+import { percent, when } from "../format";
+import { embeddingSummary } from "../lib/embeddings";
 import { errorMessage } from "../lib/errors";
 import { inkPercent } from "../lib/ink";
 import {
@@ -152,11 +153,13 @@ export function MemoryView({ id, onSelect, onChanged, onAnnounce }: DetailViewPr
         <dt className="text-ink-muted">Ámbito</dt>
         <dd className="text-ink-soft">{memory.scope}</dd>
         <dt className="text-ink-muted">Consolidada</dt>
-        <dd className="text-ink-soft" title={exact(memory.created_at)}>
-          {ago(memory.created_at)}
-        </dd>
+        <dd className="text-ink-soft">{when(memory.created_at)}</dd>
         <dt className="text-ink-muted">Último uso</dt>
-        <dd className="text-ink-soft">{ago(memory.last_accessed_at)}</dd>
+        <dd className="text-ink-soft">{when(memory.last_accessed_at)}</dd>
+        <dt className="text-ink-muted">Usos</dt>
+        <dd className="text-ink-soft">{memory.use_count}</dd>
+        <dt className="text-ink-muted">Vector</dt>
+        <dd className="text-ink-soft">{embeddingSummary(memory.embedding)}</dd>
       </dl>
 
       {!editing && (
@@ -188,7 +191,7 @@ export function MemoryView({ id, onSelect, onChanged, onAnnounce }: DetailViewPr
                 <li key={episode.id} className="rounded-md bg-field px-2.5 py-2">
                   <p className="text-sm leading-relaxed text-ink-soft">{episode.text}</p>
                   <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-ink-muted">
-                    <span title={exact(episode.created_at)}>{ago(episode.created_at)}</span>
+                    <span>{when(episode.created_at)}</span>
                     {episode.linked_here === false && <span>ahora consolidado en otra memoria</span>}
                   </p>
                 </li>

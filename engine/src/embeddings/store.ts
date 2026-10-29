@@ -207,28 +207,55 @@ export interface EmbeddingIndexStatus {
 export function getEmbeddingIndexStatus(
   db: DB,
   activeModel: string,
+  expectedDims?: number,
 ): EmbeddingIndexStatus {
+  // Noise markers never get a vector on purpose, so counting them as missing would make
+  // a healthy index look forever broken.
   const memories = (
-    db.prepare("SELECT COUNT(*) AS n FROM memories").get() as { n: number }
+    db
+      .prepare(`SELECT COUNT(*) AS n FROM memories m WHERE ${excludeNoiseSql("m")}`)
+      .get() as { n: number }
   ).n;
   const embedded = (
-    db.prepare("SELECT COUNT(*) AS n FROM memory_embeddings").get() as {
-      n: number;
-    }
-  ).n;
-  const compatible = (
     db
       .prepare(
-        "SELECT COUNT(*) AS n FROM memory_embeddings WHERE model = ?",
+        `SELECT COUNT(*) AS n FROM memory_embeddings e
+         JOIN memories m ON m.id = e.memory_id
+         WHERE ${excludeNoiseSql("m")}`,
       )
-      .get(activeModel) as { n: number }
+      .get() as { n: number }
   ).n;
+  // A vector is only usable by search when it has both the active model and the width
+  // that model produces. Without a configured width, the most common one is the best
+  // guess; a tie breaks towards the smaller width so the report is deterministic.
+  const dominant = db
+    .prepare(
+      `SELECT e.dims FROM memory_embeddings e
+       JOIN memories m ON m.id = e.memory_id
+       WHERE e.model = ? AND ${excludeNoiseSql("m")}
+       GROUP BY e.dims ORDER BY COUNT(*) DESC, e.dims ASC LIMIT 1`,
+    )
+    .get(activeModel) as { dims: number } | undefined;
+  const dims = expectedDims ?? dominant?.dims;
+  const compatible =
+    dims === undefined
+      ? 0
+      : (
+          db
+            .prepare(
+              `SELECT COUNT(*) AS n FROM memory_embeddings e
+               JOIN memories m ON m.id = e.memory_id
+               WHERE e.model = ? AND e.dims = ? AND ${excludeNoiseSql("m")}`,
+            )
+            .get(activeModel, dims) as { n: number }
+        ).n;
   const models = db
     .prepare(
-      `SELECT model, dims, COUNT(*) AS count
-       FROM memory_embeddings
-       GROUP BY model, dims
-       ORDER BY count DESC, model, dims`,
+      `SELECT e.model, e.dims, COUNT(*) AS count FROM memory_embeddings e
+       JOIN memories m ON m.id = e.memory_id
+       WHERE ${excludeNoiseSql("m")}
+       GROUP BY e.model, e.dims
+       ORDER BY count DESC, e.model, e.dims`,
     )
     .all() as Array<{ model: string; dims: number; count: number }>;
 

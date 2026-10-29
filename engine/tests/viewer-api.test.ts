@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { afterEach, describe, it, expect, beforeEach, vi } from "vitest";
 import type { ServerResponse } from "node:http";
 import type { Database as DB } from "better-sqlite3";
 import { openDb } from "../src/db.js";
 import { capture, consolidate, crystallize, reinforce } from "../src/tools.js";
 import { saveMemoryEmbedding } from "../src/embeddings/store.js";
 import {
+  handleEmbeddings,
   handleGraph,
   handleMemories,
   handleMemory,
@@ -16,6 +17,28 @@ import { relatedLinks } from "../src/relations.js";
 
 const DAY = 86_400_000;
 let db: DB;
+
+const EMBED_ENV_KEYS = [
+  "MISMEM_EMBEDDINGS",
+  "MISMEM_EMBEDDING_PROVIDER",
+  "MISMEM_EMBEDDING_URL",
+  "MISMEM_OLLAMA_URL",
+  "MISMEM_EMBEDDING_MODEL",
+] as const;
+const savedEmbedEnv = Object.fromEntries(EMBED_ENV_KEYS.map((key) => [key, process.env[key]]));
+
+afterEach(() => {
+  for (const key of EMBED_ENV_KEYS) {
+    if (savedEmbedEnv[key] === undefined) delete process.env[key];
+    else process.env[key] = savedEmbedEnv[key];
+  }
+  vi.unstubAllGlobals();
+});
+
+function setEmbedEnv(values: Partial<Record<(typeof EMBED_ENV_KEYS)[number], string>>): void {
+  for (const key of EMBED_ENV_KEYS) delete process.env[key];
+  Object.assign(process.env, values);
+}
 
 beforeEach(() => {
   db = openDb(":memory:");
@@ -47,7 +70,13 @@ interface ApiBody {
   total?: number;
   memories?: Array<{ id: string; stored_salience?: number; salience?: number }>;
   scopes?: unknown;
-  memory?: { id?: string; text?: string };
+  memory?: {
+    id?: string;
+    text?: string;
+    use_count?: number;
+    embedding?: { model: string; dims: number; created_at: number } | null;
+  };
+
   episodes?: Array<{ id?: string; text?: string; missing?: boolean; linked_here?: boolean }>;
   trait?: { id?: string; text?: string; strength?: number };
   evidence?: Array<{ id?: string; text?: string; missing?: boolean }>;
@@ -69,6 +98,18 @@ interface ApiBody {
     min_n: number;
     hubs: Array<{ id: string; degree: number; strength: number }>;
   };
+}
+
+interface EmbeddingBody {
+  enabled: boolean;
+  provider: string;
+  model: string;
+  memories: number;
+  embedded: number;
+  missing: number;
+  compatible: number;
+  stale_model: number;
+  models: Array<{ model: string; dims: number; count: number }>;
 }
 
 function call(fn: (res: ServerResponse) => void): { status: number; body: ApiBody } {
@@ -101,6 +142,76 @@ describe("viewer-api: parseDetailPath", () => {
   it("cualquier otra ruta no es de detalle", () => {
     expect(parseDetailPath("/api/memory/")).toBeNull();
     expect(parseDetailPath("/api/memory/a/b")).toBeNull();
+  });
+});
+
+describe("viewer-api: /api/embeddings", () => {
+  const status = (): EmbeddingBody => call((res) => handleEmbeddings(db, res)).body as unknown as EmbeddingBody;
+
+  it("una base vacía se lee sin llamar al servidor de embeddings", () => {
+    setEmbedEnv({ MISMEM_EMBEDDINGS: "off", MISMEM_EMBEDDING_MODEL: "embeddinggemma-2" });
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    expect(status()).toMatchObject({
+      enabled: false,
+      provider: "ollama",
+      model: "embeddinggemma-2",
+      memories: 0,
+      embedded: 0,
+      missing: 0,
+      compatible: 0,
+      stale_model: 0,
+      models: [],
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("con el índice al día, el ruido no cuenta como sin vector", () => {
+    setEmbedEnv({ MISMEM_EMBEDDING_MODEL: "embeddinggemma-2" });
+    const { memoryId } = memoryFrom("a", "una memoria", ["e1"]);
+    memoryFrom("a", "[noise] lo descartado", ["e2"]);
+    saveMemoryEmbedding(db, memoryId, "embeddinggemma-2", Float32Array.from([1, 0, 0]));
+
+    expect(status()).toMatchObject({
+      enabled: true,
+      memories: 1,
+      embedded: 1,
+      missing: 0,
+      compatible: 1,
+      stale_model: 0,
+      models: [{ model: "embeddinggemma-2", dims: 3, count: 1 }],
+    });
+  });
+
+  it("los vectores de otro modelo cuentan como obsoletos, no como ausentes", () => {
+    setEmbedEnv({ MISMEM_EMBEDDING_MODEL: "nuevo" });
+    const { memoryId } = memoryFrom("a", "una memoria", ["e1"]);
+    saveMemoryEmbedding(db, memoryId, "viejo", Float32Array.from([1, 0, 0]));
+
+    expect(status()).toMatchObject({
+      memories: 1,
+      embedded: 1,
+      missing: 0,
+      compatible: 0,
+      stale_model: 1,
+    });
+  });
+
+  it("no devuelve la URL del proveedor aunque lleve credenciales", () => {
+    // Built at runtime so the fixture never reads as a committed credential to secret scanners.
+    const userinfo = ["usuario", "secreto"].join(":");
+    setEmbedEnv({
+      MISMEM_EMBEDDING_PROVIDER: "openai",
+      MISMEM_EMBEDDING_URL: `http://${userinfo}@embed.test/v1`,
+      MISMEM_EMBEDDING_MODEL: "embeddinggemma-2",
+    });
+
+    const body = status();
+    expect(body).toMatchObject({ provider: "openai", model: "embeddinggemma-2" });
+    expect(JSON.stringify(body)).not.toContain("usuario");
+    expect(JSON.stringify(body)).not.toContain("secreto");
+    expect(JSON.stringify(body)).not.toContain("embed.test");
   });
 });
 
@@ -181,6 +292,27 @@ describe("viewer-api: /api/memory/:id", () => {
 
   it("un id que no existe es 404", () => {
     expect(call((res) => handleMemory(db, res, "NOPE")).status).toBe(404);
+  });
+
+  it("trae los usos medidos y el vector con su modelo, dimensiones y fecha", () => {
+    const { memoryId } = memoryFrom("a", "la memoria", ["primero"]);
+    reinforce(db, { memory_ids: [memoryId] });
+    reinforce(db, { memory_ids: [memoryId] });
+    saveMemoryEmbedding(db, memoryId, "embeddinggemma-2", Float32Array.from([1, 0, 0]));
+
+    const { body } = call((res) => handleMemory(db, res, memoryId));
+
+    expect(body.memory).toMatchObject({
+      use_count: 2,
+      embedding: { model: "embeddinggemma-2", dims: 3 },
+    });
+    expect(body.memory?.embedding?.created_at).toEqual(expect.any(Number));
+  });
+
+  it("sin vector, el detalle lo dice con null", () => {
+    const { memoryId } = memoryFrom("a", "la memoria", ["primero"]);
+    const { body } = call((res) => handleMemory(db, res, memoryId));
+    expect(body.memory).toMatchObject({ use_count: 0, embedding: null });
   });
 });
 

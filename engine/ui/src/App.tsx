@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Toaster } from "@/components/ui/sonner";
 import { actions, api, type EpisodeItem, type Layer, type Polarity } from "./api";
 import { Scopes } from "./components/Scopes";
+import { EmbeddingNotice } from "./components/EmbeddingNotice";
 import { MemoryList, PendingList, SearchResults, TraitList } from "./components/Lists";
 import { DetailPanel } from "./components/Detail";
 import { Consolidate } from "./components/Consolidate";
@@ -238,6 +239,8 @@ export function App() {
           </Button>
         </div>
       </header>
+
+      <EmbeddingNotice />
 
       <div
         className={`flex min-h-0 flex-1 flex-col md:grid md:overflow-hidden ${
