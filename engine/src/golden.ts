@@ -4,6 +4,16 @@
  * The corpus is JSONL (one file per domain) loaded into a throwaway DB. No network: load
  * and run are pure, and the embedder is injected as in `bench.ts`. Off-topic questions are
  * measured apart because they cannot possibly hit.
+ *
+ * Data format, one JSON object per line in `eval/golden/<domain>.jsonl`:
+ *   {"type":"memory","key":"dev-01","scope":"lucia/dev","gist":"…","details":"…","days_ago":12,"salience":0.8}
+ *   {"type":"trait","key":"dev-t1","scope":"lucia/dev","name":"…","evidence":["dev-01"]}
+ *   {"type":"episode","key":"dev-e1","scope":"lucia/dev","body":"…","days_ago":1}   (pending, unconsolidated)
+ *   {"type":"query","id":"dev-q01","kind":"parafrasis","query":"…","expect":["dev-01"],"scope":"…"}
+ * `details`, `salience` and the query `scope` are optional. Keys are unique across files; `expect` names
+ * any record key and is empty only for `ajena` (a question that must bring nothing back). A gist that
+ * starts with `[noise] ` or `[pareto:l0] ` is a noise marker: loaded, never expected, never returned.
+ * Query kinds are `GOLDEN_KINDS` below.
  */
 import { basename } from "node:path";
 import type { Database as DB } from "better-sqlite3";

@@ -2,6 +2,14 @@
 
 ## Sin publicar
 
+### Un eval dorado público en castellano, con suelo en CI
+
+- `mismem-eval` mide el recall sobre un corpus sintético de doce dominios con preguntas literales, paráfrasis,
+  erratas y ajenas, y `engine/tests/golden.test.ts` impide que el modo léxico baje del suelo de
+  `engine/eval/golden/floor.json`, supere las ajenas permitidas o devuelva marcadores de ruido. El corpus es
+  público y reproducible, no viaja en el paquete npm, y quien mejora el recall sube el suelo en el mismo PR.
+  La línea base y los comandos están en `docs/recall.md`.
+
 ## 0.6.0 — 2026-10-29
 
 ### El olvido respeta `before_days` también al borrar memorias

@@ -59,3 +59,28 @@ variables, con sus defaults, están en
 pregunta y `noiseHits` (marcadores que se escaparon: tiene que ser 0). Se corre antes y después de tocar
 `tools.ts`, `search.ts` o `embeddings/`. El banco de preguntas es privado y sale de la propia memoria.
 Cómo usarlo en un servidor: [DEPLOY.md](../DEPLOY.md#medir-el-recall).
+
+`mismem-eval` mide lo mismo sobre un corpus sintético y público en castellano: una persona ficticia en doce
+dominios. Sirve para comparar entre máquinas y para subir el suelo en CI. Desde `engine/`:
+
+```bash
+npx tsx src/eval-cli.ts --mode lexico
+node dist/eval-cli.js --mode semantico
+```
+
+El segundo exige `pnpm build` y las variables `MISMEM_EMBEDDING_*` del servidor de embeddings
+([DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única)); `--mode auto` usa el semántico si el
+embedder responde. Los datos viven en `engine/eval/golden/`, un `.jsonl` por dominio, y el formato y los
+tipos de pregunta están en la cabecera de [`engine/src/golden.ts`](../engine/src/golden.ts). La puerta de CI
+(`engine/tests/golden.test.ts`) exige que el modo léxico no baje del suelo por tipo de `floor.json` ni supere
+`lexico_ajenas_max`, y que ningún marcador de ruido llegue al resultado; quien mejora el recall sube el suelo
+en el mismo PR. No viaja en el paquete npm: se corre desde el repositorio.
+
+Línea base del 2026-10-30 (tope 5, aciertos dentro del tope; caduca cuando cambia el corpus):
+
+| Modo | Global | MRR | Paráfrasis | Episodio | Rasgo | Ajenas con algo | Recuerdos por pregunta |
+|---|---|---|---|---|---|---|---|
+| Léxico | 221/432 | 0,48 | 0/72 | 20/24 | 8/24 | 8/48 | 0,9 |
+| Semántico (`embeddinggemma-2`, corte 0,65) | 370/432 | 0,79 | 64/72 | 0/24 | 0/24 | 11/48 | 4,8 |
+
+Los dos ceros del semántico son el issue #154.
