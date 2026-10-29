@@ -6,13 +6,17 @@
 
 - Con embeddings, `recall` devolvía cero episodios pendientes y cero rasgos: las memorias llenaban el tope y
   el rescate léxico se apagaba. Ahora rasgos, memorias y episodios pendientes se fusionan en un único ranking
-  RRF, y rasgos y episodios se puntúan también por coseno. En el eval dorado el modo semántico pasa de
-  370/432 a 411/432, con episodio de 0/24 a 23/24 y rasgo de 0/24 a 21/24; las preguntas ajenas siguen en
-  11/48 y ningún tipo pierde más de un acierto.
+  RRF, y rasgos y episodios se puntúan también por coseno. El resultado se queda con el mejor rasgo y como
+  mucho dos episodios, porque sin ese tope los rasgos y los episodios desplazaban a la memoria concreta. En
+  el eval dorado (tope 5) el modo semántico pasa de 368/432 a 411/432, con episodio de 0/24 a 23/24 y rasgo
+  de 0/24 a 19/24; el acierto en primera posición sube de 329 a 355, el MRR de 0,796 a 0,871 y las preguntas
+  ajenas siguen en 11/48 con 32 recuerdos. Las preguntas que esperan una memoria aciertan en primera 328/384
+  frente a 329/384 de la línea base, y ningún tipo de pregunta pierde más de un acierto frente a ella.
 - Los vectores de rasgos y episodios pendientes viven en la tabla aditiva `layer_embeddings`, con borrado por
   disparador al consolidar o borrar el item. `mismem-embed`, `consolidate` y el backfill los reindexan igual
-  que las memorias; `capture` y `crystallize` por MCP los embeben en el acto, sin romper la escritura si el
-  embedder falla.
+  que las memorias; `capture`, `crystallize`, los aliases `mem_save`, `mem_session_summary` y `mem_update`, y
+  `/api/crystallize` del visor los embeben en el acto, sin romper la escritura si el embedder falla. Renombrar
+  un rasgo por `mem_update` borra su vector viejo.
 - `docs/recall.md` y `docs/architecture.md` describen el ranking nuevo y la línea base del 2026-10-30. Tests
   en `engine/tests/hybrid-layers.test.ts` y `engine/tests/recall-relaxed.test.ts`.
 

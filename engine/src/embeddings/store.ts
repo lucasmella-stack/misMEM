@@ -330,6 +330,10 @@ export function saveLayerEmbedding(
   );
 }
 
+// The write path already committed the item; this cap only bounds how long the caller waits
+// for its vector. The backfill runs without it because there the wait is the job.
+const WRITE_EMBED_TIMEOUT_MS = 1_000;
+
 /**
  * Embeds one freshly written trait or episode, best effort. `capture` and `crystallize`
  * go through here so the item is searchable by meaning at once; a dead embedder returns
@@ -353,15 +357,29 @@ export async function embedLayerItem(
           .get(itemId) as { text: string } | undefined);
   if (!row) return false;
 
+  const timeoutMs =
+    opts.timeoutMs ?? Math.min(cfg.timeoutMs, WRITE_EMBED_TIMEOUT_MS);
   const embedFn =
     opts.embedFn ??
-    ((texts: string[]) =>
-      embedTexts(texts, { ...cfg, timeoutMs: opts.timeoutMs ?? cfg.timeoutMs }));
+    ((texts: string[]) => embedTexts(texts, { ...cfg, timeoutMs }));
   const vecs = await embedFn([row.text.slice(0, cfg.maxChars)]);
   const vec = vecs?.[0];
   if (!vec) return false;
-  saveLayerEmbedding(db, layer, itemId, opts.model ?? cfg.model, vec);
-  return true;
+  const model = opts.model ?? cfg.model;
+
+  // The item can be consolidated or deleted while the embedder responds. Check and save in
+  // one transaction so a trigger that already ran cannot leave a vector without its row.
+  return db.transaction(() => {
+    const alive =
+      layer === "trait"
+        ? db.prepare("SELECT 1 FROM traits WHERE id = ?").get(itemId)
+        : db
+            .prepare("SELECT 1 FROM episodes WHERE id = ? AND consolidated_into IS NULL")
+            .get(itemId);
+    if (alive === undefined) return false;
+    saveLayerEmbedding(db, layer, itemId, model, vec);
+    return true;
+  })();
 }
 
 export interface LayerSemanticHit {
@@ -455,13 +473,55 @@ export function hasComparableLayerVectors(
   );
 }
 
+interface LayerIndexStatus {
+  items: number;
+  embedded: number;
+  missing: number;
+  compatible: number;
+  stale_model: number;
+}
+
 export interface EmbeddingIndexStatus {
   memories: number;
   embedded: number;
   missing: number;
   compatible: number;
   stale_model: number;
+  layers: { trait: LayerIndexStatus; episode: LayerIndexStatus };
   models: Array<{ model: string; dims: number; count: number }>;
+}
+
+function layerIndexStatus(
+  db: DB,
+  layer: LayerName,
+  activeModel: string,
+): LayerIndexStatus {
+  const source =
+    layer === "trait"
+      ? `FROM traits t
+         LEFT JOIN layer_embeddings e ON e.layer = 'trait' AND e.item_id = t.id`
+      : `FROM episodes ep
+         LEFT JOIN layer_embeddings e ON e.layer = 'episode' AND e.item_id = ep.id
+         WHERE ep.consolidated_into IS NULL`;
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS items,
+              COALESCE(SUM(CASE WHEN e.item_id IS NOT NULL THEN 1 ELSE 0 END), 0) AS embedded,
+              COALESCE(SUM(CASE WHEN e.model = @model THEN 1 ELSE 0 END), 0) AS compatible
+       ${source}`,
+    )
+    .get({ model: activeModel }) as {
+    items: number;
+    embedded: number;
+    compatible: number;
+  };
+  return {
+    items: row.items,
+    embedded: row.embedded,
+    missing: row.items - row.embedded,
+    compatible: row.compatible,
+    stale_model: row.embedded - row.compatible,
+  };
 }
 
 export function getEmbeddingIndexStatus(
@@ -485,8 +545,11 @@ export function getEmbeddingIndexStatus(
   ).n;
   const models = db
     .prepare(
-      `SELECT model, dims, COUNT(*) AS count
-       FROM memory_embeddings
+      `SELECT model, dims, SUM(count) AS count FROM (
+         SELECT model, dims, COUNT(*) AS count FROM memory_embeddings GROUP BY model, dims
+         UNION ALL
+         SELECT model, dims, COUNT(*) AS count FROM layer_embeddings GROUP BY model, dims
+       )
        GROUP BY model, dims
        ORDER BY count DESC, model, dims`,
     )
@@ -498,6 +561,10 @@ export function getEmbeddingIndexStatus(
     missing: memories - embedded,
     compatible,
     stale_model: embedded - compatible,
+    layers: {
+      trait: layerIndexStatus(db, "trait", activeModel),
+      episode: layerIndexStatus(db, "episode", activeModel),
+    },
     models,
   };
 }

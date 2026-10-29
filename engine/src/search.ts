@@ -13,12 +13,13 @@ const RRF_K = 60;
 // sólo desempata. Más abajo los puestos se achican (≈ 0.00008 al final de los 50
 // candidatos) y una saliencia alta puede adelantar dos o tres lugares.
 const SALIENCE_RRF_WEIGHT = 0.0002;
-// The rescue is a weaker signal than an exact match, so the fusion needs its weight.
-export const RESCUED_SOURCE_WEIGHT = 0.6;
-// A trait condenses many memories into one line, so a match answers more with less text.
-// The boost keeps it visible when a memory and a trait describe the same thing, without
-// turning traits into a fixed first tier: a memory that matches both signals still wins.
-const TRAIT_SOURCE_WEIGHT = 1.15;
+// A trait is one broad rule, so it matches many questions by meaning and can crowd out the
+// specific memory that answers them. On the golden corpus, letting the fusion return every
+// trait dropped memory first hits from 329 to 293; keeping only the best one and up to two
+// episodes (the rest of the result stays memories) restored 328 without losing a question
+// type against the lexical baseline.
+const MAX_TRAIT_HITS = 1;
+const MAX_EPISODE_HITS = 2;
 // A memory is already distilled and curated; an episode is raw and a trait is a compressed
 // rule. On near-equal cosine, prefer the consolidated record. A layer still wins when its
 // meaning is clearly closer, so this is a tie-break, not a restored layer order.
@@ -507,14 +508,17 @@ export function fuseHits(sources: readonly RankedSource[]): RecallHit[] {
 
   for (const source of sources) {
     source.hits.forEach((hit, index) => {
-      const layerWeight = hit.layer === "trait" ? TRAIT_SOURCE_WEIGHT : 1;
-      const contribution = (source.weight * layerWeight) / (RRF_K + index + 1);
-      const current = candidates.get(hit.id);
+      // Every layer has the same source weight. A 1.15 trait multiplier was measured to
+      // move a trait nine ranks ahead of a memory at the top (1.15/61 vs 1/61); on the
+      // golden corpus that made memories lose the first place without a compensating win.
+      const contribution = source.weight / (RRF_K + index + 1);
+      const key = `${hit.layer}:${hit.id}`;
+      const current = candidates.get(key);
       if (current) {
         current.rrf += contribution;
         return;
       }
-      candidates.set(hit.id, { hit, rrf: contribution });
+      candidates.set(key, { hit, rrf: contribution });
     });
   }
 
@@ -530,4 +534,29 @@ export function fuseHits(sources: readonly RankedSource[]): RecallHit[] {
       );
     })
     .map(({ hit }) => hit);
+}
+
+/**
+ * Keeps the first `maxTraits` traits and `maxEpisodes` episodes and drops the rest. Fed
+ * with the cosine-ordered semantic list it keeps the closest of each layer; fed with the
+ * fused result it bounds how many of them can occupy the limit and push a memory out.
+ */
+export function capLayerHits(
+  hits: readonly RecallHit[],
+  maxTraits = MAX_TRAIT_HITS,
+  maxEpisodes = MAX_EPISODE_HITS,
+): RecallHit[] {
+  let traits = 0;
+  let episodes = 0;
+  return hits.filter((hit) => {
+    if (hit.layer === "trait") {
+      traits += 1;
+      return traits <= maxTraits;
+    }
+    if (hit.layer === "episode") {
+      episodes += 1;
+      return episodes <= maxEpisodes;
+    }
+    return true;
+  });
 }

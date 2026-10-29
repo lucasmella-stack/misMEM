@@ -272,6 +272,32 @@ describe("handleAction", () => {
     expect(started).toEqual(["ok", undefined]);
   });
 
+  it("/api/crystallize embebe el rasgo que acaba de crear", async () => {
+    const { memoryId } = memoryFrom("a", "memoria", ["e1"]);
+    const seen: string[] = [];
+    const res = { statusCode: 200, setHeader() {}, end() {} };
+    await handleAction(
+      db,
+      res as unknown as ServerResponse,
+      "/api/crystallize",
+      { scope: "a", name: "rasgo de la interfaz", evidence_memory_ids: [memoryId] },
+      {
+        reembed: noReembed,
+        embeddingModel: "fake",
+        embedFn: async (texts) => {
+          seen.push(...texts);
+          return texts.map(() => Float32Array.from([1, 0]));
+        },
+      },
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(seen).toContain("rasgo de la interfaz");
+    expect(
+      db.prepare("SELECT model FROM layer_embeddings WHERE layer = 'trait'").get(),
+    ).toEqual({ model: "fake" });
+  });
+
   it("una entrada inválida es 400 y una ruta desconocida no se despacha", async () => {
     const { memoryId } = memoryFrom("a", "memoria", ["e1"]);
     expect((await act(`/api/memory/${memoryId}/edit`, { gist: "" })).status).toBe(400);

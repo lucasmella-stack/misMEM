@@ -8,6 +8,7 @@ import { capture, consolidate, crystallize, recallHybrid } from "../src/tools.js
 import {
   embedLayerItem,
   embedPendingMemories,
+  getEmbeddingIndexStatus,
   saveLayerEmbedding,
   semanticSearchLayer,
 } from "../src/embeddings/store.js";
@@ -83,6 +84,145 @@ describe("capas semánticas en el recall", () => {
     ]);
     expect(hits.find((hit) => hit.id === trait)?.via).toBe("semantic");
     expect(hits.find((hit) => hit.id === episode)?.via).toBe("semantic");
+  });
+
+  it("una memoria más cercana gana a un rasgo aunque el rasgo fuera antes intocable", async () => {
+    const source = capture(db, { scope: "dev", body: "origen de la memoria" });
+    const memory = consolidate(db, {
+      scope: "dev",
+      gist: "memoria concreta",
+      source_episode_ids: [source.id],
+    }).memory_id;
+    const trait = crystallize(db, {
+      scope: "dev",
+      name: "regla general",
+      evidence_memory_ids: [memory],
+    }).trait_id;
+    const query = "consulta";
+    const embed = tableEmbed({
+      [query]: axis(1),
+      "memoria concreta": axis(0.9),
+      "regla general": axis(0.8),
+    });
+    await embedPendingMemories(db, { embedFn: embed, model: "fake" });
+
+    const { hits } = await recallHybrid(
+      db,
+      { query, limit: 5 },
+      embed,
+      { reinforce: false, embeddingModel: "fake" },
+    );
+
+    // The old 1.15 trait multiplier put the 0.8 trait over the 0.9 memory.
+    expect(hits[0]?.layer).toBe("memory");
+    expect(hits[0]?.id).toBe(memory);
+    expect(hits.map((hit) => hit.id)).toContain(trait);
+  });
+
+  it("deja un solo rasgo, el de mayor coseno, en el resultado", async () => {
+    const source = capture(db, { scope: "dev", body: "origen" });
+    const memory = consolidate(db, {
+      scope: "dev",
+      gist: "memoria de apoyo",
+      source_episode_ids: [source.id],
+    }).memory_id;
+    const best = crystallize(db, {
+      scope: "dev",
+      name: "rasgo cercano",
+      evidence_memory_ids: [memory],
+    }).trait_id;
+    const second = crystallize(db, {
+      scope: "dev",
+      name: "rasgo lejano",
+      evidence_memory_ids: [memory],
+    }).trait_id;
+    const query = "consulta";
+    const embed = tableEmbed({
+      [query]: axis(1),
+      "memoria de apoyo": axis(0.8),
+      "rasgo cercano": axis(0.95),
+      "rasgo lejano": axis(0.9),
+    });
+    await embedPendingMemories(db, { embedFn: embed, model: "fake" });
+
+    const { hits } = await recallHybrid(
+      db,
+      { query, limit: 5 },
+      embed,
+      { reinforce: false, embeddingModel: "fake" },
+    );
+
+    const traits = hits.filter((hit) => hit.layer === "trait");
+    expect(traits).toHaveLength(1);
+    expect(traits[0]?.id).toBe(best);
+    expect(hits.map((hit) => hit.id)).not.toContain(second);
+  });
+
+  it("deja dos episodios, los de mayor coseno, en el resultado", async () => {
+    const source = capture(db, { scope: "dev", body: "origen" });
+    const memory = consolidate(db, {
+      scope: "dev",
+      gist: "memoria de apoyo",
+      source_episode_ids: [source.id],
+    }).memory_id;
+    const first = capture(db, { scope: "dev", body: "episodio uno" }).id;
+    const second = capture(db, { scope: "dev", body: "episodio dos" }).id;
+    const third = capture(db, { scope: "dev", body: "episodio tres" }).id;
+    const query = "consulta";
+    const embed = tableEmbed({
+      [query]: axis(1),
+      "memoria de apoyo": axis(0.8),
+      "episodio uno": axis(0.95),
+      "episodio dos": axis(0.9),
+      "episodio tres": axis(0.85),
+    });
+    await embedPendingMemories(db, { embedFn: embed, model: "fake" });
+
+    const { hits } = await recallHybrid(
+      db,
+      { query, limit: 5 },
+      embed,
+      { reinforce: false, embeddingModel: "fake" },
+    );
+
+    const episodes = hits.filter((hit) => hit.layer === "episode").map((hit) => hit.id);
+    expect(episodes).toEqual([first, second]);
+    expect(episodes).not.toContain(third);
+    expect(hits.map((hit) => hit.id)).toContain(memory);
+  });
+
+  it("una ajena con cosenos justo por debajo de cada puerta no entra", async () => {
+    const source = capture(db, { scope: "dev", body: "origen" });
+    const memory = consolidate(db, {
+      scope: "dev",
+      gist: "memoria de apoyo",
+      source_episode_ids: [source.id],
+    }).memory_id;
+    crystallize(db, {
+      scope: "dev",
+      name: "rasgo casi",
+      evidence_memory_ids: [memory],
+    });
+    capture(db, { scope: "dev", body: "episodio casi" });
+
+    const query = "consulta";
+    const embed = tableEmbed({
+      [query]: axis(1),
+      "memoria de apoyo": axis(0.5),
+      "rasgo casi": axis(0.7099),
+      "episodio casi": axis(0.6599),
+    });
+    await embedPendingMemories(db, { embedFn: embed, model: "fake" });
+
+    const { hits } = await recallHybrid(
+      db,
+      { query, limit: 5 },
+      embed,
+      { reinforce: false, embeddingModel: "fake" },
+    );
+
+    // Gates are minScore + margin: trait 0.71, episode 0.66, memory minScore 0.65.
+    expect(hits).toEqual([]);
   });
 
   it("una pregunta ajena no trae rasgos ni episodios", async () => {
@@ -202,6 +342,71 @@ describe("vectores de capa y ciclo de vida", () => {
         .prepare("SELECT COUNT(*) AS n FROM layer_embeddings WHERE layer = 'episode' AND item_id = ?")
         .get(episode),
     ).toEqual({ n: 0 });
+  });
+
+  it("no deja vector huérfano si el episodio se consolida mientras se embebe", async () => {
+    const episode = capture(db, { scope: "dev", body: "episodio en vuelo" }).id;
+    let release: (vectors: Float32Array[] | null) => void = () => undefined;
+    const waiting = new Promise<Float32Array[] | null>((resolve) => {
+      release = resolve;
+    });
+    const pending = embedLayerItem(db, "episode", episode, {
+      embedFn: () => waiting,
+      model: "fake",
+    });
+    consolidate(db, {
+      scope: "dev",
+      gist: "absorbe el episodio en vuelo",
+      source_episode_ids: [episode],
+    });
+    release([axis(1)]);
+
+    expect(await pending).toBe(false);
+    expect(
+      db
+        .prepare("SELECT 1 FROM layer_embeddings WHERE layer = 'episode' AND item_id = ?")
+        .get(episode),
+    ).toBeUndefined();
+  });
+
+  it("el estado cuenta rasgos y episodios pendientes con y sin vector", () => {
+    const source = capture(db, { scope: "dev", body: "origen" });
+    const memory = consolidate(db, {
+      scope: "dev",
+      gist: "memoria de apoyo",
+      source_episode_ids: [source.id],
+    }).memory_id;
+    const embeddedTrait = crystallize(db, {
+      scope: "dev",
+      name: "rasgo con vector",
+      evidence_memory_ids: [memory],
+    }).trait_id;
+    crystallize(db, {
+      scope: "dev",
+      name: "rasgo sin vector",
+      evidence_memory_ids: [memory],
+    });
+    const embeddedEpisode = capture(db, { scope: "dev", body: "episodio con vector" }).id;
+    capture(db, { scope: "dev", body: "episodio sin vector" });
+    saveLayerEmbedding(db, "trait", embeddedTrait, "fake", axis(1));
+    saveLayerEmbedding(db, "episode", embeddedEpisode, "fake", axis(1));
+
+    const status = getEmbeddingIndexStatus(db, "fake");
+
+    expect(status.layers.trait).toEqual({
+      items: 2,
+      embedded: 1,
+      missing: 1,
+      compatible: 1,
+      stale_model: 0,
+    });
+    expect(status.layers.episode).toEqual({
+      items: 2,
+      embedded: 1,
+      missing: 1,
+      compatible: 1,
+      stale_model: 0,
+    });
   });
 
   it("abre una base creada antes de layer_embeddings, conserva sus datos y la usa", async () => {

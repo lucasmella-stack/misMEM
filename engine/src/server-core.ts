@@ -9,8 +9,8 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Database as DB } from "better-sqlite3";
-import { capture, recallHybrid, consolidate, crystallize, forget, reinforce } from "./tools.js";
-import { embedLayerItem, embedPendingMemories, type LayerName } from "./embeddings/store.js";
+import { captureAndEmbed, embedWrittenLayer, recallHybrid, consolidate, crystallize, forget, reinforce } from "./tools.js";
+import { embedPendingMemories } from "./embeddings/store.js";
 import {
   ENGRAM_TOOLS,
   dispatchEngramTool,
@@ -140,18 +140,6 @@ const { version } = createRequire(import.meta.url)("../package.json") as {
   version: string;
 };
 
-/**
- * Embedding the new item right away is optional: if the embedder is down the next backfill
- * picks it up and the write path never notices.
- */
-async function embedLayerQuietly(db: DB, layer: LayerName, itemId: string): Promise<void> {
-  try {
-    await embedLayerItem(db, layer, itemId);
-  } catch {
-    /* semantic ranking is optional; a dead embedder must not break the write */
-  }
-}
-
 export function createServer(db: DB): Server {
   const server = new Server(
     { name: "mismem", version },
@@ -168,9 +156,7 @@ export function createServer(db: DB): Server {
       let result: unknown;
       switch (name) {
         case "capture": {
-          const captured = capture(db, args);
-          result = captured;
-          await embedLayerQuietly(db, "episode", captured.id);
+          result = await captureAndEmbed(db, args);
           break;
         }
         case "recall":
@@ -193,7 +179,7 @@ export function createServer(db: DB): Server {
         case "crystallize": {
           const trait = crystallize(db, args);
           result = trait;
-          await embedLayerQuietly(db, "trait", trait.trait_id);
+          await embedWrittenLayer(db, "trait", trait.trait_id);
           break;
         }
         case "forget":

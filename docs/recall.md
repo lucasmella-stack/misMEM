@@ -26,9 +26,11 @@ nativas. Si el servidor no responde, todo degrada silenciosamente a FTS5 puro.
 La semántica cubre las tres capas. Las memorias guardan su vector en `memory_embeddings`; los rasgos y los
 episodios pendientes, en `layer_embeddings`. Esos vectores se escriben al capturar o cristalizar y en el
 backfill, nunca al vuelo en una consulta. En el ranking por significado las tres capas forman una sola lista
-ordenada por coseno: un rasgo o un episodio tiene que superar a una memoria para pasarle por delante, y no
-hereda una posición fija. Un rasgo exige un margen mayor porque una regla corta y general se parece a
-cualquier pregunta de su tema; un episodio pendiente exige uno pequeño. Backfill y reindexado: `mismem-embed`
+ordenada por coseno, con una prima de 0,05 para la memoria consolidada; ninguna capa hereda una posición fija.
+Un rasgo exige 0,06 de margen sobre el corte y un episodio pendiente 0,01, porque una regla corta y general se
+parece a cualquier pregunta de su tema. Cuando hay vectores, el resultado se queda con el mejor rasgo y como
+mucho dos episodios por consulta: sin ese tope, los rasgos y los episodios desplazaban a la memoria concreta
+que responde. El modo léxico, sin vectores, no aplica el tope. Backfill y reindexado: `mismem-embed`
 (`--status`, `--force`), que recorre memorias, rasgos y episodios pendientes.
 
 También habla con cualquier servidor compatible con OpenAI (`/v1/embeddings`, por ejemplo
@@ -88,8 +90,9 @@ Línea base del 2026-10-30 (tope 5, aciertos dentro del tope; caduca cuando camb
 | Modo | Global | MRR | Paráfrasis | Episodio | Rasgo | Ajenas con algo | Recuerdos por pregunta |
 |---|---|---|---|---|---|---|---|
 | Léxico | 221/432 | 0,48 | 1/72 | 20/24 | 8/24 | 8/48 | 0,9 |
-| Semántico (`embeddinggemma-2`, corte 0,65) | 410/432 | 0,84 | 63/72 | 23/24 | 21/24 | 11/48 | 4,9 |
+| Semántico (`embeddinggemma-2`, corte 0,65) | 411/432 | 0,87 | 64/72 | 23/24 | 19/24 | 11/48 | 4,87 |
 
 En el semántico, las tres capas compiten en el mismo ranking: rasgos y episodios pendientes pasan de 0/24 a
-21/24 y 23/24. El episodio que sigue sin aparecer (`dev-q33`) no es un fallo del ranking: su texto no dice
+19/24 y 23/24. El acierto en primera posición es 355/432 y el de las preguntas que esperan una memoria,
+328/384, frente a 329/384 de la línea base sin vectores de capa. El episodio que sigue sin aparecer (`dev-q33`) no es un fallo del ranking: su texto no dice
 "Lucía", que está sólo en el ámbito, y otro episodio parecido puntúa algo más alto.

@@ -26,8 +26,9 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Database as DB } from "better-sqlite3";
 import { z } from "zod";
 import { CrystallizeInput, Scope } from "./schema.js";
-import { crystallize } from "./tools.js";
+import { crystallize, embedWrittenLayer } from "./tools.js";
 import { embedPendingMemories } from "./embeddings/store.js";
+import type { EmbedFn } from "./embeddings/provider.js";
 import { JobError, type ConsolidationJob } from "./consolidation/job.js";
 import { json } from "./viewer.js";
 
@@ -205,6 +206,8 @@ export async function handleAction(
   body: unknown,
   opts: {
     reembed?: Reembed;
+    embedFn?: EmbedFn;
+    embeddingModel?: string;
     job?: ConsolidationJob;
     allowDelete?: boolean;
     confirmations?: ForgetConfirmations;
@@ -218,7 +221,12 @@ export async function handleAction(
       return true;
     }
     if (pathname === "/api/crystallize") {
-      json(res, 200, crystallizeFromUi(db, body));
+      const trait = crystallizeFromUi(db, body);
+      await embedWrittenLayer(db, "trait", trait.trait_id, {
+        embedFn: opts.embedFn,
+        model: opts.embeddingModel,
+      });
+      json(res, 200, trait);
       return true;
     }
     const match = ROUTE.exec(pathname);

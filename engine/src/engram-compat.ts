@@ -20,7 +20,7 @@
  *   mem_session_end      → no-op informativo
  */
 import type { Database as DB } from "better-sqlite3";
-import { capture, pendingEpisodes, recallHybrid } from "./tools.js";
+import { captureAndEmbed, pendingEpisodes, recallHybrid } from "./tools.js";
 import type { EmbedFn } from "./embeddings/provider.js";
 
 export interface EngramToolDef {
@@ -57,7 +57,7 @@ export const ENGRAM_TOOLS: EngramToolDef[] = [
   {
     name: "mem_search",
     description:
-      "[engram-compat] Hybrid search: FTS5 across all layers plus semantic ranking for memories.",
+      "[engram-compat] Hybrid search: FTS5 across all layers plus semantic ranking for memories, traits and pending episodes.",
     inputSchema: {
       type: "object",
       required: ["query"],
@@ -200,22 +200,26 @@ function suggestTopicKey(title: string, content: string): string {
   return `${category}/${slug}`;
 }
 
-export function dispatchEngramTool(
+export async function dispatchEngramTool(
   db: DB,
   name: string,
   rawArgs: unknown,
   searchOptions: { embedFn?: EmbedFn; embeddingModel?: string } = {},
-): unknown {
+): Promise<unknown> {
   const args = asObject(rawArgs);
 
   switch (name) {
     case "mem_save": {
       const scope = asString(args.scope) || DEFAULT_SCOPE;
-      return capture(db, { scope, body: formatSaveBody(args) });
+      return captureAndEmbed(
+        db,
+        { scope, body: formatSaveBody(args) },
+        { embedFn: searchOptions.embedFn, model: searchOptions.embeddingModel },
+      );
     }
 
     case "mem_search": {
-      return recallHybrid(db, args, searchOptions.embedFn, {
+      return await recallHybrid(db, args, searchOptions.embedFn, {
         embeddingModel: searchOptions.embeddingModel,
       });
     }
@@ -260,12 +264,20 @@ export function dispatchEngramTool(
 
     case "mem_session_summary": {
       const scope = asString(args.scope) || "session";
-      return capture(db, { scope, body: asString(args.content) });
+      return captureAndEmbed(
+        db,
+        { scope, body: asString(args.content) },
+        { embedFn: searchOptions.embedFn, model: searchOptions.embeddingModel },
+      );
     }
 
     case "mem_save_prompt": {
       const scope = asString(args.scope) || "prompts";
-      return capture(db, { scope, body: asString(args.content) });
+      return captureAndEmbed(
+        db,
+        { scope, body: asString(args.content) },
+        { embedFn: searchOptions.embedFn, model: searchOptions.embeddingModel },
+      );
     }
 
     case "mem_update": {
@@ -282,12 +294,21 @@ export function dispatchEngramTool(
       const updTr = db
         .prepare("UPDATE traits SET name = ?, updated_at = ? WHERE id = ?")
         .run(content, Date.now(), id);
-      if (updTr.changes > 0) return { updated: "trait", id };
+      if (updTr.changes > 0) {
+        // The vector described the old name; without this it would keep matching the
+        // replaced trait until the next force backfill.
+        db.prepare("DELETE FROM layer_embeddings WHERE layer = 'trait' AND item_id = ?").run(id);
+        return { updated: "trait", id };
+      }
       // Fallback: append new episode that references the original id
-      const result = capture(db, {
-        scope: DEFAULT_SCOPE,
-        body: `[update of ${id}]\n${content}`,
-      });
+      const result = await captureAndEmbed(
+        db,
+        {
+          scope: DEFAULT_SCOPE,
+          body: `[update of ${id}]\n${content}`,
+        },
+        { embedFn: searchOptions.embedFn, model: searchOptions.embeddingModel },
+      );
       return { updated: "appended", original_id: id, new_id: result.id };
     }
 

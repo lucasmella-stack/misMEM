@@ -34,7 +34,7 @@ persiste, lo cristalizado permanece.
 |---|---|---|---|
 | `episodes` | Lo que ocurrió: texto original y fechado | No vencen solos: `forget` los borra una vez consolidados (30 días por defecto en la herramienta MCP, 90 en `mismem-forget`) | Evidencia y contexto inmediato |
 | `memories` | Lo aprendido al resumir varios episodios | Su `salience` baja si no se usa y sube al recordarla | Conocimiento operativo y búsqueda semántica |
-| `traits` | Patrones, preferencias o decisiones estables | Permanente salvo borrado explícito | Identidad y reglas de máxima prioridad |
+| `traits` | Patrones, preferencias o decisiones estables | Permanente salvo borrado explícito | Identidad y reglas generales; sin prioridad fija en el recall |
 
 Ejemplo: "hoy PostgreSQL rindió mejor" es un episode; "PostgreSQL es preferible en este proyecto" es una
 memory; "priorizamos soluciones robustas para concurrencia" puede cristalizar como trait.

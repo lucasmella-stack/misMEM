@@ -47,7 +47,7 @@ describe("recall", () => {
     expect(hits).toEqual([]);
   });
 
-  it("ranks traits over memories over episodes", () => {
+  it("does not give a trait a fixed step over an equally matching memory", () => {
     const { id: ep } = capture(db, { scope: "s", body: "patron recurrente" });
     const { memory_id } = consolidate(db, {
       scope: "s",
@@ -60,7 +60,9 @@ describe("recall", () => {
       evidence_memory_ids: [memory_id],
     });
     const { hits } = recall(db, { query: "patron" });
-    expect(hits[0]?.layer).toBe("trait");
+    // Equal FTS rank, so the fusion decides: a memory keeps its salience tie-break and a
+    // trait no longer starts with a layer multiplier.
+    expect(hits.map((hit) => hit.layer)).toEqual(["memory", "trait"]);
   });
 });
 

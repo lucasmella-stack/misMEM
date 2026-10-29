@@ -11,12 +11,25 @@ import {
 } from "./schema.js";
 import { contentHash } from "./hash.js";
 import { registerTurn } from "./connectome.js";
-import { CANDIDATE_POOL_LIMIT, CONSOLIDATED_SEMANTIC_PRIOR, EPISODE_SCORE_MARGIN, RESCUED_SOURCE_WEIGHT, TRAIT_SCORE_MARGIN, fuseHits, hasComparableVectors, lexicalCandidates, semanticHitToRecall, type RankedSource } from "./search.js";
+import {
+  CANDIDATE_POOL_LIMIT,
+  CONSOLIDATED_SEMANTIC_PRIOR,
+  EPISODE_SCORE_MARGIN,
+  TRAIT_SCORE_MARGIN,
+  capLayerHits,
+  fuseHits,
+  hasComparableVectors,
+  lexicalCandidates,
+  semanticHitToRecall,
+  type RankedSource,
+} from "./search.js";
 import { embedTexts, loadEmbeddingConfig, type EmbedFn } from "./embeddings/provider.js";
 import {
+  embedLayerItem,
   hasComparableLayerVectors,
   semanticSearchLayer,
   semanticSearchMemories,
+  type LayerName,
   type LayerSemanticHit,
 } from "./embeddings/store.js";
 import {
@@ -45,6 +58,46 @@ export function capture(db: DB, raw: unknown): { id: string; deduped: boolean } 
     "INSERT INTO episodes (id, scope, body, created_at, content_hash) VALUES (?, ?, ?, ?, ?)",
   ).run(id, input.scope, input.body, now(), hash);
   return { id, deduped: false };
+}
+
+export interface WriteEmbedOptions {
+  embedFn?: EmbedFn;
+  model?: string;
+  timeoutMs?: number;
+}
+
+/**
+ * Embedding a freshly written item is optional for the write: a dead embedder must not
+ * fail the capture or the crystallization. The next backfill picks the missing vector up.
+ */
+export async function embedWrittenLayer(
+  db: DB,
+  layer: LayerName,
+  itemId: string,
+  opts: WriteEmbedOptions = {},
+): Promise<boolean> {
+  try {
+    return await embedLayerItem(db, layer, itemId, opts);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The one write path for episodes: store the verbatim text and, if it is new, try its
+ * vector. `capture` by MCP and every Engram alias that stores an episode go through here,
+ * so an alias cannot create an episode that semantic recall will never see.
+ */
+export async function captureAndEmbed(
+  db: DB,
+  raw: unknown,
+  opts: WriteEmbedOptions = {},
+): Promise<{ id: string; deduped: boolean }> {
+  const captured = capture(db, raw);
+  if (!captured.deduped) {
+    await embedWrittenLayer(db, "episode", captured.id, opts);
+  }
+  return captured;
 }
 
 export interface PendingEpisode {
@@ -102,8 +155,13 @@ function finalizeHits(
   limit: number,
   options: RecallOptions,
   at: number,
+  capLayers = false,
 ): { hits: RecallHit[] } {
-  const hits = ranked.slice(0, limit);
+  // Cap before slicing: a trait or episode that does not fit the layer quota must not
+  // consume a slot a memory could fill. Only the semantic path caps: a lexical fallback
+  // has no vector tail to trim and its floor is calibrated without the cap.
+  const capped = capLayers ? capLayerHits(ranked) : ranked;
+  const hits = capped.slice(0, limit);
 
   if (options.reinforce ?? reinforcesOnRecall()) {
     reinforceMemories(
@@ -190,11 +248,12 @@ export function recall(
   const input = RecallInput.parse(raw);
   const at = options.at ?? now();
   const lexical = lexicalCandidates(db, input, at);
-  const weight = lexical.rescued ? RESCUED_SOURCE_WEIGHT : 1;
+  // The rescue only fills a strict search that found nothing, so it does not need a
+  // smaller weight: it is the only signal in that result.
   const ranked = fuseHits([
-    { hits: lexical.traits, weight },
-    { hits: lexical.memories, weight },
-    { hits: lexical.episodes, weight },
+    { hits: lexical.traits, weight: 1 },
+    { hits: lexical.memories, weight: 1 },
+    { hits: lexical.episodes, weight: 1 },
   ]);
   return finalizeHits(
     db,
@@ -258,15 +317,14 @@ export async function recallHybrid(
         scope: input.scope,
       }));
   const lexical = lexicalCandidates(db, input, at, { rescue: !semanticLayer });
-  const lexicalWeight = lexical.rescued ? RESCUED_SOURCE_WEIGHT : 1;
 
   // Every signal is a source in one RRF fusion: an exact word match, a stored memory
   // vector, and the stored vectors of traits and pending episodes. A hit found by several
   // signals rises; no layer keeps a fixed step over another.
   const sources: RankedSource[] = [
-    { hits: lexical.traits, weight: lexicalWeight },
-    { hits: lexical.memories, weight: lexicalWeight },
-    { hits: lexical.episodes, weight: lexicalWeight },
+    { hits: lexical.traits, weight: 1 },
+    { hits: lexical.memories, weight: 1 },
+    { hits: lexical.episodes, weight: 1 },
   ];
   if (queryVec) {
     // One semantic ranking for the three layers: a trait or pending episode must beat a
@@ -296,7 +354,9 @@ export async function recallHybrid(
     ]
       .sort((a, b) => b.score - a.score)
       .map((entry) => entry.hit);
-    sources.push({ hits: byMeaning, weight: 1 });
+    // Trim before fusion so the layer quota keeps the closest trait and episodes by
+    // cosine, not whichever one an exact word match happened to lift.
+    sources.push({ hits: capLayerHits(byMeaning), weight: 1 });
   }
 
   return finalizeHits(
@@ -305,6 +365,7 @@ export async function recallHybrid(
     input.limit,
     { ...options, reinforce: options.reinforce ?? input.reinforce },
     at,
+    semanticLayer,
   );
 }
 

@@ -8,6 +8,7 @@ import {
   worthRecalling,
 } from "../src/inject.js";
 import type { RecallHit } from "../src/schema.js";
+import { capLayerHits } from "../src/search.js";
 
 const hit = (over: Partial<RecallHit> & { id: string }): RecallHit => ({
   layer: "memory",
@@ -69,6 +70,23 @@ describe("selectForInjection", () => {
   it("respeta el tope de cantidad", () => {
     const hits = [hit({ id: "a" }), hit({ id: "b" }), hit({ id: "c" }), hit({ id: "d" })];
     expect(selectForInjection(hits, { maxMemories: 2 })).toHaveLength(2);
+  });
+
+  it("con dos rasgos delante, el tope deja sitio a la memoria que esperaba fin-q35", () => {
+    // The order fin-q35 produced before the cap: two traits pushed the expected memory
+    // past the three non-episode slots. The cap keeps one trait and the hook reaches it.
+    const hits = [
+      hit({ id: "tra-t1", layer: "trait" }),
+      hit({ id: "via-10" }),
+      hit({ id: "tra-11", layer: "trait" }),
+      hit({ id: "fin-t1" }),
+      hit({ id: "fin-t2" }),
+    ];
+    expect(selectForInjection(capLayerHits(hits)).map((h) => h.id)).toEqual([
+      "tra-t1",
+      "via-10",
+      "fin-t1",
+    ]);
   });
 
   it("respeta el presupuesto de caracteres", () => {
