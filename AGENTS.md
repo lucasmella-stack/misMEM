@@ -23,8 +23,8 @@ la interfaz es React, Vite y Tailwind. Gestor de paquetes: pnpm, nunca npm.
 | `engine/src/db.ts` | `SCHEMA`, migraciones aditivas (`migrate()`), apertura de la base con permisos `0600` | cambia una tabla, una columna o un índice |
 | `engine/src/schema.ts` | Inputs Zod de las herramientas y el tipo `RecallHit` | cambia lo que una herramienta acepta o devuelve |
 | `engine/src/tools.ts` | Las operaciones MCP: `capture`, `recall` y `recallHybrid`, `reinforce`, `consolidate`, `crystallize`, `forget` y la lista de episodios pendientes | cambia lo que hace una herramienta |
-| `engine/src/search.ts` | Ranking del recall: consulta FTS5, rescate y fusión RRF con la saliencia | cambia el ranking (pide `mismem-bench`) |
-| `engine/src/embeddings/` | `provider.ts` (configuración por entorno y cliente HTTP), `store.ts` (SQL de `memory_embeddings`, búsqueda y backfill), `vector.ts` (coseno) | cambia la capa semántica (pide `mismem-bench`) |
+| `engine/src/search.ts` | Ranking del recall: consulta FTS5, rescate y fusión RRF con la saliencia | cambia el ranking (pide `mismem-bench` y `pnpm eval`) |
+| `engine/src/embeddings/` | `provider.ts` (configuración por entorno y cliente HTTP), `store.ts` (SQL de `memory_embeddings`, búsqueda y backfill), `vector.ts` (coseno) | cambia la capa semántica (pide `mismem-bench` y `pnpm eval`) |
 | `engine/src/salience.ts` | Decay y refuerzo de la saliencia | cambia la fórmula de saliencia |
 | `engine/src/noise.ts`, `engine/src/terms.ts`, `engine/src/hash.ts` | Marcadores de ruido, tokenización compartida por la búsqueda y la medición de uso, hash del contenido (dedup de `capture`) | cambia uno de esos tres criterios |
 | `engine/src/relations.ts` | Lecturas que comparten el visor y la exportación a Obsidian (memorias parecidas por vector) | cambia cómo se relacionan las memorias |
@@ -38,7 +38,8 @@ la interfaz es React, Vite y Tailwind. Gestor de paquetes: pnpm, nunca npm.
 | `engine/src/pareto/classifier.ts` | Prefiltro heurístico que descarta ruido antes del LLM | cambia qué se descarta sin LLM |
 | `engine/src/ingest/` | Importadores de ChatGPT y de VS Code, y el recorrido de ficheros | se importa un formato nuevo |
 | `engine/src/inject.ts`, `engine/src/usage.ts`, `engine/src/hook-client.ts`, `engine/src/hook-readiness.ts` | Lógica de los hooks: qué inyectar, qué se usó, cliente remoto y espera a que el servidor esté listo | cambia un hook |
-| `engine/src/obsidian.ts`, `engine/src/bench.ts` | Exportación como bóveda de Obsidian; medición del recall | cambia una de las dos |
+| `engine/src/obsidian.ts` | Exportación como bóveda de Obsidian | cambia la exportación |
+| `engine/src/bench.ts`, `engine/src/golden.ts`, `engine/eval/golden/` | Medición del recall: banco privado (`mismem-bench`) y eval dorado público (`pnpm eval`) con su suelo de CI | cambia una medición o el corpus |
 | `engine/src/*-cli.ts`, `engine/src/*-args.ts`, `engine/src/cli-args.ts`, `engine/src/env.ts` | Los binarios `mismem-*`, la lectura estricta de sus argumentos y la lectura de variables numéricas | cambia un CLI o un flag |
 | `engine/tests/` | Un `<área>.test.ts` por área; `fixtures/` (exports ficticios) y `support/` | cada cambio |
 | `scripts/` | `install.sh` (instalador de Linux), `mismem-hook.sh` (envoltorio de los hooks), `backup-mismem-from-server.ps1` (respaldo desde Windows) | cambia la instalación o el respaldo |
@@ -72,6 +73,10 @@ pnpm typecheck && pnpm test && pnpm knip && pnpm dup && pnpm lint && pnpm build
 - Medir el recall, tras `pnpm build`: `node dist/bench-cli.js --bank <banco.jsonl> --db <base.db>`.
   Informa MRR, la posición del acierto, los recuerdos devueltos por pregunta y `noiseHits`, que tiene que ser 0.
   El banco es privado y sale de la propia memoria: no se sube a ningún sitio.
+- Medir el recall sobre el corpus público en castellano, desde `engine/`: `pnpm eval --mode lexico`;
+  tras `pnpm build`, `node dist/eval-cli.js --mode semantico` con las variables `MISMEM_EMBEDDING_*`. La puerta
+  de CI es `tests/golden.test.ts`; quien mejora el recall sube el suelo en `engine/eval/golden/floor.json` en el
+  mismo PR. La línea base y cómo se corre están en [docs/recall.md](docs/recall.md#medirlo).
 
 ## Reglas duras
 
@@ -80,7 +85,7 @@ pnpm typecheck && pnpm test && pnpm knip && pnpm dup && pnpm lint && pnpm build
 | Nunca leer ni editar `.env*`, ni mostrar un secreto en una respuesta, un log o un issue | Ahí viven las claves de los proveedores y las credenciales del servidor; `.env.example` sólo lleva marcadores |
 | Sin `git push --force` ni reescribir la historia sin permiso expreso | Se mergea con merge commit y la historia publicada conserva el porqué de cada commit |
 | El esquema cambia sólo con migraciones aditivas en `migrate()` de `engine/src/db.ts`: se añaden columnas, índices y tablas, y cada paso comprueba el estado y se puede repetir. `migrate()` sí puede borrar y recrear disparadores heredados y rellenar columnas nuevas; nunca borra una tabla ni una columna con datos. Con su test y su línea en el CHANGELOG | La base de cada persona ya existe y se abre con el código nuevo: un error rompe datos reales. `CODEOWNERS` pide revisión de los dos responsables |
-| Quien toca el ranking o los embeddings (`tools.ts`, `search.ts`, `embeddings/`) corre `mismem-bench` antes y después y pone las cifras en el PR, con la etiqueta `needs-bench` ([Tests](docs/standards/tests.md)) | Sin esa medida no hay forma de saber si el cambio mejora el recall: los tests no la dan y el bench no corre en CI |
+| Quien toca el ranking o los embeddings (`tools.ts`, `search.ts`, `embeddings/`) corre `mismem-bench` y `pnpm eval` antes y después y pone las cifras en el PR, con la etiqueta `needs-bench` ([Tests](docs/standards/tests.md)) | Sin esa medida no hay forma de saber si el cambio mejora el recall: los tests sólo vigilan el suelo del eval, y el bench de la memoria real no corre en CI |
 | Toda dependencia que se añade o se sube entra con versión exacta (sin `^` ni `~`) y publicada hace 14 días o más; los `^` que ya hay se fijan la próxima vez que se suban ([Seguridad](docs/standards/security.md)). Un script de instalación nuevo se lee, y sólo entonces se aprueba, uno a uno, en `allowBuilds` de `engine/pnpm-workspace.yaml` (hoy `better-sqlite3` y `esbuild`) | Cadena de suministro: lo recién publicado es lo que más se compromete, y un `postinstall` ejecuta código al instalar |
 | Los hooks `mismem-inject` y `mismem-used` nunca fallan ni bloquean un prompt: errores a stderr, salida sin error, y ante la duda no hacen nada; contra un servidor remoto (`MISMEM_HOOK_URL`) llevan además un tope de tiempo | Corren en cada turno del cliente; un hook roto cuesta más que un recuerdo sin inyectar |
 | `engine/src/server-http.ts` escucha al importarse: su lógica va a módulos que se puedan importar y probar (`http-guard.ts`, `http-host.ts`, `http-body.ts`) | Un test no puede importarlo sin abrir un puerto; el test del servidor lo lanza como proceso hijo |
@@ -98,9 +103,9 @@ pnpm typecheck && pnpm test && pnpm knip && pnpm dup && pnpm lint && pnpm build
   en los tests; la interfaz no la lleva y usa el alias `@/`. Ids con `ulid`. Los writes múltiples, dentro de
   `db.transaction`.
 - **Zod en los bordes**: las entradas de las herramientas MCP (`schema.ts`), los cuerpos POST del visor, la
-  salida del LLM y el banco de `mismem-bench`. Los argumentos de un CLI se validan en su `*-args.ts`. La
-  entrada estándar de un hook y la respuesta del servidor remoto no pasan por Zod: se parsean a la defensiva
-  (`try/catch`, sin romper el turno).
+  salida del LLM, el banco de `mismem-bench` y el corpus del eval dorado con su suelo. Los argumentos de un
+  CLI se validan en su `*-args.ts`. La entrada estándar de un hook y la respuesta del servidor remoto no pasan
+  por Zod: se parsean a la defensiva (`try/catch`, sin romper el turno).
 - **Funciones puras con dependencias inyectadas**: el reloj entra como `at`, el embedder como `embedFn`, el LLM
   como `distillFn`. Así un test no necesita red ni reloj real.
 - **Variables numéricas** de entorno: se leen con `engine/src/env.ts` (`envPositiveNumber`, que trata como "sin

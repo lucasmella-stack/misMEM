@@ -53,6 +53,7 @@
     "dev": "tsx src/server.ts",
     "dev:http": "tsx src/server-http.ts",
     "dev:ui": "vite --config ui/vite.config.ts",
+    "eval": "tsx src/eval-cli.ts",
     "start": "node dist/server.js",
     "start:http": "node dist/server-http.js",
     "test": "vitest run",

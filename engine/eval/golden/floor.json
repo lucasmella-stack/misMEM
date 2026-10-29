@@ -1,0 +1,18 @@
+{
+  "limit": 5,
+  "lexico": {
+    "literal": { "hits": 46 },
+    "parafrasis": { "hits": 1 },
+    "sinonimo": { "hits": 22 },
+    "coloquial": { "hits": 24 },
+    "sin_tildes": { "hits": 29 },
+    "errata": { "hits": 26 },
+    "ingles": { "hits": 2 },
+    "larga": { "hits": 5 },
+    "clave": { "hits": 24 },
+    "ambito": { "hits": 14 },
+    "episodio": { "hits": 20 },
+    "rasgo": { "hits": 8 }
+  },
+  "lexico_ajenas_max": 8
+}

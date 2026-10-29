@@ -70,6 +70,9 @@ quedan fuera (`engine/src/noise.ts`).
 | Consolidación con LLM | Cron nocturno que destila episodios en memorias con DeepSeek, OpenRouter, OpenAI o cualquier servidor compatible, con prefiltro Pareto para descartar ruido. Ver [su README](../engine/src/consolidation/README.md) |
 | CLIs | `mismem-http` (el mismo servidor HTTP que `pnpm start:http`), `mismem-ingest` (exports de ChatGPT y transcripts de VS Code), `mismem-consolidate`, `mismem-forget`, `mismem-stats`, `mismem-embed`, `mismem-migrate-engram`, `mismem-bench` (mide el recall con un banco de preguntas propio, sin reforzar), `mismem-obsidian` y los dos hooks, `mismem-inject` y `mismem-used` |
 
+El eval dorado no es un binario: su corpus vive en `engine/eval/golden/` y se corre desde el repositorio con
+`pnpm eval` (léxico) o, tras `pnpm build`, con `node dist/eval-cli.js` (semántico). No viaja en el paquete npm.
+
 `mismem-obsidian` escribe la memoria como bóveda de Obsidian en `<bóveda>/misMEM/`: una nota por memoria,
 rasgo y ámbito, enlazadas por origen y por parecido. Re-exportar sólo borra las notas cuyo frontmatter
 sigue declarando el id del manifiesto, y se niega si la base no tiene nada que exportar o el manifiesto no

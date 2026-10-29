@@ -1,0 +1,67 @@
+{"type": "memory", "key": "fin-01", "scope": "lucia/finanzas", "gist": "Tiene la hipoteca del piso en el Banco del Ebro: variable, euríbor más 0,75 y revisión cada diciembre.", "days_ago": 380, "details": "La firmó en 2023 a treinta años, con una entrada del veinte por ciento del precio."}
+{"type": "memory", "key": "fin-02", "scope": "lucia/finanzas", "gist": "Ahorra 300 euros al mes en un fondo indexado al MSCI World a través de un roboadvisor.", "days_ago": 210, "details": "Empezó con 150 y subió la aportación cuando le pagaron la subida de sueldo."}
+{"type": "memory", "key": "fin-03", "scope": "lucia/finanzas", "gist": "Tiene un colchón de emergencia de 9.000 euros, unos seis meses de gastos, en una cuenta remunerada.", "days_ago": 300, "details": "No lo toca salvo despido o avería grave en casa."}
+{"type": "memory", "key": "fin-04", "scope": "lucia/hogar", "gist": "Paga 65 euros al mes de comunidad, incluida la portería y el ascensor.", "days_ago": 90}
+{"type": "memory", "key": "fin-05", "scope": "lucia/finanzas", "gist": "Está suscrita a Filmin por 8,99 euros al mes y no tiene Netflix.", "days_ago": 60, "details": "Comparte la cuenta con Andrés y alternan las series que ven."}
+{"type": "memory", "key": "fin-06", "scope": "lucia/finanzas", "gist": "Pagó Disney+ tres meses por una promoción de 1,99 euros y lo canceló al acabar.", "days_ago": 175}
+{"type": "memory", "key": "fin-07", "scope": "lucia/finanzas", "gist": "Reparte el sueldo con la regla 50/30/20: mitad para gastos fijos, treinta para caprichos y veinte para ahorro.", "days_ago": 250, "details": "La revisa cada enero con la hoja de cálculo que heredó de su madre."}
+{"type": "memory", "key": "fin-08", "scope": "lucia/finanzas", "gist": "La declaración de la renta la presenta la gestoría del barrio, no un programa de autoedición.", "days_ago": 130, "details": "El asesor le cobra 60 euros y le avisa de los borradores."}
+{"type": "memory", "key": "fin-09", "scope": "lucia/hogar", "gist": "En marzo cambió el seguro del hogar a Seguros Moncayo: paga 180 euros al año y cubre inundación y robo.", "days_ago": 140}
+{"type": "memory", "key": "fin-10", "scope": "lucia/finanzas", "gist": "Tiene un Corsa que usa poco: casi siempre va en bici al trabajo y coge el tranvía cuando llueve.", "days_ago": 320, "details": "Vive a tres kilómetros de la oficina y tarda lo mismo en bici que en transporte público."}
+{"type": "memory", "key": "fin-11", "scope": "lucia/hogar", "gist": "Compró el piso por 168.000 euros en 2023, en el barrio de Delicias, con una entrada de 33.600.", "days_ago": 390, "details": "El piso tiene dos habitaciones y un balcón pequeño al patio interior."}
+{"type": "memory", "key": "fin-12", "scope": "lucia/hogar", "gist": "Paga 320 euros de IBI al año, en dos plazos, en mayo y en noviembre.", "days_ago": 230}
+{"type": "memory", "key": "fin-13", "scope": "lucia/hogar", "gist": "Tiene tarifa eléctrica fija a 0,14 euros el kilovatio hora.", "days_ago": 200, "details": "En enero cambió de tarifa porque la anterior le subió el precio sin avisar."}
+{"type": "memory", "key": "fin-14", "scope": "lucia/finanzas", "gist": "En enero amortizó 10.000 euros de hipoteca y pidió reducir plazo, no cuota.", "days_ago": 270, "details": "Le quedan veinticuatro años en lugar de veintisiete."}
+{"type": "memory", "key": "fin-15", "scope": "lucia/finanzas", "gist": "En junio amortizó 5.000 euros más y esta vez eligió bajar la cuota mensual.", "days_ago": 255}
+{"type": "memory", "key": "fin-16", "scope": "lucia/hogar", "gist": "Comparte con Andrés una cuenta para la casa: 700 euros al mes cada uno, de donde salen luz, agua y comunidad.", "days_ago": 240, "details": "La cuenta se revisa en enero y en julio, y el sobrante se queda para reparaciones."}
+{"type": "memory", "key": "fin-17", "scope": "lucia/finanzas", "gist": "No invierte en criptomonedas porque no soporta la volatilidad; prefiere fondos indexados y letras del Tesoro.", "days_ago": 190}
+{"type": "memory", "key": "fin-18", "scope": "lucia/finanzas", "gist": "Aporta 100 euros al mes a un plan de pensiones con deducción en la declaración.", "days_ago": 220, "details": "Lo abrió con 30 años y no piensa tocarlo hasta la jubilación."}
+{"type": "memory", "key": "fin-19", "scope": "lucia/finanzas", "gist": "Paga 39 euros al mes por el gimnasio Fuerza Norte, con la sala de fuerza incluida.", "days_ago": 110}
+{"type": "memory", "key": "fin-20", "scope": "lucia/finanzas", "gist": "Usa tarjeta de débito y no tiene tarjeta de crédito desde que se le olvidó pagar una.", "days_ago": 350, "details": "La última vez le cobraron veinte euros de intereses por un recibo de cuarenta."}
+{"type": "memory", "key": "fin-n1", "scope": "lucia/finanzas", "gist": "[noise] saludo y charla sobre la hipoteca y el ahorro del mes", "days_ago": 2}
+{"type": "memory", "key": "fin-n2", "scope": "lucia/hogar", "gist": "[pareto:l0] repaso de los seguros y las suscripciones de casa", "days_ago": 4}
+{"type": "trait", "key": "fin-t1", "scope": "lucia/finanzas", "name": "Prefiere el ahorro automático y los fondos indexados antes que las apuestas puntuales.", "evidence": ["fin-02", "fin-17"]}
+{"type": "trait", "key": "fin-t2", "scope": "lucia/finanzas", "name": "Nunca gasta dinero que no tiene: evita el crédito y solo se endeuda con la hipoteca.", "evidence": ["fin-03", "fin-20"]}
+{"type": "episode", "key": "fin-e1", "scope": "lucia/finanzas", "body": "Hoy he ido al banco a preguntar por el cambio de la revisión de la hipoteca y me han dicho que hasta diciembre nada. Aproveché para pedir la cartilla del fondo, que no la tenía en papel. El gestor se llamaba Óscar y me ha intentado vender un producto de renta fija que no he entendido.", "days_ago": 2}
+{"type": "episode", "key": "fin-e2", "scope": "lucia/hogar", "body": "He vendido la bici vieja por ciento veinte euros en la aplicación de segunda mano. Con ese dinero y lo que tenía en la hucha he pagado la reparación de la caldera, que se rompió el domingo. Menos mal que no tuve que tocar el fondo de emergencia.", "days_ago": 4}
+{"type": "episode", "key": "fin-e3", "scope": "lucia/finanzas", "body": "Acabo de hacer la compra del mes y me he pasado doce euros del presupuesto. La culpa es del aceite, que ha subido una barbaridad. Esta semana cenamos lentejas tres días para compensar. Andrés dice que exagero.", "days_ago": 0}
+{"type": "query", "id": "fin-q01", "kind": "literal", "query": "¿Cuánto pagó por el piso y cuánto dio de entrada?", "expect": ["fin-11"]}
+{"type": "query", "id": "fin-q02", "kind": "literal", "query": "¿Cuánto pone cada uno en la cuenta de la casa?", "expect": ["fin-16"]}
+{"type": "query", "id": "fin-q03", "kind": "literal", "query": "¿Quién le presenta la declaración de la renta?", "expect": ["fin-08"]}
+{"type": "query", "id": "fin-q04", "kind": "literal", "query": "¿Cuánto paga de IBI y en cuántos plazos?", "expect": ["fin-12"]}
+{"type": "query", "id": "fin-q05", "kind": "parafrasis", "query": "¿Qué entidad financiera le dio el dinero de la vivienda y cuándo le ajustan el tipo?", "expect": ["fin-01"]}
+{"type": "query", "id": "fin-q06", "kind": "parafrasis", "query": "¿Para qué guarda un fondo aparte y cuánto dinero representa?", "expect": ["fin-03"]}
+{"type": "query", "id": "fin-q07", "kind": "parafrasis", "query": "¿Qué proporciones sigue al distribuir el salario mensual?", "expect": ["fin-07"]}
+{"type": "query", "id": "fin-q08", "kind": "parafrasis", "query": "¿Cómo se mueve por la ciudad y qué hace los días de lluvia?", "expect": ["fin-10"]}
+{"type": "query", "id": "fin-q09", "kind": "parafrasis", "query": "¿Qué productos financieros le dan tranquilidad y cuáles descarta por sus oscilaciones?", "expect": ["fin-17"]}
+{"type": "query", "id": "fin-q10", "kind": "parafrasis", "query": "¿A cuánto le sale el kilovatio hora?", "expect": ["fin-13"]}
+{"type": "query", "id": "fin-q11", "kind": "sinonimo", "query": "¿Qué plataforma de cine comparte con Andrés y cuánto le cuesta?", "expect": ["fin-05"]}
+{"type": "query", "id": "fin-q12", "kind": "sinonimo", "query": "¿Cómo reparten los gastos de la casa con su pareja?", "expect": ["fin-16"]}
+{"type": "query", "id": "fin-q13", "kind": "sinonimo", "query": "¿Qué medio de pago usa para comprar y cuál evita?", "expect": ["fin-20"]}
+{"type": "query", "id": "fin-q14", "kind": "sinonimo", "query": "¿Cuánto destina a la jubilación cada mes?", "expect": ["fin-18"]}
+{"type": "query", "id": "fin-q15", "kind": "coloquial", "query": "Oye, ¿cuánto pagas al mes por el gimnasio?", "expect": ["fin-19"]}
+{"type": "query", "id": "fin-q16", "kind": "coloquial", "query": "¿Al final mantuviste la plataforma esa de la promo o la quitaste?", "expect": ["fin-06"]}
+{"type": "query", "id": "fin-q17", "kind": "coloquial", "query": "Cuando amortizaste en junio, ¿qué elegiste, pagar menos cada mes o quitarte años?", "expect": ["fin-15"]}
+{"type": "query", "id": "fin-q18", "kind": "sin_tildes", "query": "cuanto paga de comunidad al mes", "expect": ["fin-04"], "scope": "lucia/hogar"}
+{"type": "query", "id": "fin-q19", "kind": "sin_tildes", "query": "que hizo con la hipoteca en enero", "expect": ["fin-14"]}
+{"type": "query", "id": "fin-q20", "kind": "sin_tildes", "query": "con que compania tiene asegurada la casa", "expect": ["fin-09"], "scope": "lucia/hogar"}
+{"type": "query", "id": "fin-q21", "kind": "errata", "query": "¿Cuanto ahorra al mes y en que fondo lo mete?", "expect": ["fin-02"]}
+{"type": "query", "id": "fin-q22", "kind": "errata", "query": "¿Cunato paga de IBI y en cuantos plazos?", "expect": ["fin-12"]}
+{"type": "query", "id": "fin-q23", "kind": "errata", "query": "¿Quien le hace la declaracion de la renta?", "expect": ["fin-08"]}
+{"type": "query", "id": "fin-q24", "kind": "ingles", "query": "How much money does she keep as an emergency reserve?", "expect": ["fin-03"]}
+{"type": "query", "id": "fin-q25", "kind": "ingles", "query": "Does she own a car, or how does she get around?", "expect": ["fin-10"]}
+{"type": "query", "id": "fin-q26", "kind": "larga", "query": "Estoy mirando con Lucía si conviene quitar años de hipoteca o bajar la letra cada mes, y me ha dicho que ella ya hizo una amortización en enero de diez mil euros, así que quiero recordar qué decidió entonces con el plazo.", "expect": ["fin-14"]}
+{"type": "query", "id": "fin-q27", "kind": "larga", "query": "Lucía quiere revisar el presupuesto del año y me ha pedido que le recuerde cómo reparte el sueldo, porque se ha quedado sin la hoja de cálculo donde lo tenía apuntado y no se acuerda de los porcentajes.", "expect": ["fin-07"]}
+{"type": "query", "id": "fin-q28", "kind": "larga", "query": "Mi cuñado insiste en meter dinero en una moneda digital y Lucía se ha negado en redondo; antes de discutirlo otra vez quiero saber qué productos prefiere ella y por qué razón descarta los otros.", "expect": ["fin-17"]}
+{"type": "query", "id": "fin-q29", "kind": "clave", "query": "Filmin", "expect": ["fin-05"]}
+{"type": "query", "id": "fin-q30", "kind": "clave", "query": "9.000 euros", "expect": ["fin-03"]}
+{"type": "query", "id": "fin-q31", "kind": "ambito", "query": "¿Cuánto cuesta al año el seguro de la casa?", "expect": ["fin-09"], "scope": "lucia/hogar"}
+{"type": "query", "id": "fin-q32", "kind": "ambito", "query": "¿Cuánto paga al mes por el gimnasio?", "expect": ["fin-19"], "scope": "lucia/finanzas"}
+{"type": "query", "id": "fin-q33", "kind": "episodio", "query": "¿Qué le ofreció el gestor del banco cuando fue a preguntar por la revisión?", "expect": ["fin-e1"]}
+{"type": "query", "id": "fin-q34", "kind": "episodio", "query": "¿Con qué pagó la reparación de la caldera?", "expect": ["fin-e2"]}
+{"type": "query", "id": "fin-q35", "kind": "rasgo", "query": "¿Cómo prefiere construir su patrimonio?", "expect": ["fin-t1"]}
+{"type": "query", "id": "fin-q36", "kind": "rasgo", "query": "¿Qué límite se pone con el dinero prestado?", "expect": ["fin-t2"]}
+{"type": "query", "id": "fin-q37", "kind": "ajena", "query": "¿Qué diferencia hay entre un sello nuevo y uno usado?", "expect": []}
+{"type": "query", "id": "fin-q38", "kind": "ajena", "query": "¿Para qué sirve una amarra de través al atracar un velero?", "expect": []}
+{"type": "query", "id": "fin-q39", "kind": "ajena", "query": "¿Qué es una falla normal en geología?", "expect": []}
+{"type": "query", "id": "fin-q40", "kind": "ajena", "query": "¿Con qué frecuencia muda las plumas un flamenco?", "expect": []}
