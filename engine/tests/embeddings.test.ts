@@ -201,6 +201,7 @@ describe("getEmbeddingIndexStatus", () => {
       missing: 0,
       compatible: 0,
       stale_model: 0,
+      stale_dims: 0,
       models: [],
     });
   });
@@ -219,7 +220,8 @@ describe("getEmbeddingIndexStatus", () => {
       embedded: 3,
       missing: 0,
       compatible: 2,
-      stale_model: 1,
+      stale_model: 0,
+      stale_dims: 1,
     });
   });
 
@@ -230,9 +232,37 @@ describe("getEmbeddingIndexStatus", () => {
     saveMemoryEmbedding(db, b, "m", Float32Array.from([1, 0, 0, 0, 0]));
 
     // Sin dimensiones conocidas hay empate y se elige la menor de forma determinista.
-    expect(getEmbeddingIndexStatus(db, "m")).toMatchObject({ compatible: 1, stale_model: 1 });
+    expect(getEmbeddingIndexStatus(db, "m")).toMatchObject({
+      compatible: 1,
+      stale_model: 0,
+      stale_dims: 1,
+    });
     // Con las dimensiones del modelo activo, el vector de 5 no sirve para buscar.
-    expect(getEmbeddingIndexStatus(db, "m", 5)).toMatchObject({ compatible: 1, stale_model: 1 });
+    expect(getEmbeddingIndexStatus(db, "m", 5)).toMatchObject({
+      compatible: 1,
+      stale_model: 0,
+      stale_dims: 1,
+    });
+  });
+
+  it("separa los vectores de otro modelo de los del modelo activo con otro ancho", () => {
+    const a = makeMemory("vida", "uno");
+    const b = makeMemory("vida", "dos");
+    const c = makeMemory("vida", "tres");
+    const d = makeMemory("vida", "cuatro");
+    saveMemoryEmbedding(db, a, "m", Float32Array.from([1, 0, 0]));
+    saveMemoryEmbedding(db, b, "m", Float32Array.from([1, 0, 0]));
+    saveMemoryEmbedding(db, c, "m", Float32Array.from([1, 0, 0, 0, 0]));
+    saveMemoryEmbedding(db, d, "viejo", Float32Array.from([1, 0, 0]));
+
+    expect(getEmbeddingIndexStatus(db, "m")).toMatchObject({
+      memories: 4,
+      embedded: 4,
+      missing: 0,
+      compatible: 2,
+      stale_model: 1,
+      stale_dims: 1,
+    });
   });
 
   it("un vector de otro modelo es obsoleto y no cambia lo que falta", () => {
@@ -245,6 +275,7 @@ describe("getEmbeddingIndexStatus", () => {
       missing: 0,
       compatible: 0,
       stale_model: 1,
+      stale_dims: 0,
     });
   });
 
@@ -257,6 +288,8 @@ describe("getEmbeddingIndexStatus", () => {
       memories: 1,
       embedded: 1,
       missing: 0,
+      stale_model: 0,
+      stale_dims: 0,
     });
   });
 });

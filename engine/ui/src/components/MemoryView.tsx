@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { actions, api, isMissing, type ForgetChallenge, type MemoryDetail } from "../api";
 import { percent, when } from "../format";
-import { embeddingSummary } from "../lib/embeddings";
 import { errorMessage } from "../lib/errors";
 import { inkPercent } from "../lib/ink";
 import {
@@ -17,10 +16,17 @@ import {
   truncate,
   type DetailViewProps,
 } from "./DetailParts";
+import { MemoryFacts } from "./MemoryFacts";
 
 export function MemoryView({ id, onSelect, onChanged, onAnnounce }: DetailViewProps) {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["memory", id], queryFn: ({ signal }) => api.memory(id, signal) });
+  // The notice already caches the index status; reuse it to tell a current vector from a stale one.
+  const embeddings = useQuery({
+    queryKey: ["embeddings"],
+    queryFn: ({ signal }) => api.embeddings(signal),
+    staleTime: 60_000,
+  });
   const [editing, setEditing] = useState(false);
   const [confirm, setConfirm] = useState<"unconsolidate" | "forget" | null>(null);
   const [challenge, setChallenge] = useState<ForgetChallenge>();
@@ -149,18 +155,7 @@ export function MemoryView({ id, onSelect, onChanged, onAnnounce }: DetailViewPr
         )}
       </div>
 
-      <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-        <dt className="text-ink-muted">Ámbito</dt>
-        <dd className="text-ink-soft">{memory.scope}</dd>
-        <dt className="text-ink-muted">Consolidada</dt>
-        <dd className="text-ink-soft">{when(memory.created_at)}</dd>
-        <dt className="text-ink-muted">Último uso</dt>
-        <dd className="text-ink-soft">{when(memory.last_accessed_at)}</dd>
-        <dt className="text-ink-muted">Usos</dt>
-        <dd className="text-ink-soft">{memory.use_count}</dd>
-        <dt className="text-ink-muted">Vector</dt>
-        <dd className="text-ink-soft">{embeddingSummary(memory.embedding)}</dd>
-      </dl>
+      <MemoryFacts memory={memory} activeModel={embeddings.data?.model} />
 
       {!editing && (
         <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Acciones sobre la memoria">

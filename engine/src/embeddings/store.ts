@@ -201,6 +201,7 @@ export interface EmbeddingIndexStatus {
   missing: number;
   compatible: number;
   stale_model: number;
+  stale_dims: number;
   models: Array<{ model: string; dims: number; count: number }>;
 }
 
@@ -249,6 +250,20 @@ export function getEmbeddingIndexStatus(
             )
             .get(activeModel, dims) as { n: number }
         ).n;
+  // The active model can come back with a different width after a provider upgrade. Those
+  // vectors are not "another model": they need a forced reindex, not an incremental one.
+  const stale_dims =
+    dims === undefined
+      ? 0
+      : (
+          db
+            .prepare(
+              `SELECT COUNT(*) AS n FROM memory_embeddings e
+               JOIN memories m ON m.id = e.memory_id
+               WHERE e.model = ? AND e.dims <> ? AND ${excludeNoiseSql("m")}`,
+            )
+            .get(activeModel, dims) as { n: number }
+        ).n;
   const models = db
     .prepare(
       `SELECT e.model, e.dims, COUNT(*) AS count FROM memory_embeddings e
@@ -264,7 +279,8 @@ export function getEmbeddingIndexStatus(
     embedded,
     missing: memories - embedded,
     compatible,
-    stale_model: embedded - compatible,
+    stale_model: embedded - compatible - stale_dims,
+    stale_dims,
     models,
   };
 }

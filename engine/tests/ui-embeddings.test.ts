@@ -1,5 +1,9 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { EmbeddingStatus } from "../ui/src/api";
+import type { EmbeddingStatus, MemoryDetail } from "../ui/src/api";
+import { EmbeddingNoticeView } from "../ui/src/components/EmbeddingNoticeView";
+import { MemoryFacts } from "../ui/src/components/MemoryFacts";
 import { exact } from "../ui/src/format";
 import { embeddingSummary, embeddingWarning } from "../ui/src/lib/embeddings";
 
@@ -16,6 +20,7 @@ function status(overrides: Partial<EmbeddingStatus> = {}): EmbeddingStatus {
     missing: 0,
     compatible: 10,
     stale_model: 0,
+    stale_dims: 0,
     models: [],
     ...overrides,
   };
@@ -47,6 +52,24 @@ describe("embeddingWarning", () => {
     expect(message).toContain("1 memoria sin vector");
     expect(message).toContain("2 memorias con vectores de otro modelo");
   });
+
+  it("no avisa si nunca se indexó: el servidor de embeddings es opcional", () => {
+    expect(embeddingWarning(status({ embedded: 0, missing: 10, compatible: 0 }))).toBeNull();
+  });
+
+  it("avisa de los vectores del modelo activo con otras dimensiones y manda --force", () => {
+    const message = embeddingWarning(status({ stale_dims: 2, compatible: 8 }));
+
+    expect(message).toContain("2 memorias con vectores de otras dimensiones");
+    expect(message).toContain("mismem-embed --force");
+  });
+
+  it("no manda --force cuando el problema es sólo otro modelo", () => {
+    const message = embeddingWarning(status({ stale_model: 2, compatible: 8 }));
+
+    expect(message).toContain("mismem-embed");
+    expect(message).not.toContain("--force");
+  });
 });
 
 describe("embeddingSummary", () => {
@@ -64,5 +87,102 @@ describe("embeddingSummary", () => {
     expect(summary).toContain("768 dimensiones");
     expect(summary).toContain("hace 3 días");
     expect(summary).toContain(exact(created));
+  });
+
+  it("marca como obsoleto el vector de un modelo distinto del activo", () => {
+    const summary = embeddingSummary(
+      { model: "viejo", dims: 3, created_at: NOW },
+      NOW,
+      "nuevo",
+    );
+
+    expect(summary).toContain("obsoleto: no lo usa la búsqueda");
+  });
+
+  it("no marca el vector del modelo activo", () => {
+    const summary = embeddingSummary(
+      { model: "nuevo", dims: 3, created_at: NOW },
+      NOW,
+      "nuevo",
+    );
+
+    expect(summary).not.toContain("obsoleto");
+  });
+});
+
+function memory(overrides: Partial<MemoryDetail["memory"]> = {}): MemoryDetail["memory"] {
+  return {
+    id: "mem_1",
+    scope: "vida",
+    text: "una memoria",
+    details: null,
+    salience: 0.5,
+    stored_salience: 0.5,
+    use_count: 3,
+    created_at: NOW,
+    last_accessed_at: null,
+    noise: false,
+    embedding: null,
+    ...overrides,
+  };
+}
+
+describe("EmbeddingNoticeView", () => {
+  it("deja montada la región viva aunque no haya aviso", () => {
+    const html = renderToStaticMarkup(createElement(EmbeddingNoticeView, { message: null }));
+
+    expect(html).toContain('role="status"');
+    expect(html).toContain('aria-live="polite"');
+    expect(html).not.toContain("El índice semántico");
+  });
+
+  it("anuncia el aviso cuando lo hay", () => {
+    const html = renderToStaticMarkup(
+      createElement(EmbeddingNoticeView, { message: "El índice semántico no está al día." }),
+    );
+
+    expect(html).toContain('role="status"');
+    expect(html).toContain('aria-live="polite"');
+    expect(html).toContain("El índice semántico no está al día.");
+  });
+});
+
+describe("MemoryFacts", () => {
+  it("enseña los usos y el vector con su modelo y dimensiones", () => {
+    const html = renderToStaticMarkup(
+      createElement(MemoryFacts, {
+        memory: memory({
+          use_count: 7,
+          embedding: { model: "embeddinggemma-2", dims: 768, created_at: NOW },
+        }),
+        activeModel: "embeddinggemma-2",
+      }),
+    );
+
+    expect(html).toContain("Usos");
+    expect(html).toContain(">7<");
+    expect(html).toContain("Vector");
+    expect(html).toContain("embeddinggemma-2");
+    expect(html).toContain("768 dimensiones");
+    expect(html).not.toContain("obsoleto");
+  });
+
+  it("sin vector lo dice con todas las letras", () => {
+    const html = renderToStaticMarkup(
+      createElement(MemoryFacts, { memory: memory(), activeModel: "embeddinggemma-2" }),
+    );
+
+    expect(html).toContain("Sin vector: no aparece en la búsqueda por significado");
+  });
+
+  it("marca como obsoleto el vector de otro modelo", () => {
+    const html = renderToStaticMarkup(
+      createElement(MemoryFacts, {
+        memory: memory({ embedding: { model: "viejo", dims: 3, created_at: NOW } }),
+        activeModel: "nuevo",
+      }),
+    );
+
+    expect(html).toContain("obsoleto: no lo usa la búsqueda");
   });
 });

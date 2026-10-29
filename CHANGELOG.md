@@ -2,7 +2,8 @@
 
 ## Sin publicar
 
-- El visor avisa cuando el índice semántico tiene memorias sin vector o con vectores de otro modelo, con las cifras y la orden `mismem-embed` para reindexar, y el detalle de cada memoria enseña sus usos, su modelo y dimensiones, y las fechas absolutas junto a las relativas.
+- El visor avisa cuando el índice semántico tiene memorias sin vector, con vectores de otro modelo o con vectores de otras dimensiones, con las cifras y la orden que lo resuelve (`mismem-embed` para lo pendiente y `mismem-embed --force` para reindexar todo al ancho actual). El detalle de cada memoria enseña sus usos, su modelo y dimensiones, marca como obsoleto el vector que la búsqueda no usa y muestra las fechas absolutas junto a las relativas.
+- `mismem-embed --status` cambia de significado: ya no cuenta los marcadores de ruido como memorias, sólo cuenta como `compatible` los vectores del modelo activo con su ancho dominante y añade `stale_dims` para los del modelo activo con otro ancho, de modo que `stale_model` queda para los de otro modelo.
 
 ## 0.6.0 — 2026-10-29
 

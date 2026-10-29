@@ -32,7 +32,7 @@ interface MemoryItem {
   traits?: number;
 }
 
-/** El estado del índice semántico; nunca incluye la URL del proveedor. */
+/** The semantic index status; it never includes the provider URL. */
 export interface EmbeddingStatus {
   enabled: boolean;
   provider: "ollama" | "openai";
@@ -42,6 +42,7 @@ export interface EmbeddingStatus {
   missing: number;
   compatible: number;
   stale_model: number;
+  stale_dims: number;
   models: Array<{ model: string; dims: number; count: number }>;
 }
 

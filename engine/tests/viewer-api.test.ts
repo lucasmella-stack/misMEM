@@ -109,6 +109,7 @@ interface EmbeddingBody {
   missing: number;
   compatible: number;
   stale_model: number;
+  stale_dims: number;
   models: Array<{ model: string; dims: number; count: number }>;
 }
 
@@ -162,6 +163,7 @@ describe("viewer-api: /api/embeddings", () => {
       missing: 0,
       compatible: 0,
       stale_model: 0,
+      stale_dims: 0,
       models: [],
     });
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -195,6 +197,24 @@ describe("viewer-api: /api/embeddings", () => {
       missing: 0,
       compatible: 0,
       stale_model: 1,
+      stale_dims: 0,
+    });
+  });
+
+  it("los vectores del modelo activo con otro ancho no se disfrazan de otro modelo", () => {
+    setEmbedEnv({ MISMEM_EMBEDDING_MODEL: "embeddinggemma-2" });
+    const { memoryId } = memoryFrom("a", "una memoria", ["e1"]);
+    const other = memoryFrom("a", "otra memoria", ["e2"]).memoryId;
+    saveMemoryEmbedding(db, memoryId, "embeddinggemma-2", Float32Array.from([1, 0, 0]));
+    saveMemoryEmbedding(db, other, "embeddinggemma-2", Float32Array.from([1, 0, 0, 0, 0]));
+
+    expect(status()).toMatchObject({
+      memories: 2,
+      embedded: 2,
+      missing: 0,
+      compatible: 1,
+      stale_model: 0,
+      stale_dims: 1,
     });
   });
 
