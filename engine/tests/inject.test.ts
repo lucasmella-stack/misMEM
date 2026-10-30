@@ -8,6 +8,14 @@ import {
   worthRecalling,
 } from "../src/inject.js";
 import type { RecallHit } from "../src/schema.js";
+import { openDb } from "../src/db.js";
+import { recallHybrid } from "../src/tools.js";
+import { saveLayerEmbedding, saveMemoryEmbedding } from "../src/embeddings/store.js";
+
+/** Unit vector whose cosine with [1, 0] is exactly `score`. */
+function axis(score: number): Float32Array {
+  return Float32Array.from([score, Math.sqrt(1 - score * score)]);
+}
 
 const hit = (over: Partial<RecallHit> & { id: string }): RecallHit => ({
   layer: "memory",
@@ -69,6 +77,49 @@ describe("selectForInjection", () => {
   it("respeta el tope de cantidad", () => {
     const hits = [hit({ id: "a" }), hit({ id: "b" }), hit({ id: "c" }), hit({ id: "d" })];
     expect(selectForInjection(hits, { maxMemories: 2 })).toHaveLength(2);
+  });
+
+  it("el hook recibe fin-t1 en el resultado real de fin-q35, no el primer rasgo fusionado", async () => {
+    // fin-q35 before the fix: the only trait it names lexically (tra-t1) reached the hook
+    // and fin-t1, the closest trait by cosine, never did. The rows and their distances are
+    // the ones the golden case has; only the ids are kept for readability.
+    const db = openDb(":memory:");
+    try {
+      const at = 1;
+      const insertMemory = db.prepare(
+        `INSERT INTO memories (id, scope, gist, source_episode_ids, salience, created_at)
+         VALUES (?, 'dev', ?, '[]', 1, ?)`,
+      );
+      insertMemory.run("via-10", "memoria via", at);
+      insertMemory.run("tra-11", "memoria tra", at);
+      const insertTrait = db.prepare(
+        `INSERT INTO traits (id, scope, name, evidence_memory_ids, created_at, updated_at)
+         VALUES (?, 'dev', ?, '[]', ?, ?)`,
+      );
+      insertTrait.run("tra-t1", "despliegue del proxy", at, at);
+      insertTrait.run("tra-t2", "regla de equipo", at, at);
+      insertTrait.run("fin-t1", "prefiere avisar antes", at, at);
+
+      saveMemoryEmbedding(db, "via-10", "fake", axis(0.9));
+      saveMemoryEmbedding(db, "tra-11", "fake", axis(0.93));
+      saveLayerEmbedding(db, "trait", "tra-t1", "fake", axis(0.9));
+      saveLayerEmbedding(db, "trait", "tra-t2", "fake", axis(0.75));
+      saveLayerEmbedding(db, "trait", "fin-t1", "fake", axis(0.97));
+
+      const query = "despliegue";
+      const embedFn = async (texts: string[]) => texts.map(() => axis(1));
+      const { hits } = await recallHybrid(
+        db,
+        { query, limit: 5, reinforce: false },
+        embedFn,
+        { reinforce: false, embeddingModel: "fake" },
+      );
+
+      expect(hits.filter((h) => h.layer === "trait").map((h) => h.id)).toEqual(["fin-t1"]);
+      expect(selectForInjection(hits).map((h) => h.id)).toContain("fin-t1");
+    } finally {
+      db.close();
+    }
   });
 
   it("respeta el presupuesto de caracteres", () => {

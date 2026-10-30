@@ -12,7 +12,7 @@ beforeEach(() => {
 });
 
 describe("pending episodes: one query behind the viewer and mem_context", () => {
-  it("both agree on membership and order, including episodes in the same millisecond", () => {
+  it("both agree on membership and order, including episodes in the same millisecond", async () => {
     vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
     for (const body of ["one", "two", "three"]) capture(db, { scope: "a", body });
     const done = capture(db, { scope: "a", body: "done" });
@@ -25,22 +25,22 @@ describe("pending episodes: one query behind the viewer and mem_context", () => 
     handleRecent(db, res as unknown as ServerResponse, new URL("http://x/api/recent?layer=episode&pending=1&scope=a"));
     const viewer = (JSON.parse(viewerBody) as { rows: Array<{ id: string }>; total: number });
 
-    const compat = dispatchEngramTool(db, "mem_context", { scope: "a", limit: 50 }) as { hits: Array<{ id: string; layer: string }> };
+    const compat = (await dispatchEngramTool(db, "mem_context", { scope: "a", limit: 50 })) as { hits: Array<{ id: string; layer: string }> };
 
     expect(compat.hits.map((h) => h.id)).toEqual(viewer.rows.map((r) => r.id));
     expect(viewer.total).toBe(3);
     expect(compat.hits.every((h) => h.layer === "episode")).toBe(true);
   });
 
-  it("keeps the mem_context payload shape (no consolidated_into) and its own limit clamp", () => {
+  it("keeps the mem_context payload shape (no consolidated_into) and its own limit clamp", async () => {
     for (let i = 0; i < 3; i++) capture(db, { scope: "a", body: `e${i}` });
-    const out = dispatchEngramTool(db, "mem_context", { limit: 1000 }) as { hits: Array<Record<string, unknown>> };
+    const out = (await dispatchEngramTool(db, "mem_context", { limit: 1000 })) as { hits: Array<Record<string, unknown>> };
     expect(Object.keys(out.hits[0]!)).toEqual(["id", "scope", "text", "created_at", "layer"]);
-    expect(dispatchEngramTool(db, "mem_context", { limit: 0 })).toMatchObject({ hits: expect.any(Array) });
-    expect((dispatchEngramTool(db, "mem_context", { limit: -5 }) as { hits: unknown[] }).hits).toHaveLength(1);
+    expect((await dispatchEngramTool(db, "mem_context", { limit: 0 }))).toMatchObject({ hits: expect.any(Array) });
+    expect(((await dispatchEngramTool(db, "mem_context", { limit: -5 })) as { hits: unknown[] }).hits).toHaveLength(1);
   });
 
-  it("count ignores limit and offset; the page honours them", () => {
+  it("count ignores limit and offset; the page honours them", async () => {
     for (let i = 0; i < 5; i++) capture(db, { scope: "a", body: `e${i}` });
     expect(countPendingEpisodes(db, "a")).toBe(5);
     expect(countPendingEpisodes(db, null)).toBe(5);

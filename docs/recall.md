@@ -1,8 +1,8 @@
 # Cómo busca recall
 
-`recall` devuelve traits, después memories, después episodes. Dentro de las memories fusiona dos señales
-con RRF: las palabras (FTS5) y, si hay un servidor de embeddings, el significado. La relevancia va antes
-que la saliencia, que sólo desempata. Esta página cuenta el comportamiento; las constantes están en
+`recall` pone traits, memories y episodes en un solo ranking: las tres capas compiten por la misma plaza con
+RRF. Cada señal aporta `peso / (60 + puesto)` y un recuerdo que encuentran varias señales sube; ninguna capa
+conserva un escalón fijo. La saliencia sólo desempata entre memories. Las constantes están en
 `engine/src/search.ts` y las variables, en la tabla de [DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única).
 
 ## Por palabras (siempre)
@@ -23,8 +23,16 @@ encuentra memorias que dicen "deudas". El valor por defecto es Ollama (`ollama p
 Los vectores se guardan como BLOB en la misma SQLite y la búsqueda es coseno en JS, sin extensiones
 nativas. Si el servidor no responde, todo degrada silenciosamente a FTS5 puro.
 
-La semántica cubre deliberadamente sólo `memories`; `episodes` y `traits` conservan búsqueda FTS5.
-Backfill y reindexado: `mismem-embed` (`--status`, `--force`).
+La semántica cubre las tres capas. Las memorias guardan su vector en `memory_embeddings`; los rasgos y los
+episodios pendientes, en `layer_embeddings`. Esos vectores se escriben al capturar o cristalizar y en el
+backfill, nunca al vuelo en una consulta. En el ranking por significado las tres capas forman una sola lista
+ordenada por coseno, con una prima de 0,05 para la memoria consolidada; ninguna capa hereda una posición fija.
+Un rasgo exige 0,06 de margen sobre el corte y un episodio pendiente 0,01, porque una regla corta y general se
+parece a cualquier pregunta de su tema. Cuando hay vectores, el resultado se queda con el mejor rasgo y como
+mucho dos episodios por consulta, elegidos por coseno antes de la fusión: una coincidencia exacta de palabras
+no puede adelantar a un rasgo o un episodio que está más cerca por significado. Sin ese tope, los rasgos y los
+episodios desplazaban a la memoria concreta que responde. El modo léxico, sin vectores, no aplica el tope. Backfill y reindexado: `mismem-embed`
+(`--status`, `--force`), que recorre memorias, rasgos y episodios pendientes.
 
 También habla con cualquier servidor compatible con OpenAI (`/v1/embeddings`, por ejemplo
 `llama-server --embedding`). **Si tus memorias no están en inglés, usa EmbeddingGemma 2**: con memorias en
@@ -83,6 +91,9 @@ Línea base del 2026-10-30 (tope 5, aciertos dentro del tope; caduca cuando camb
 | Modo | Global | MRR | Paráfrasis | Episodio | Rasgo | Ajenas con algo | Recuerdos por pregunta |
 |---|---|---|---|---|---|---|---|
 | Léxico | 221/432 | 0,48 | 1/72 | 20/24 | 8/24 | 8/48 | 0,9 |
-| Semántico (`embeddinggemma-2`, corte 0,65) | 368/432 | 0,80 | 64/72 | 0/24 | 0/24 | 11/48 | 4,8 |
+| Semántico (`embeddinggemma-2`, corte 0,65) | 411/432 | 0,87 | 64/72 | 23/24 | 19/24 | 11/48 | 4,87 |
 
-Los dos ceros del semántico son el issue #154.
+En el semántico, las tres capas compiten en el mismo ranking: rasgos y episodios pendientes pasan de 0/24 a
+19/24 y 23/24. El acierto en primera posición es 355/432 y el de las preguntas que esperan una memoria,
+328/384, frente a 329/384 de la línea base sin vectores de capa. El episodio que sigue sin aparecer (`dev-q33`) no es un fallo del ranking: su texto no dice
+"Lucía", que está sólo en el ámbito, y otro episodio parecido puntúa algo más alto.

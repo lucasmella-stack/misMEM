@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * mismem-embed — backfill y reindexado de embeddings para memories.
+ * mismem-embed — backfill y reindexado de embeddings de memorias, rasgos y episodios pendientes.
  *
  * Requiere el servidor de embeddings configurado: Ollama (default:
  * `ollama pull nomic-embed-text`) o uno compatible con OpenAI. Idempotente: procesa vectores
@@ -65,6 +65,9 @@ async function main(): Promise<void> {
     });
     console.log(
       `[embed] pendientes=${result.pending} embebidas=${result.embedded} reembebidas=${result.reembedded} fallidas=${result.failed}`,
+    );
+    console.log(
+      `[embed] rasgos y episodios pendientes=${result.layers.pending} embebidos=${result.layers.embedded} fallidos=${result.layers.failed}`,
     );
     if (result.failed > 0 && result.embedded === 0) {
       console.error(

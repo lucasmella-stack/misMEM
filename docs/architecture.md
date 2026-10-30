@@ -34,7 +34,7 @@ persiste, lo cristalizado permanece.
 |---|---|---|---|
 | `episodes` | Lo que ocurrió: texto original y fechado | No vencen solos: `forget` los borra una vez consolidados (30 días por defecto en la herramienta MCP, 90 en `mismem-forget`) | Evidencia y contexto inmediato |
 | `memories` | Lo aprendido al resumir varios episodios | Su `salience` baja si no se usa y sube al recordarla | Conocimiento operativo y búsqueda semántica |
-| `traits` | Patrones, preferencias o decisiones estables | Permanente salvo borrado explícito | Identidad y reglas de máxima prioridad |
+| `traits` | Patrones, preferencias o decisiones estables | Permanente salvo borrado explícito | Identidad y reglas generales; sin prioridad fija en el recall |
 
 Ejemplo: "hoy PostgreSQL rindió mejor" es un episode; "PostgreSQL es preferible en este proyecto" es una
 memory; "priorizamos soluciones robustas para concurrencia" puede cristalizar como trait.
@@ -54,8 +54,9 @@ resume las tablas.
 | `forget` | episodes y memories → nada | el usuario | Suelta lo que ya no se consulta; la herramienta MCP simula por defecto |
 
 Además, una **capa de compatibilidad con Engram** (`mem_save`, `mem_search`, `mem_context`,
-`mem_session_*`, ...) para los clientes que hablan ese protocolo. El orden de prioridad al buscar es
-traits, después memories, después episodes; los marcadores de ruido (`[noise] ...`, `[pareto:l0] ...`)
+`mem_session_*`, ...) para los clientes que hablan ese protocolo. Al buscar, las tres capas compiten en un
+solo ranking RRF: rasgos, memorias y episodios pendientes se puntúan por palabras y, si hay embeddings, por
+significado, sin un escalón fijo entre capas. Los marcadores de ruido (`[noise] ...`, `[pareto:l0] ...`)
 quedan fuera (`engine/src/noise.ts`).
 
 ## Componentes
@@ -134,7 +135,8 @@ el grado es popularidad.
 
 - **Engine**: TypeScript estricto, ES2022, ESM, Node 22 o superior.
 - **Almacenamiento**: SQLite con WAL, `better-sqlite3`.
-- **Búsqueda**: FTS5 más RRF semántico para las memories, manteniendo traits > memories > episodes.
+- **Búsqueda**: FTS5 y fusión RRF sobre las palabras y los vectores guardados de las tres capas: memorias,
+  rasgos y episodios pendientes.
 - **Protocolo**: [Model Context Protocol](https://modelcontextprotocol.io/) con `@modelcontextprotocol/sdk`.
 - **Validación**: Zod en todos los bordes.
 

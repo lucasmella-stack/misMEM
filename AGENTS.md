@@ -24,7 +24,7 @@ la interfaz es React, Vite y Tailwind. Gestor de paquetes: pnpm, nunca npm.
 | `engine/src/schema.ts` | Inputs Zod de las herramientas y el tipo `RecallHit` | cambia lo que una herramienta acepta o devuelve |
 | `engine/src/tools.ts` | Las operaciones MCP: `capture`, `recall` y `recallHybrid`, `reinforce`, `consolidate`, `crystallize`, `forget` y la lista de episodios pendientes | cambia lo que hace una herramienta |
 | `engine/src/search.ts` | Ranking del recall: consulta FTS5, rescate y fusión RRF con la saliencia | cambia el ranking (pide `mismem-bench` y `pnpm eval`) |
-| `engine/src/embeddings/` | `provider.ts` (configuración por entorno y cliente HTTP), `store.ts` (SQL de `memory_embeddings`, búsqueda y backfill), `vector.ts` (coseno) | cambia la capa semántica (pide `mismem-bench` y `pnpm eval`) |
+| `engine/src/embeddings/` | `provider.ts` (configuración por entorno y cliente HTTP), `store.ts` (SQL de `memory_embeddings` y `layer_embeddings`, búsqueda y backfill), `vector.ts` (coseno) | cambia la capa semántica (pide `mismem-bench` y `pnpm eval`) |
 | `engine/src/salience.ts` | Decay y refuerzo de la saliencia | cambia la fórmula de saliencia |
 | `engine/src/noise.ts`, `engine/src/terms.ts`, `engine/src/hash.ts` | Marcadores de ruido, tokenización compartida por la búsqueda y la medición de uso, hash del contenido (dedup de `capture`) | cambia uno de esos tres criterios |
 | `engine/src/relations.ts` | Lecturas que comparten el visor y la exportación a Obsidian (memorias parecidas por vector) | cambia cómo se relacionan las memorias |
@@ -54,6 +54,7 @@ Las tablas de la base, en `engine/src/db.ts`:
 | `traits` | `name` único por `scope`, `evidence_memory_ids` (JSON), `strength` y `polarity` |
 | `co_use` | Pares de memorias usadas en el mismo turno; sólo lo escribe `reinforce` |
 | `memory_embeddings` | Un vector (BLOB) por memoria y el modelo que lo generó |
+| `layer_embeddings` | Un vector (BLOB) por rasgo y por episodio pendiente, con su modelo y dimensión; los disparadores lo borran al consolidar o borrar el item |
 | `episodes_fts`, `memories_fts`, `traits_fts` | Índices FTS5 que mantienen disparadores |
 
 ## Comandos
