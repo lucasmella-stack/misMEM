@@ -27,7 +27,7 @@ import type { Database as DB } from "better-sqlite3";
 import { z } from "zod";
 import { CrystallizeInput, Scope } from "./schema.js";
 import { crystallize, embedWrittenLayer } from "./tools.js";
-import { embedPendingMemories } from "./embeddings/store.js";
+import { AUTO_BACKFILL_MAX_ROWS, embedPendingMemories } from "./embeddings/store.js";
 import type { EmbedFn } from "./embeddings/provider.js";
 import { JobError, type ConsolidationJob } from "./consolidation/job.js";
 import { json } from "./viewer.js";
@@ -61,7 +61,9 @@ const EditInput = z.object({
 
 type Reembed = (db: DB) => Promise<unknown>;
 
-const defaultReembed: Reembed = (db) => embedPendingMemories(db);
+// Acotado: la petición del visor no puede quedarse esperando un reindexado entero.
+const defaultReembed: Reembed = (db) =>
+  embedPendingMemories(db, { maxRows: AUTO_BACKFILL_MAX_ROWS });
 
 function exists(db: DB, table: "memories" | "traits", id: string): boolean {
   return db.prepare(`SELECT 1 FROM ${table} WHERE id = ?`).get(id) !== undefined;

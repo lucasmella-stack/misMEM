@@ -41,7 +41,7 @@ async function main(): Promise<void> {
   const db = openDefaultDb();
   try {
     const cfg = loadEmbeddingConfig();
-    const status = getEmbeddingIndexStatus(db, cfg.model);
+    const status = getEmbeddingIndexStatus(db, cfg.model, cfg);
 
     if (args.status) {
       console.log(

@@ -199,11 +199,18 @@ docker exec mismem-brain node dist/embed-cli.js --status   # cuántas memorias t
 docker exec mismem-brain node dist/embed-cli.js            # completa las que faltan
 ```
 
-Cambiar de **modelo**, de **prefijo** o de `MISMEM_EMBEDDING_MAX_CHARS`, o editar el
+Cambiar de **modelo**, de **prefijo de documento** o de `MISMEM_EMBEDDING_MAX_CHARS`, o editar el
 texto de una memoria, un rasgo o un episodio, se detecta solo: cada vector guarda
 una huella del texto exacto que se envió, y el siguiente `mismem-embed` reembebe lo
 afectado. `--status` los cuenta en `outdated`. Mientras dura el reindexado, la
-búsqueda por significado sigue viendo los vectores viejos.
+búsqueda por significado sigue viendo los vectores viejos. El prefijo de consulta
+(`MISMEM_EMBEDDING_QUERY_PREFIX`) no entra en la huella: cambiarlo no invalida
+ningún vector guardado.
+
+Tras actualizar desde una versión sin huella, conviene correr `mismem-embed` una vez: las filas
+antiguas tienen la huella vacía y se reembeben todas. Los backfills que se disparan solos (la
+herramienta `consolidate`, una edición desde el visor y la consolidación nocturna) procesan como
+mucho 64 filas por llamada, así que solos tardarían varias pasadas en vaciar la base.
 
 ---
 
@@ -417,7 +424,8 @@ Sin default: si falta una de las dos (como variable o como parámetro del script
 | `MISMEM_EMBEDDING_URL` | `http://127.0.0.1:11434` (ollama) / `http://127.0.0.1:8080` (openai) | Servidor de embeddings |
 | `MISMEM_OLLAMA_URL` | — | Nombre anterior de la URL; sólo vale para `ollama` |
 | `MISMEM_EMBEDDING_MODEL` | `nomic-embed-text` | Modelo. Cambiarlo reindexa solo |
-| `MISMEM_EMBEDDING_QUERY_PREFIX` / `_DOC_PREFIX` | vacío | Prefijos que algunos modelos piden para consulta y documento. Cambiarlos reindexa solo en el siguiente backfill |
+| `MISMEM_EMBEDDING_QUERY_PREFIX` | vacío | Prefijo que algunos modelos piden en la consulta. Cambiarlo no toca ningún vector guardado |
+| `MISMEM_EMBEDDING_DOC_PREFIX` | vacío | Prefijo que algunos modelos piden en el documento. Cambiarlo reindexa solo en el siguiente backfill |
 | `MISMEM_EMBEDDING_MIN_SCORE` | `0.65` con las familias `nomic-embed-text` y EmbeddingGemma (el nombre aparece en el id, sin distinguir mayúsculas); `0.5` con cualquier otro modelo | Parecido mínimo (coseno) para que una memoria cuente. Depende del modelo; `0` trae todo. Un valor explícito gana siempre al default |
 | `MISMEM_EMBEDDING_MAX_CHARS` | `4000` | Tope del texto de cada memoria al indexar. Cambiarlo reindexa solo en el siguiente backfill |
 | `MISMEM_EMBEDDING_TIMEOUT_MS` | `3000` | Espera por consulta (el reindexado usa 120 s) |

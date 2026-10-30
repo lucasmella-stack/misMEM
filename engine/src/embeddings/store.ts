@@ -19,6 +19,13 @@ import { cosine } from "./vector.js";
 
 const MAX_CONSECUTIVE_FAILURES = 2;
 
+/**
+ * Automatic backfills (the consolidate tool, a viewer edit, the nightly run) can fire while a
+ * client waits, so they embed at most this many rows per call and leave the rest for the next
+ * pass. `mismem-embed` passes no cap: there the wait is the job and the progress is visible.
+ */
+export const AUTO_BACKFILL_MAX_ROWS = 64;
+
 /** Stored text of a memory as the backfill embeds it. */
 function memoryEmbeddingText(row: { gist: string; details: string | null }): string {
   return row.details ? `${row.gist}\n${row.details}` : row.gist;
@@ -49,9 +56,10 @@ export function saveMemoryEmbedding(
   model: string,
   vec: Float32Array,
   text?: string,
+  cfg: EmbeddingConfig = loadEmbeddingConfig(),
 ): void {
   const source = text ?? currentMemoryText(db, memoryId);
-  const fingerprint = embeddingFingerprint(source, loadEmbeddingConfig());
+  const fingerprint = embeddingFingerprint(source, cfg);
   db.prepare(
     `INSERT OR REPLACE INTO memory_embeddings (memory_id, model, dims, vec, created_at, fingerprint)
      VALUES (?, ?, ?, ?, ?, ?)`,
@@ -69,7 +77,7 @@ function currentMemoryText(db: DB, memoryId: string): string {
   const row = db.prepare("SELECT gist, details FROM memories WHERE id = ?").get(memoryId) as
     | { gist: string; details: string | null }
     | undefined;
-  if (!row) throw new Error(`memory not found: ${memoryId}`);
+  if (!row) throw new Error(`no existe la memoria: ${memoryId}`);
   return memoryEmbeddingText(row);
 }
 
@@ -250,20 +258,24 @@ export async function embedPendingMemories(
     had_embedding: number;
   }>;
 
+  // A bounded caller embeds at most `maxRows` rows across the three layers; `pending` keeps
+  // reporting the whole backlog so the rest is visibly waiting for the next pass.
+  const budget = opts.maxRows ?? Number.POSITIVE_INFINITY;
+  const selectedRows = pendingRows.slice(0, budget);
   const memories = await embedInBatches(
-    pendingRows,
+    selectedRows,
     resolved.embedFn,
     resolved.batchSize,
     (m) => (m.details ? `${m.gist}\n${m.details}` : m.gist).slice(0, resolved.maxChars),
     (m, vec) => {
-      saveMemoryEmbedding(db, m.id, resolved.model, vec, memoryEmbeddingText(m));
+      saveMemoryEmbedding(db, m.id, resolved.model, vec, memoryEmbeddingText(m), resolved.cfg);
       return true;
     },
   );
 
   // Traits and pending episodes follow the same run: a caller that backfills memories
   // never leaves the other two layers without vectors.
-  const layers = await embedPendingLayersResolved(db, resolved);
+  const layers = await embedPendingLayersResolved(db, resolved, budget - selectedRows.length);
 
   return { pending: pendingRows.length, ...memories, layers };
 }
@@ -276,9 +288,12 @@ interface ResolveOptions {
   timeoutMs?: number;
   expectedDims?: number;
   force?: boolean;
+  /** Rows this call may embed, shared by the three layers; omitted means everything. */
+  maxRows?: number;
 }
 
 interface ResolvedEmbedOptions {
+  cfg: EmbeddingConfig;
   embedFn: EmbedFn;
   model: string;
   batchSize: number;
@@ -293,6 +308,7 @@ function resolveEmbedOptions(
   cfg: ReturnType<typeof loadEmbeddingConfig>,
 ): ResolvedEmbedOptions {
   return {
+    cfg,
     embedFn:
       opts.embedFn ??
       ((texts: string[]) => embedTexts(texts, { ...cfg, timeoutMs: opts.timeoutMs ?? cfg.timeoutMs })),
@@ -308,6 +324,7 @@ function resolveEmbedOptions(
 async function embedPendingLayersResolved(
   db: DB,
   opts: ResolvedEmbedOptions,
+  maxRows: number,
 ): Promise<{ pending: number; embedded: number; failed: number }> {
   const needsEmbedding = [
     "e.item_id IS NULL",
@@ -326,7 +343,7 @@ async function embedPendingLayersResolved(
   const staleTrait = `${predicate} OR COALESCE(e.fingerprint, '') <> mismem_fp_text(t.name)`;
   const staleEpisode = `${predicate} OR COALESCE(e.fingerprint, '') <> mismem_fp_text(ep.body)`;
 
-  const traitRows = db
+  const pendingTraits = db
     .prepare(
       `SELECT t.id, t.name AS text, e.item_id IS NOT NULL AS had_embedding
        FROM traits t
@@ -334,7 +351,7 @@ async function embedPendingLayersResolved(
        WHERE (${staleTrait}) ${opts.scope ? "AND t.scope = @scope" : ""}`,
     )
     .all(params) as Array<{ id: string; text: string; had_embedding: number }>;
-  const episodeRows = db
+  const pendingEpisodes = db
     .prepare(
       `SELECT ep.id, ep.body AS text, e.item_id IS NOT NULL AS had_embedding
        FROM episodes ep
@@ -344,8 +361,10 @@ async function embedPendingLayersResolved(
     )
     .all(params) as Array<{ id: string; text: string; had_embedding: number }>;
 
+  const traitRows = pendingTraits.slice(0, maxRows);
+  const episodeRows = pendingEpisodes.slice(0, Math.max(0, maxRows - traitRows.length));
   const stats: { pending: number; embedded: number; failed: number } = {
-    pending: traitRows.length + episodeRows.length,
+    pending: pendingTraits.length + pendingEpisodes.length,
     embedded: 0,
     failed: 0,
   };
@@ -360,7 +379,7 @@ async function embedPendingLayersResolved(
       opts.batchSize,
       (row) => row.text.slice(0, opts.maxChars),
       (row, vec) =>
-        saveLayerEmbeddingIfCurrent(db, layer, row.id, row.text, opts.model, vec),
+        saveLayerEmbeddingIfCurrent(db, layer, row.id, row.text, opts.model, vec, opts.cfg),
     );
     stats.embedded += batch.embedded;
     stats.failed += batch.failed;
@@ -375,9 +394,10 @@ export function saveLayerEmbedding(
   model: string,
   vec: Float32Array,
   text?: string,
+  cfg: EmbeddingConfig = loadEmbeddingConfig(),
 ): void {
   const source = text ?? liveLayerText(db, layer, itemId);
-  if (source === undefined) throw new Error(`layer item not found: ${layer}:${itemId}`);
+  if (source === undefined) throw new Error(`no existe el elemento de la capa ${layer}: ${itemId}`);
   db.prepare(
     `INSERT OR REPLACE INTO layer_embeddings (layer, item_id, model, dims, vec, created_at, fingerprint)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -388,7 +408,7 @@ export function saveLayerEmbedding(
     vec.length,
     Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength),
     Date.now(),
-    embeddingFingerprint(source, loadEmbeddingConfig()),
+    embeddingFingerprint(source, cfg),
   );
 }
 
@@ -416,10 +436,11 @@ function saveLayerEmbeddingIfCurrent(
   expectedText: string,
   model: string,
   vec: Float32Array,
+  cfg: EmbeddingConfig,
 ): boolean {
   return db.transaction(() => {
     if (liveLayerText(db, layer, itemId) !== expectedText) return false;
-    saveLayerEmbedding(db, layer, itemId, model, vec, expectedText);
+    saveLayerEmbedding(db, layer, itemId, model, vec, expectedText, cfg);
     return true;
   })();
 }
@@ -463,7 +484,7 @@ export async function embedLayerItem(
 
   // The item can be renamed, consolidated or deleted while the embedder responds. The
   // helper checks and saves in one transaction so a stale vector cannot outlive its text.
-  return saveLayerEmbeddingIfCurrent(db, layer, itemId, row.text, model, vec);
+  return saveLayerEmbeddingIfCurrent(db, layer, itemId, row.text, model, vec, cfg);
 }
 
 export interface LayerSemanticHit {
@@ -644,6 +665,7 @@ export function getEmbeddingIndexStatus(
         `SELECT COUNT(*) AS n
          FROM memory_embeddings e JOIN memories m ON m.id = e.memory_id
          WHERE e.model = @model
+           AND ${excludeNoiseSql("m")}
            AND COALESCE(e.fingerprint, '') <> mismem_fp_memory(m.gist, m.details)`,
       )
       .get({ model: activeModel }) as { n: number }

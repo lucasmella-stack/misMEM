@@ -15,9 +15,13 @@
   vector, otro modelo, otras dimensiones). Cambiar `MISMEM_EMBEDDING_DOC_PREFIX` o `MISMEM_EMBEDDING_MAX_CHARS`,
   o editar el texto de una memoria, un rasgo o un episodio por un camino que no borre su vector, ya no deja
   vectores que describen otro texto: se reembeben solos en el siguiente `mismem-embed`, sin `--force`. Las filas
-  anteriores a la columna se reembeben una sola vez.
+  anteriores a la columna se reembeben una sola vez, así que conviene correr `mismem-embed` una vez tras
+  actualizar. Los backfills que se disparan solos (la herramienta `consolidate`, una edición desde el visor y la
+  consolidación nocturna) procesan como mucho 64 filas por llamada y dejan el resto para la siguiente pasada;
+  `mismem-embed` no tiene tope. Cambiar `MISMEM_EMBEDDING_QUERY_PREFIX` no invalida ningún vector guardado.
 - `getEmbeddingIndexStatus` y `mismem-embed --status` cuentan en `outdated`, para memorias y para cada capa, las
-  filas del modelo activo con huella distinta o nula.
+  filas del modelo activo con huella distinta o nula. El conteo de memorias excluye los marcadores de ruido, igual
+  que el backfill.
 - La migración es aditiva y repetible: `migrate()` añade la columna a `memory_embeddings` y a
   `layer_embeddings` si falta, sin borrar nada. Tests en `engine/tests/embeddings.test.ts` (prefijo, edición de
   `details`, fila sin huella, migración sobre una base anterior repetida dos veces) y

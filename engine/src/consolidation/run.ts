@@ -1,7 +1,7 @@
 import type { Database as DB } from "better-sqlite3";
 import { consolidate } from "../tools.js";
 import { envNonNegativeNumber, envPositiveNumber } from "../env.js";
-import { embedPendingMemories } from "../embeddings/store.js";
+import { AUTO_BACKFILL_MAX_ROWS, embedPendingMemories } from "../embeddings/store.js";
 import { classify } from "../pareto/classifier.js";
 import {
   distill,
@@ -212,7 +212,11 @@ export async function runConsolidation(
   // Opcional: si no hay Ollama, degrada sin afectar la consolidación.
   if (!opts.dryRun) {
     try {
-      const emb = await embedPendingMemories(db, { timeoutMs: 120_000, batchSize: 8 });
+      const emb = await embedPendingMemories(db, {
+        timeoutMs: 120_000,
+        batchSize: 8,
+        maxRows: AUTO_BACKFILL_MAX_ROWS,
+      });
       if (emb.pending > 0) {
         log(`[consolidation] embeddings: pendientes=${emb.pending} embebidas=${emb.embedded} fallidas=${emb.failed}`);
       }

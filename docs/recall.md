@@ -63,10 +63,11 @@ ya se pierde uno (medido el 2026-10-30, issue #158). Un `MISMEM_EMBEDDING_MIN_SC
 
 La búsqueda sólo compara vectores del modelo configurado. Cada vector guarda además una huella del texto
 exacto que se envió al servidor (el prefijo de documento más el texto ya recortado). Cambiar de modelo, de
-prefijo o de `MISMEM_EMBEDDING_MAX_CHARS`, o editar el texto de una memoria, un rasgo o un episodio, reindexa
-solo en el siguiente backfill (`mismem-embed`): `--status` cuenta en `outdated` los vectores del modelo activo
-que ya no coinciden, y `--force` sigue sirviendo para reindexar todo aunque nada haya cambiado. Todas las
-variables, con sus defaults, están en
+prefijo de documento o de `MISMEM_EMBEDDING_MAX_CHARS`, o editar el texto de una memoria, un rasgo o un
+episodio, reindexa solo en el siguiente backfill (`mismem-embed`): `--status` cuenta en `outdated` los vectores
+del modelo activo que ya no coinciden, y `--force` sigue sirviendo para reindexar todo aunque nada haya
+cambiado. El prefijo de consulta no entra en la huella: cambiarlo no invalida ningún vector guardado. Todas
+las variables, con sus defaults, están en
 [DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única).
 
 ## Medirlo

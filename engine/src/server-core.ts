@@ -10,7 +10,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Database as DB } from "better-sqlite3";
 import { captureAndEmbed, embedWrittenLayer, recallHybrid, consolidate, crystallize, forget, reinforce } from "./tools.js";
-import { embedPendingMemories } from "./embeddings/store.js";
+import { AUTO_BACKFILL_MAX_ROWS, embedPendingMemories } from "./embeddings/store.js";
 import {
   ENGRAM_TOOLS,
   dispatchEngramTool,
@@ -166,8 +166,9 @@ export function createServer(db: DB): Server {
           result = consolidate(db, args);
           // Best-effort: si hay embedder local, la memoria nueva queda
           // embebida ya; si no, el backfill nocturno la levanta después.
+          // Acotado para que el cliente no espere un reindexado entero.
           try {
-            await embedPendingMemories(db);
+            await embedPendingMemories(db, { maxRows: AUTO_BACKFILL_MAX_ROWS });
           } catch {
             /* semántica es opcional; nunca rompe el write path */
           }
