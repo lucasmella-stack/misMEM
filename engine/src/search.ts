@@ -2,7 +2,7 @@
 import type { Database as DB } from "better-sqlite3";
 import type { RecallInput, RecallHit } from "./schema.js";
 import { excludeNoiseSql } from "./noise.js";
-import { plain, searchTerms } from "./terms.js";
+import { isRescueStopword, plain, searchTerms } from "./terms.js";
 import type { SemanticHit } from "./embeddings/store.js";
 import { effectiveSalience, type SalienceRow } from "./salience.js";
 
@@ -56,20 +56,15 @@ const FTS_TOKEN_SPLIT = /[^\p{L}\p{N}]+/u;
 
 // How many matching words a rescued record needs. One is too easy: any record sharing a
 // rare but unrelated word would come back. The exception is a one-word query, which cannot
-// reach two.
+// reach two. The rescue sees at most RELAXED_MAX_TERMS words, so a bar that grew with the
+// query would stop growing at twelve and change silently if that cap moved; two is what
+// the golden corpus supports.
 const RELAXED_MIN_INFORMATIVE = 2;
-// The bar grows with the query, but only over the words the corpus actually contains: a
-// long question also carries names, dates and filler that no record has, and requiring a
-// match for those made every long question miss. Measured on the golden corpus (adjustment
-// half): 0.3 over all words demanded six matches from an 18-word question whose answer
-// shared two or three; 0.15 over the present words recovers those without adding off-topic
-// hits.
-const RELAXED_MIN_RATIO = 0.15;
 // A query is mostly made of words no record contains when it is about something else. In
 // that case the few words that do exist are not evidence: the astronomy question of the
-// unit test keeps only "sistema" out of seven content words. Requiring 30 % of the original
-// words to exist keeps it out, while a real long question leaves most of its words in the
-// corpus.
+// unit test keeps only "sistema" out of seven content words. Requiring 30 % of the query
+// words (stopwords excluded, before the term cap) to exist keeps it out, while a real long
+// question leaves most of its words in the corpus.
 const RELAXED_MIN_PRESENT_RATIO = 0.3;
 // A record matched only by generic words proves nothing, so at least one rare word is
 // required. Two made no difference to off-topic questions once the added function words
@@ -102,7 +97,11 @@ interface RelaxedTerm {
 interface RelaxedQuery {
   /** Términos que se buscan y se cuentan, ya sin prefijos repetidos. */
   terms: RelaxedTerm[];
-  /** Palabras distintas antes de juntar prefijos: dice si la consulta es de una sola. */
+  /**
+   * Distinct content words before merging prefixes and before the term cap: it says whether
+   * the query has a single word, and it is the denominator of the presence gate, which is
+   * measured over the whole question and not over what the rescue actually searches.
+   */
   wordCount: number;
 }
 
@@ -117,7 +116,10 @@ function relaxedTerms(query: string): RelaxedQuery {
   const terms: RelaxedTerm[] = [];
   for (const term of searchTerms(query)) {
     for (const word of plain(term).split(FTS_TOKEN_SPLIT)) {
-      if (!word || seen.has(word)) continue;
+      // The rescue drops filler the strict query keeps, through its own list: the strict
+      // AND needs those words to match when they are the whole query, but an OR over them
+      // only adds candidates that share nothing.
+      if (!word || seen.has(word) || isRescueStopword(word)) continue;
       seen.add(word);
       terms.push({
         word,
@@ -212,13 +214,14 @@ interface PlannedTerm {
 
 /**
  * What the rescue is allowed to demand from this query. `wordCount` is the number of
- * distinct words after stopwords and the cap; `terms` keeps only the ones at least one
- * candidate contains. Words no record has are context noise: they cannot match, and
- * counting them made long questions ask for more coincidences than their answer could
- * possibly provide.
+ * distinct content words in the question, before the term cap; `terms` keeps only the ones
+ * at least one candidate contains. Words no record has are context noise: they cannot
+ * match, and counting them made long questions ask for more coincidences than their answer
+ * could possibly provide.
  */
 interface RelaxedPlan {
   terms: PlannedTerm[];
+  /** Content words of the question, without the rescue's term cap. */
   wordCount: number;
 }
 
@@ -335,15 +338,12 @@ function relaxRows<T extends RankedCandidate>(rows: T[], plan: RelaxedPlan): T[]
   // exist are not evidence; this keeps a long off-topic question from being rescued by two
   // generic words while a real long question still passes with most of its words present.
   if (terms.length / plan.wordCount < RELAXED_MIN_PRESENT_RATIO) return [];
-  // A one-word query cannot reach two matches; anything else starts at two and grows with
-  // the present words, so a very long question needs more than a single coincidence.
-  // The exception is the original query having one word, not the plan keeping one term:
-  // two forms of the same word dedupe to a single prefix and must still count as one
-  // coincidence, or "decidir decision" rescues a memory that only says "decision".
+  // A one-word query cannot reach two matches; anything else asks for two. The exception
+  // is the original query having one word, not the plan keeping one term: two forms of the
+  // same word dedupe to a single prefix and must still count as one coincidence, or
+  // "decidir decision" rescues a memory that only says "decision".
   const singleWord = plan.wordCount === 1;
-  const required = singleWord
-    ? 1
-    : Math.max(RELAXED_MIN_INFORMATIVE, Math.ceil(terms.length * RELAXED_MIN_RATIO));
+  const required = singleWord ? 1 : RELAXED_MIN_INFORMATIVE;
   // A one-word query has only one term to match, so asking for two rare ones would make
   // the rescue unreachable ("deudas" against "la deuda").
   const rareRequired = singleWord ? 1 : RELAXED_MIN_RARE_MATCHES;
@@ -359,7 +359,7 @@ function relaxRows<T extends RankedCandidate>(rows: T[], plan: RelaxedPlan): T[]
       };
     })
     // A candidate made only of common words proves nothing; one rare word is the minimum
-    // signal, and the count of all matches still has to clear the query-length bar.
+    // signal, and the count of all matches still has to clear two.
     .filter(
       ({ matches, informative }) => matches >= required && informative >= rareRequired,
     )
@@ -446,13 +446,13 @@ export function lexicalCandidates(
     const relaxed = relaxedFts(terms);
     if (relaxed !== strict) {
       rows = run(relaxed);
-      // The ratio counts what was actually searched: RELAXED_MAX_TERMS already capped the
-      // query, and demanding matches for words never searched would be unreachable.
-      const searchedWords = Math.min(wordCount, RELAXED_MAX_TERMS);
+      // The presence gate is measured over the whole question, not over the capped search:
+      // a word past the cap was part of what the question is about, and letting the cap
+      // shrink the denominator would pass questions mostly about things no record has.
       rescuedPlan = planTerms(
         db,
         terms,
-        searchedWords,
+        wordCount,
         [...rows.traits, ...rows.memories, ...rows.episodes],
       );
     }

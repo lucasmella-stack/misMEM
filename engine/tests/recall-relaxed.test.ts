@@ -77,6 +77,43 @@ describe("recall léxico: frases normales", () => {
     ).toContain(target);
   });
 
+  it("no rescata si las palabras presentes no llegan al 30 % de la consulta", () => {
+    // Eight content words, two of them in the record: 2/8 = 25 %. Without the presence
+    // gate the candidate clears the two-match bar and would be rescued.
+    memory("dev", "kubernetes traefik en produccion");
+    expect(
+      memoryIds("kubernetes traefik ingress panel metricas martes jueves viernes"),
+    ).toEqual([]);
+  });
+
+  it("rescata justo en el 30 % de palabras presentes", () => {
+    // 3/10 is exactly the threshold: the gate rejects only what falls below it.
+    const target = memory("dev", "kubernetes traefik ingress en produccion");
+    expect(
+      memoryIds("kubernetes traefik ingress panel metricas martes jueves viernes sabado domingo"),
+    ).toEqual([target]);
+  });
+
+  it("la puerta mide la consulta entera, no las palabras que caben en el tope de 12", () => {
+    // Fifteen content words and four in the record: 4/15 = 27 % on the question, but
+    // 4/12 = 33 % if the denominator is the capped rescue query. The cap must not soften
+    // the gate; this candidate only comes back with the old arithmetic.
+    memory("dev", "kubernetes docker nginx postgres en produccion");
+    expect(
+      memoryIds(
+        "kubernetes docker nginx postgres redis grafana prometheus terraform ansible vagrant packer consul vault kong envoy",
+      ),
+    ).toEqual([]);
+  });
+
+  it("un verbo coloquial no tapa la única palabra con tema", () => {
+    // The review of this change found "¿qué podemos hacer con el despliegue?" returning
+    // nothing: "podemos" and "hacer" survived the stopword list, the two-match bar then
+    // required both, and the memory only has "despliegue". The rescue ignores those verbs.
+    const target = memory("dev", "el despliegue del servicio usa docker compose en el servidor de casa");
+    expect(memoryIds("¿qué podemos hacer con el despliegue?")).toEqual([target]);
+  });
+
   it("al relajar hacen falta dos palabras: una sola en común no alcanza", () => {
     const both = memory("pc", "el teclado retroiluminado tiene luces RGB");
     memory("pc", "el teclado mecánico nuevo");
