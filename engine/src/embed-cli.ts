@@ -23,7 +23,7 @@ function help(): void {
       "     MISMEM_EMBEDDING_MODEL, MISMEM_EMBEDDING_QUERY_PREFIX, MISMEM_EMBEDDING_DOC_PREFIX,\n" +
       "     MISMEM_EMBEDDING_MIN_SCORE, MISMEM_EMBEDDING_MAX_CHARS, MISMEM_EMBEDDING_TIMEOUT_MS,\n" +
       "     MISMEM_EMBEDDINGS=off\n" +
-      "Cambiar de modelo se detecta solo; cambiar un prefijo o MAX_CHARS no: reindexar con --force.",
+      "Cambiar de modelo, de prefijo o de MAX_CHARS se detecta solo; el siguiente backfill reembebe lo afectado.",
   );
 }
 

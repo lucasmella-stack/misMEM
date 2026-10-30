@@ -61,8 +61,11 @@ Con EmbeddingGemma 2 el corte por defecto también es 0,65: en el golden eval, c
 ajenas traían 5 recuerdos cada una; con 0,65 sólo 11 traen algo y no se pierde ningún acierto, y con 0,66
 ya se pierde uno (medido el 2026-10-30, issue #158). Un `MISMEM_EMBEDDING_MIN_SCORE` explícito gana siempre.
 
-La búsqueda sólo compara vectores del modelo configurado. Cambiar de modelo reindexa solo en el siguiente
-backfill (`mismem-embed`); cambiar un prefijo no se detecta y exige `mismem-embed --force`. Todas las
+La búsqueda sólo compara vectores del modelo configurado. Cada vector guarda además una huella del texto
+exacto que se envió al servidor (el prefijo de documento más el texto ya recortado). Cambiar de modelo, de
+prefijo o de `MISMEM_EMBEDDING_MAX_CHARS`, o editar el texto de una memoria, un rasgo o un episodio, reindexa
+solo en el siguiente backfill (`mismem-embed`): `--status` cuenta en `outdated` los vectores del modelo activo
+que ya no coinciden, y `--force` sigue sirviendo para reindexar todo aunque nada haya cambiado. Todas las
 variables, con sus defaults, están en
 [DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única).
 

@@ -8,21 +8,69 @@
  */
 import type { Database as DB } from "better-sqlite3";
 import { excludeNoiseSql } from "../noise.js";
-import { embedTexts, loadEmbeddingConfig, type EmbedFn } from "./provider.js";
+import {
+  embedTexts,
+  embeddingFingerprint,
+  loadEmbeddingConfig,
+  type EmbeddingConfig,
+  type EmbedFn,
+} from "./provider.js";
 import { cosine } from "./vector.js";
 
 const MAX_CONSECUTIVE_FAILURES = 2;
 
+/** Stored text of a memory as the backfill embeds it. */
+function memoryEmbeddingText(row: { gist: string; details: string | null }): string {
+  return row.details ? `${row.gist}\n${row.details}` : row.gist;
+}
+
+/**
+ * SQLite cannot hash, so the pending queries and the status call back into these functions.
+ * Deterministic and built from the config of this call, which is what turns "the vector no
+ * longer describes its row" into a plain SQL predicate.
+ */
+function registerFingerprintFunctions(db: DB, cfg: EmbeddingConfig): void {
+  db.function("mismem_fp_text", { deterministic: true }, (text: string) =>
+    embeddingFingerprint(text, cfg),
+  );
+  db.function("mismem_fp_memory", { deterministic: true }, (gist: string, details: string | null) =>
+    embeddingFingerprint(memoryEmbeddingText({ gist, details }), cfg),
+  );
+}
+
+/**
+ * `text` is the untruncated text the caller embedded; the fingerprint truncates it the same
+ * way the request does. Omitted (fixtures, callers that just saved the row), the row's
+ * current text is read, which is the same string they were embedding.
+ */
 export function saveMemoryEmbedding(
   db: DB,
   memoryId: string,
   model: string,
   vec: Float32Array,
+  text?: string,
 ): void {
+  const source = text ?? currentMemoryText(db, memoryId);
+  const fingerprint = embeddingFingerprint(source, loadEmbeddingConfig());
   db.prepare(
-    `INSERT OR REPLACE INTO memory_embeddings (memory_id, model, dims, vec, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(memoryId, model, vec.length, Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength), Date.now());
+    `INSERT OR REPLACE INTO memory_embeddings (memory_id, model, dims, vec, created_at, fingerprint)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(
+    memoryId,
+    model,
+    vec.length,
+    Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength),
+    Date.now(),
+    fingerprint,
+  );
+}
+
+function currentMemoryText(db: DB, memoryId: string): string {
+  const row = db.prepare("SELECT gist, details FROM memories WHERE id = ?").get(memoryId) as
+    | { gist: string; details: string | null }
+    | undefined;
+  if (!row) throw new Error(`memory not found: ${memoryId}`);
+  return memoryEmbeddingText(row);
 }
 
 export interface SemanticHit {
@@ -172,10 +220,12 @@ export async function embedPendingMemories(
     };
   }
   const resolved = resolveEmbedOptions(opts, cfg);
+  registerFingerprintFunctions(db, cfg);
   const needsEmbedding = [
     "e.memory_id IS NULL",
     "e.model <> @model",
     opts.expectedDims !== undefined ? "e.dims <> @expectedDims" : null,
+    "COALESCE(e.fingerprint, '') <> mismem_fp_memory(m.gist, m.details)",
   ]
     .filter((value): value is string => value !== null)
     .join(" OR ");
@@ -206,7 +256,7 @@ export async function embedPendingMemories(
     resolved.batchSize,
     (m) => (m.details ? `${m.gist}\n${m.details}` : m.gist).slice(0, resolved.maxChars),
     (m, vec) => {
-      saveMemoryEmbedding(db, m.id, resolved.model, vec);
+      saveMemoryEmbedding(db, m.id, resolved.model, vec, memoryEmbeddingText(m));
       return true;
     },
   );
@@ -272,13 +322,16 @@ async function embedPendingLayersResolved(
     expectedDims: opts.expectedDims,
     scope: opts.scope,
   };
+  // The text column differs per layer, so the hash comparison goes into each query.
+  const staleTrait = `${predicate} OR COALESCE(e.fingerprint, '') <> mismem_fp_text(t.name)`;
+  const staleEpisode = `${predicate} OR COALESCE(e.fingerprint, '') <> mismem_fp_text(ep.body)`;
 
   const traitRows = db
     .prepare(
       `SELECT t.id, t.name AS text, e.item_id IS NOT NULL AS had_embedding
        FROM traits t
        LEFT JOIN layer_embeddings e ON e.layer = 'trait' AND e.item_id = t.id
-       WHERE (${predicate}) ${opts.scope ? "AND t.scope = @scope" : ""}`,
+       WHERE (${staleTrait}) ${opts.scope ? "AND t.scope = @scope" : ""}`,
     )
     .all(params) as Array<{ id: string; text: string; had_embedding: number }>;
   const episodeRows = db
@@ -287,7 +340,7 @@ async function embedPendingLayersResolved(
        FROM episodes ep
        LEFT JOIN layer_embeddings e ON e.layer = 'episode' AND e.item_id = ep.id
        WHERE ep.consolidated_into IS NULL
-         AND (${predicate}) ${opts.scope ? "AND ep.scope = @scope" : ""}`,
+         AND (${staleEpisode}) ${opts.scope ? "AND ep.scope = @scope" : ""}`,
     )
     .all(params) as Array<{ id: string; text: string; had_embedding: number }>;
 
@@ -321,10 +374,13 @@ export function saveLayerEmbedding(
   itemId: string,
   model: string,
   vec: Float32Array,
+  text?: string,
 ): void {
+  const source = text ?? liveLayerText(db, layer, itemId);
+  if (source === undefined) throw new Error(`layer item not found: ${layer}:${itemId}`);
   db.prepare(
-    `INSERT OR REPLACE INTO layer_embeddings (layer, item_id, model, dims, vec, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT OR REPLACE INTO layer_embeddings (layer, item_id, model, dims, vec, created_at, fingerprint)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     layer,
     itemId,
@@ -332,6 +388,7 @@ export function saveLayerEmbedding(
     vec.length,
     Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength),
     Date.now(),
+    embeddingFingerprint(source, loadEmbeddingConfig()),
   );
 }
 
@@ -362,7 +419,7 @@ function saveLayerEmbeddingIfCurrent(
 ): boolean {
   return db.transaction(() => {
     if (liveLayerText(db, layer, itemId) !== expectedText) return false;
-    saveLayerEmbedding(db, layer, itemId, model, vec);
+    saveLayerEmbedding(db, layer, itemId, model, vec, expectedText);
     return true;
   })();
 }
@@ -506,6 +563,8 @@ interface LayerIndexStatus {
   missing: number;
   compatible: number;
   stale_model: number;
+  /** Rows of the active model whose vector no longer matches their text or the config. */
+  outdated: number;
 }
 
 export interface EmbeddingIndexStatus {
@@ -514,6 +573,7 @@ export interface EmbeddingIndexStatus {
   missing: number;
   compatible: number;
   stale_model: number;
+  outdated: number;
   layers: { trait: LayerIndexStatus; episode: LayerIndexStatus };
   models: Array<{ model: string; dims: number; count: number }>;
 }
@@ -530,17 +590,22 @@ function layerIndexStatus(
       : `FROM episodes ep
          LEFT JOIN layer_embeddings e ON e.layer = 'episode' AND e.item_id = ep.id
          WHERE ep.consolidated_into IS NULL`;
+  const text = layer === "trait" ? "t.name" : "ep.body";
   const row = db
     .prepare(
       `SELECT COUNT(*) AS items,
               COALESCE(SUM(CASE WHEN e.item_id IS NOT NULL THEN 1 ELSE 0 END), 0) AS embedded,
-              COALESCE(SUM(CASE WHEN e.model = @model THEN 1 ELSE 0 END), 0) AS compatible
+              COALESCE(SUM(CASE WHEN e.model = @model THEN 1 ELSE 0 END), 0) AS compatible,
+              COALESCE(SUM(CASE WHEN e.model = @model
+                                 AND COALESCE(e.fingerprint, '') <> mismem_fp_text(${text})
+                                THEN 1 ELSE 0 END), 0) AS outdated
        ${source}`,
     )
     .get({ model: activeModel }) as {
     items: number;
     embedded: number;
     compatible: number;
+    outdated: number;
   };
   return {
     items: row.items,
@@ -548,13 +613,16 @@ function layerIndexStatus(
     missing: row.items - row.embedded,
     compatible: row.compatible,
     stale_model: row.embedded - row.compatible,
+    outdated: row.outdated,
   };
 }
 
 export function getEmbeddingIndexStatus(
   db: DB,
   activeModel: string,
+  cfg: EmbeddingConfig = loadEmbeddingConfig(),
 ): EmbeddingIndexStatus {
+  registerFingerprintFunctions(db, cfg);
   const memories = (
     db.prepare("SELECT COUNT(*) AS n FROM memories").get() as { n: number }
   ).n;
@@ -569,6 +637,16 @@ export function getEmbeddingIndexStatus(
         "SELECT COUNT(*) AS n FROM memory_embeddings WHERE model = ?",
       )
       .get(activeModel) as { n: number }
+  ).n;
+  const outdated = (
+    db
+      .prepare(
+        `SELECT COUNT(*) AS n
+         FROM memory_embeddings e JOIN memories m ON m.id = e.memory_id
+         WHERE e.model = @model
+           AND COALESCE(e.fingerprint, '') <> mismem_fp_memory(m.gist, m.details)`,
+      )
+      .get({ model: activeModel }) as { n: number }
   ).n;
   const models = db
     .prepare(
@@ -588,6 +666,7 @@ export function getEmbeddingIndexStatus(
     missing: memories - embedded,
     compatible,
     stale_model: embedded - compatible,
+    outdated,
     layers: {
       trait: layerIndexStatus(db, "trait", activeModel),
       episode: layerIndexStatus(db, "episode", activeModel),

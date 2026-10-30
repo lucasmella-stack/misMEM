@@ -6,6 +6,7 @@
  * no responde, todo degrada silenciosamente a FTS5 puro.
  */
 
+import { createHash } from "node:crypto";
 import { envPositiveNumber } from "../env.js";
 
 type EmbeddingProvider = "ollama" | "openai";
@@ -71,6 +72,24 @@ export function loadEmbeddingConfig(): EmbeddingConfig {
 
 export type EmbedFn = (texts: string[]) => Promise<Float32Array[] | null>;
 
+/**
+ * Text exactly as the embedder receives a document: the configured prefix plus the stored
+ * text cut at maxChars. Both the request and the fingerprint go through here so a change in
+ * one cannot leave the other describing a different string.
+ */
+function documentText(text: string, cfg: EmbeddingConfig): string {
+  return cfg.docPrefix + text.slice(0, cfg.maxChars);
+}
+
+/**
+ * sha256 (hex, first 16 chars) of the exact document text. Keeping it on the row lets the
+ * backfill tell a vector that describes its text from one left behind by an edit or by a
+ * change of prefix or maxChars; the model and the dims alone cannot see either.
+ */
+export function embeddingFingerprint(text: string, cfg: EmbeddingConfig): string {
+  return createHash("sha256").update(documentText(text, cfg)).digest("hex").slice(0, 16);
+}
+
 async function requestVectors(
   input: string[],
   cfg: EmbeddingConfig,
@@ -99,9 +118,12 @@ export async function embedTexts(
   kind: EmbedKind = "document",
 ): Promise<Float32Array[] | null> {
   if (!cfg.enabled || texts.length === 0) return null;
-  const prefix = kind === "query" ? cfg.queryPrefix : cfg.docPrefix;
+  const input =
+    kind === "query"
+      ? texts.map((t) => cfg.queryPrefix + t)
+      : texts.map((t) => documentText(t, cfg));
   try {
-    const vectors = await requestVectors(texts.map((t) => prefix + t), cfg);
+    const vectors = await requestVectors(input, cfg);
     if (!vectors || vectors.length !== texts.length) return null;
     return vectors.map((e) => Float32Array.from(e));
   } catch {

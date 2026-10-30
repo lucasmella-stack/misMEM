@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Database as DB } from "better-sqlite3";
 import { openDb } from "../src/db.js";
 import { capture, consolidate, recallHybrid } from "../src/tools.js";
@@ -74,6 +77,7 @@ describe("embedPendingMemories", () => {
     const second = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
     expect(second.pending).toBe(0);
     expect(second.embedded).toBe(0);
+    expect(second.reembedded).toBe(0);
   });
 
   it("corta temprano si el embedder está caído", async () => {
@@ -189,6 +193,81 @@ describe("embedPendingMemories", () => {
       embedded: 1,
       reembedded: 1,
     });
+  });
+});
+
+describe("huella del texto embebido", () => {
+  it("reembebe cuando cambia el prefijo de documento", async () => {
+    makeMemory("vida", "cashflow del mes");
+    await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+    const saved = process.env.MISMEM_EMBEDDING_DOC_PREFIX;
+    process.env.MISMEM_EMBEDDING_DOC_PREFIX = "search_document: ";
+    try {
+      const again = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+      expect(again).toMatchObject({ pending: 1, embedded: 1, reembedded: 1 });
+    } finally {
+      if (saved === undefined) delete process.env.MISMEM_EMBEDDING_DOC_PREFIX;
+      else process.env.MISMEM_EMBEDDING_DOC_PREFIX = saved;
+    }
+  });
+
+  it("una edición de los detalles deja la fila pendiente", async () => {
+    const memoryId = makeMemory("vida", "cashflow del mes");
+    await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+
+    db.prepare("UPDATE memories SET details = ? WHERE id = ?").run("detalle nuevo", memoryId);
+    const again = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+
+    expect(again).toMatchObject({ pending: 1, embedded: 1, reembedded: 1 });
+  });
+
+  it("una fila antigua sin huella se reembebe una sola vez", async () => {
+    makeMemory("vida", "cashflow del mes");
+    await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+    // Rows written before the column existed carry no fingerprint.
+    db.prepare("UPDATE memory_embeddings SET fingerprint = NULL").run();
+
+    const once = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+    const twice = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+
+    expect(once).toMatchObject({ pending: 1, embedded: 1, reembedded: 1 });
+    expect(twice).toMatchObject({ pending: 0, embedded: 0, reembedded: 0 });
+  });
+
+  it("añade la huella a una base creada antes y la migración se puede repetir", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mismem-fingerprint-"));
+    const path = join(dir, "mem.db");
+    const columns = (open: DB, table: string): string[] =>
+      (open.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map(
+        (c) => c.name,
+      );
+    try {
+      const before = openDb(path);
+      const source = capture(before, { scope: "vida", body: "episodio heredado" });
+      const memoryId = consolidate(before, {
+        scope: "vida",
+        gist: "cashflow del mes",
+        source_episode_ids: [source.id],
+      }).memory_id;
+      before.exec("ALTER TABLE memory_embeddings DROP COLUMN fingerprint");
+      before.exec("ALTER TABLE layer_embeddings DROP COLUMN fingerprint");
+      before.close();
+
+      for (let run = 0; run < 2; run++) {
+        const reopened = openDb(path);
+        try {
+          expect(columns(reopened, "memory_embeddings")).toContain("fingerprint");
+          expect(columns(reopened, "layer_embeddings")).toContain("fingerprint");
+          expect(reopened.prepare("SELECT gist FROM memories WHERE id = ?").get(memoryId)).toEqual({
+            gist: "cashflow del mes",
+          });
+        } finally {
+          reopened.close();
+        }
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
