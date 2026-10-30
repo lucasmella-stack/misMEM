@@ -202,7 +202,7 @@ describe("engram-compat: mem_update", () => {
     ).toBeUndefined();
   });
 
-  it("borra el vector del rasgo al renombrarlo", async () => {
+  it("al renombrar un rasgo embebe el nombre nuevo en el mismo paso", async () => {
     const { id: ep } = capture(db, { scope: "s", body: "x" });
     const { memory_id } = consolidate(db, {
       scope: "s",
@@ -219,16 +219,73 @@ describe("engram-compat: mem_update", () => {
        VALUES ('trait', ?, 'fake', 1, ?, ?)`,
     ).run(trait_id, Buffer.from(new Float32Array([1]).buffer), Date.now());
 
-    await dispatchEngramTool(db, "mem_update", { id: trait_id, content: "nombre nuevo" });
+    const seen: string[] = [];
+    const embedFn: EmbedFn = async (texts) => {
+      seen.push(...texts);
+      return texts.map(() => Float32Array.from([0, 1]));
+    };
+    await dispatchEngramTool(
+      db,
+      "mem_update",
+      { id: trait_id, content: "nombre nuevo" },
+      { embedFn, embeddingModel: "fake" },
+    );
 
-    expect(
-      db
-        .prepare("SELECT 1 FROM layer_embeddings WHERE layer = 'trait' AND item_id = ?")
-        .get(trait_id),
-    ).toBeUndefined();
+    expect(seen).toEqual(["nombre nuevo"]);
     expect(db.prepare("SELECT name FROM traits WHERE id = ?").get(trait_id)).toEqual({
       name: "nombre nuevo",
     });
+    const row = db
+      .prepare(
+        "SELECT model, dims, vec FROM layer_embeddings WHERE layer = 'trait' AND item_id = ?",
+      )
+      .get(trait_id) as { model: string; dims: number; vec: Buffer };
+    expect(row.model).toBe("fake");
+    expect(row.dims).toBe(2);
+    expect(
+      Array.from(new Float32Array(row.vec.buffer, row.vec.byteOffset, row.vec.byteLength / 4)),
+    ).toEqual([0, 1]);
+  });
+
+  it("renombrar un rasgo con el mismo nombre no toca su vector", async () => {
+    const { id: ep } = capture(db, { scope: "s", body: "x" });
+    const { memory_id } = consolidate(db, {
+      scope: "s",
+      gist: "g",
+      source_episode_ids: [ep],
+    });
+    const { trait_id } = crystallize(db, {
+      scope: "s",
+      name: "nombre igual",
+      evidence_memory_ids: [memory_id],
+    });
+    db.prepare(
+      `INSERT INTO layer_embeddings (layer, item_id, model, dims, vec, created_at)
+       VALUES ('trait', ?, 'fake', 1, ?, ?)`,
+    ).run(trait_id, Buffer.from(new Float32Array([1]).buffer), Date.now());
+
+    let calls = 0;
+    const embedFn: EmbedFn = async (texts) => {
+      calls += texts.length;
+      return texts.map(() => Float32Array.from([0, 1]));
+    };
+    await dispatchEngramTool(
+      db,
+      "mem_update",
+      { id: trait_id, content: "nombre igual" },
+      { embedFn, embeddingModel: "fake" },
+    );
+
+    expect(calls).toBe(0);
+    const row = db
+      .prepare(
+        "SELECT dims, vec FROM layer_embeddings WHERE layer = 'trait' AND item_id = ?",
+      )
+      .get(trait_id) as { dims: number; vec: Buffer };
+    expect(row.dims).toBe(1);
+    expect(
+      Array.from(new Float32Array(row.vec.buffer, row.vec.byteOffset, row.vec.byteLength / 4)),
+    ).toEqual([1]);
   });
 
   it("appends new episode if id not found", async () => {

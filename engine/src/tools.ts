@@ -15,8 +15,9 @@ import {
   CANDIDATE_POOL_LIMIT,
   CONSOLIDATED_SEMANTIC_PRIOR,
   EPISODE_SCORE_MARGIN,
+  MAX_EPISODE_HITS,
+  MAX_TRAIT_HITS,
   TRAIT_SCORE_MARGIN,
-  capLayerHits,
   fuseHits,
   hasComparableVectors,
   lexicalCandidates,
@@ -155,13 +156,8 @@ function finalizeHits(
   limit: number,
   options: RecallOptions,
   at: number,
-  capLayers = false,
 ): { hits: RecallHit[] } {
-  // Cap before slicing: a trait or episode that does not fit the layer quota must not
-  // consume a slot a memory could fill. Only the semantic path caps: a lexical fallback
-  // has no vector tail to trim and its floor is calibrated without the cap.
-  const capped = capLayers ? capLayerHits(ranked) : ranked;
-  const hits = capped.slice(0, limit);
+  const hits = ranked.slice(0, limit);
 
   if (options.reinforce ?? reinforcesOnRecall()) {
     reinforceMemories(
@@ -318,6 +314,56 @@ export async function recallHybrid(
       }));
   const lexical = lexicalCandidates(db, input, at, { rescue: !semanticLayer });
 
+  // One semantic ranking for the three layers: a trait or pending episode must beat a
+  // memory on cosine to pass it, instead of inheriting a full rank-1 share from its own
+  // short list. That keeps the layers competing by meaning, not by list membership.
+  const semanticTraits = queryVec
+    ? semanticSearchLayer(db, "trait", queryVec, {
+        scope: input.scope,
+        limit: CANDIDATE_POOL_LIMIT,
+        minScore: cfg.minScore + TRAIT_SCORE_MARGIN,
+        model: semanticModel,
+      })
+    : [];
+  const semanticEpisodes = queryVec
+    ? semanticSearchLayer(db, "episode", queryVec, {
+        scope: input.scope,
+        limit: CANDIDATE_POOL_LIMIT,
+        minScore: cfg.minScore + EPISODE_SCORE_MARGIN,
+        model: semanticModel,
+      })
+    : [];
+
+  // The quota is decided by the cosine order before the fusion, never by the fused
+  // order: a trait that entered only through an exact word must not displace the trait
+  // that is closest in meaning. A layer with no stored vectors falls back to its first
+  // lexical candidates.
+  const quota = (
+    semanticIds: readonly string[],
+    lexicalIds: readonly string[],
+    max: number,
+  ): Set<string> => new Set((semanticIds.length > 0 ? semanticIds : lexicalIds).slice(0, max));
+  const allowedTraits = quota(
+    semanticTraits.map((hit) => hit.id),
+    lexical.traits.map((hit) => hit.id),
+    MAX_TRAIT_HITS,
+  );
+  const allowedEpisodes = quota(
+    semanticEpisodes.map((hit) => hit.id),
+    lexical.episodes.map((hit) => hit.id),
+    MAX_EPISODE_HITS,
+  );
+  // Without any comparable vector there is no semantic cut to trim: the lexical fallback
+  // keeps its calibrated order, which is why the quota only applies to the hybrid result.
+  const keepAllowed = (hits: readonly RecallHit[]): RecallHit[] =>
+    semanticLayer
+      ? hits.filter(
+          (hit) =>
+            hit.layer === "memory" ||
+            (hit.layer === "trait" ? allowedTraits : allowedEpisodes).has(hit.id),
+        )
+      : [...hits];
+
   // Every signal is a source in one RRF fusion: an exact word match, a stored memory
   // vector, and the stored vectors of traits and pending episodes. A hit found by several
   // signals rises; no layer keeps a fixed step over another.
@@ -327,21 +373,6 @@ export async function recallHybrid(
     { hits: lexical.episodes, weight: 1 },
   ];
   if (queryVec) {
-    // One semantic ranking for the three layers: a trait or pending episode must beat a
-    // memory on cosine to pass it, instead of inheriting a full rank-1 share from its own
-    // short list. That keeps the layers competing by meaning, not by list membership.
-    const traits = semanticSearchLayer(db, "trait", queryVec, {
-      scope: input.scope,
-      limit: CANDIDATE_POOL_LIMIT,
-      minScore: cfg.minScore + TRAIT_SCORE_MARGIN,
-      model: semanticModel,
-    });
-    const episodes = semanticSearchLayer(db, "episode", queryVec, {
-      scope: input.scope,
-      limit: CANDIDATE_POOL_LIMIT,
-      minScore: cfg.minScore + EPISODE_SCORE_MARGIN,
-      model: semanticModel,
-    });
     // Stable on purpose: an exact tie keeps the source order, which already applies
     // salience for memories and id for layer rows. Re-sorting by id would erase that.
     const byMeaning = [
@@ -349,23 +380,25 @@ export async function recallHybrid(
         hit: semanticHitToRecall(hit, at),
         score: hit.score + CONSOLIDATED_SEMANTIC_PRIOR,
       })),
-      ...traits.map((hit) => ({ hit: layerHitToRecall(hit, "trait"), score: hit.score })),
-      ...episodes.map((hit) => ({ hit: layerHitToRecall(hit, "episode"), score: hit.score })),
+      ...semanticTraits.map((hit) => ({ hit: layerHitToRecall(hit, "trait"), score: hit.score })),
+      ...semanticEpisodes.map((hit) => ({
+        hit: layerHitToRecall(hit, "episode"),
+        score: hit.score,
+      })),
     ]
       .sort((a, b) => b.score - a.score)
       .map((entry) => entry.hit);
-    // Trim before fusion so the layer quota keeps the closest trait and episodes by
-    // cosine, not whichever one an exact word match happened to lift.
-    sources.push({ hits: capLayerHits(byMeaning), weight: 1 });
+    // Trim before fusion so the quota keeps its rank positions and a memory does not lose
+    // a place to a trait or episode the result will drop anyway.
+    sources.push({ hits: keepAllowed(byMeaning), weight: 1 });
   }
 
   return finalizeHits(
     db,
-    fuseHits(sources),
+    keepAllowed(fuseHits(sources)),
     input.limit,
     { ...options, reinforce: options.reinforce ?? input.reinforce },
     at,
-    semanticLayer,
   );
 }
 

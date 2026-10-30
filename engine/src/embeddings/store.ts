@@ -123,7 +123,8 @@ async function embedInBatches<T extends BatchRow>(
   embedFn: EmbedFn,
   batchSize: number,
   textOf: (row: T) => string,
-  save: (row: T, vec: Float32Array) => void,
+  /** Returns false when the row changed while the embedder worked, so nothing was saved. */
+  save: (row: T, vec: Float32Array) => boolean,
 ): Promise<{ embedded: number; reembedded: number; failed: number }> {
   const stats = { embedded: 0, reembedded: 0, failed: 0 };
   let consecutiveFailures = 0;
@@ -144,7 +145,7 @@ async function embedInBatches<T extends BatchRow>(
       const vec = vecs[j];
       const row = batch[j];
       if (!vec || !row) continue;
-      save(row, vec);
+      if (!save(row, vec)) continue;
       stats.embedded++;
       if (row.had_embedding) stats.reembedded++;
     }
@@ -204,7 +205,10 @@ export async function embedPendingMemories(
     resolved.embedFn,
     resolved.batchSize,
     (m) => (m.details ? `${m.gist}\n${m.details}` : m.gist).slice(0, resolved.maxChars),
-    (m, vec) => saveMemoryEmbedding(db, m.id, resolved.model, vec),
+    (m, vec) => {
+      saveMemoryEmbedding(db, m.id, resolved.model, vec);
+      return true;
+    },
   );
 
   // Traits and pending episodes follow the same run: a caller that backfills memories
@@ -302,7 +306,8 @@ async function embedPendingLayersResolved(
       opts.embedFn,
       opts.batchSize,
       (row) => row.text.slice(0, opts.maxChars),
-      (row, vec) => saveLayerEmbedding(db, layer, row.id, opts.model, vec),
+      (row, vec) =>
+        saveLayerEmbeddingIfCurrent(db, layer, row.id, row.text, opts.model, vec),
     );
     stats.embedded += batch.embedded;
     stats.failed += batch.failed;
@@ -328,6 +333,38 @@ export function saveLayerEmbedding(
     Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength),
     Date.now(),
   );
+}
+
+/** Text of a live layer item, or undefined when it no longer exists or is consolidated. */
+function liveLayerText(db: DB, layer: LayerName, itemId: string): string | undefined {
+  const row =
+    layer === "trait"
+      ? db.prepare("SELECT name AS text FROM traits WHERE id = ?").get(itemId)
+      : db
+          .prepare("SELECT body AS text FROM episodes WHERE id = ? AND consolidated_into IS NULL")
+          .get(itemId);
+  return (row as { text: string } | undefined)?.text;
+}
+
+/**
+ * The embedder answers asynchronously, so the item can be renamed, consolidated or deleted
+ * meanwhile. The existence, pending state and text are checked in the same transaction as
+ * the save: a vector for text that no longer exists would match the wrong thing until the
+ * next force backfill.
+ */
+function saveLayerEmbeddingIfCurrent(
+  db: DB,
+  layer: LayerName,
+  itemId: string,
+  expectedText: string,
+  model: string,
+  vec: Float32Array,
+): boolean {
+  return db.transaction(() => {
+    if (liveLayerText(db, layer, itemId) !== expectedText) return false;
+    saveLayerEmbedding(db, layer, itemId, model, vec);
+    return true;
+  })();
 }
 
 // The write path already committed the item; this cap only bounds how long the caller waits
@@ -367,19 +404,9 @@ export async function embedLayerItem(
   if (!vec) return false;
   const model = opts.model ?? cfg.model;
 
-  // The item can be consolidated or deleted while the embedder responds. Check and save in
-  // one transaction so a trigger that already ran cannot leave a vector without its row.
-  return db.transaction(() => {
-    const alive =
-      layer === "trait"
-        ? db.prepare("SELECT 1 FROM traits WHERE id = ?").get(itemId)
-        : db
-            .prepare("SELECT 1 FROM episodes WHERE id = ? AND consolidated_into IS NULL")
-            .get(itemId);
-    if (alive === undefined) return false;
-    saveLayerEmbedding(db, layer, itemId, model, vec);
-    return true;
-  })();
+  // The item can be renamed, consolidated or deleted while the embedder responds. The
+  // helper checks and saves in one transaction so a stale vector cannot outlive its text.
+  return saveLayerEmbeddingIfCurrent(db, layer, itemId, row.text, model, vec);
 }
 
 export interface LayerSemanticHit {

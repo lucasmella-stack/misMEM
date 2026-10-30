@@ -20,7 +20,7 @@
  *   mem_session_end      → no-op informativo
  */
 import type { Database as DB } from "better-sqlite3";
-import { captureAndEmbed, pendingEpisodes, recallHybrid } from "./tools.js";
+import { captureAndEmbed, embedWrittenLayer, pendingEpisodes, recallHybrid } from "./tools.js";
 import type { EmbedFn } from "./embeddings/provider.js";
 
 export interface EngramToolDef {
@@ -291,13 +291,25 @@ export async function dispatchEngramTool(
         db.prepare("DELETE FROM memory_embeddings WHERE memory_id = ?").run(id);
         return { updated: "memory", id };
       }
-      const updTr = db
-        .prepare("UPDATE traits SET name = ?, updated_at = ? WHERE id = ?")
-        .run(content, Date.now(), id);
-      if (updTr.changes > 0) {
-        // The vector described the old name; without this it would keep matching the
-        // replaced trait until the next force backfill.
-        db.prepare("DELETE FROM layer_embeddings WHERE layer = 'trait' AND item_id = ?").run(id);
+      const trait = db.prepare("SELECT name FROM traits WHERE id = ?").get(id) as
+        | { name: string }
+        | undefined;
+      if (trait) {
+        if (trait.name !== content) {
+          // The vector described the old name; delete it and embed the new one through the
+          // same best-effort write path as the other writes, so a renamed trait does not
+          // lose its semantic layer until the next backfill.
+          db.prepare("UPDATE traits SET name = ?, updated_at = ? WHERE id = ?").run(
+            content,
+            Date.now(),
+            id,
+          );
+          db.prepare("DELETE FROM layer_embeddings WHERE layer = 'trait' AND item_id = ?").run(id);
+          await embedWrittenLayer(db, "trait", id, {
+            embedFn: searchOptions.embedFn,
+            model: searchOptions.embeddingModel,
+          });
+        }
         return { updated: "trait", id };
       }
       // Fallback: append new episode that references the original id
