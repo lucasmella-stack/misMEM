@@ -30,6 +30,15 @@ const DEFAULT_MIN_SCORE = 0.5;
 // nomic-embed-text scores unrelated texts high: at 0.5 the inject hook adds noise to every prompt.
 // Measured in issue #72: 0.65 leaves off-topic queries with 0 memories and loses no hits.
 const NOMIC_MIN_SCORE = 0.65;
+// embeddinggemma-2 too: on the golden eval, 0.5 brings 5 memories to each of the 48 off-topic
+// questions; 0.65 leaves 37 of 48 with nothing and loses no hit, 0.66 already loses one (issue #158).
+const GEMMA_MIN_SCORE = 0.65;
+// Matched by family name anywhere in the id: llama-server, TEI and vLLM take free ids such as
+// `google/embeddinggemma-300m` or a GGUF path, and Ollama adds tags (`nomic-embed-text:latest`).
+const MODEL_MIN_SCORES: ReadonlyArray<readonly [family: string, minScore: number]> = [
+  ["nomic-embed-text", NOMIC_MIN_SCORE],
+  ["embeddinggemma", GEMMA_MIN_SCORE],
+];
 const OLLAMA_DEFAULT_URL = "http://127.0.0.1:11434";
 // El puerto por defecto de llama-server: con el proveedor openai, el de Ollama respondería 404 en silencio.
 const OPENAI_DEFAULT_URL = "http://127.0.0.1:8080";
@@ -42,8 +51,9 @@ export function loadEmbeddingConfig(): EmbeddingConfig {
   const minScore = Number(process.env.MISMEM_EMBEDDING_MIN_SCORE || Number.NaN);
   const maxChars = Number(process.env.MISMEM_EMBEDDING_MAX_CHARS);
   const model = process.env.MISMEM_EMBEDDING_MODEL ?? "nomic-embed-text";
-  // startsWith: Ollama accepts tags (`nomic-embed-text:latest`) and it is the same model.
-  const defaultMinScore = model.startsWith("nomic-embed-text") ? NOMIC_MIN_SCORE : DEFAULT_MIN_SCORE;
+  const family = model.toLowerCase();
+  const defaultMinScore =
+    MODEL_MIN_SCORES.find(([name]) => family.includes(name))?.[1] ?? DEFAULT_MIN_SCORE;
   return {
     enabled: (process.env.MISMEM_EMBEDDINGS ?? "auto") !== "off",
     provider,

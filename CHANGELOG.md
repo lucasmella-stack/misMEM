@@ -2,6 +2,11 @@
 
 ## Sin publicar
 
+- Con EmbeddingGemma 2 y sin `MISMEM_EMBEDDING_MIN_SCORE`, el corte por defecto pasa de 0,5 a 0,65: en el
+  golden eval, las preguntas ajenas que traen algo bajan de 48/48 a 11/48 sin perder ningún acierto (#158).
+  Vale para cualquier id de la familia (`google/embeddinggemma-300m`, una ruta GGUF). Tests en
+  `engine/tests/embeddings-provider.test.ts`; `DEPLOY.md` y `docs/recall.md` recogen el valor nuevo.
+
 ### Recall híbrido: las tres capas compiten en un solo ranking (#154)
 
 - Con embeddings, `recall` devolvía cero episodios pendientes y cero rasgos: las memorias llenaban el tope y

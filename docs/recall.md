@@ -37,7 +37,8 @@ episodios desplazaban a la memoria concreta que responde. El modo léxico, sin v
 También habla con cualquier servidor compatible con OpenAI (`/v1/embeddings`, por ejemplo
 `llama-server --embedding`). **Si tus memorias no están en inglés, usa EmbeddingGemma 2**: con memorias en
 castellano encontró 34 de 50 paráfrasis frente a 4 de 50 de `nomic-embed-text` (medido en la issue #72), y
-en CPU no gasta VRAM. Va con sus prefijos y un corte de 0,65 (con 0,68 sale casi igual):
+en CPU no gasta VRAM. Va con sus prefijos; su corte por defecto es 0,65 (la línea de abajo sólo lo hace
+explícito):
 
 ```bash
 MISMEM_EMBEDDING_PROVIDER=openai
@@ -54,7 +55,11 @@ modelo sin preguntas.
 
 Con `nomic-embed-text` el corte por defecto es 0,65: con 0,5 el hook de inyección añadía recuerdos sin
 relación a cada prompt. No hay que esperar paráfrasis: encuentra la memoria cuando la consulta comparte sus
-palabras, no cuando la dice de otra forma. Un `MISMEM_EMBEDDING_MIN_SCORE` explícito gana siempre.
+palabras, no cuando la dice de otra forma.
+
+Con EmbeddingGemma 2 el corte por defecto también es 0,65: en el golden eval, con 0,5 las 48 preguntas
+ajenas traían 5 recuerdos cada una; con 0,65 sólo 11 traen algo y no se pierde ningún acierto, y con 0,66
+ya se pierde uno (medido el 2026-10-30, issue #158). Un `MISMEM_EMBEDDING_MIN_SCORE` explícito gana siempre.
 
 La búsqueda sólo compara vectores del modelo configurado. Cambiar de modelo reindexa solo en el siguiente
 backfill (`mismem-embed`); cambiar un prefijo no se detecta y exige `mismem-embed --force`. Todas las

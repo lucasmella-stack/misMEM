@@ -70,8 +70,24 @@ describe("loadEmbeddingConfig", () => {
     setEnv({ MISMEM_EMBEDDING_MIN_SCORE: value });
     expect(loadEmbeddingConfig().minScore).toBe(0.65);
     setEnv({ MISMEM_EMBEDDING_MIN_SCORE: value, MISMEM_EMBEDDING_MODEL: "embeddinggemma-2" });
+    expect(loadEmbeddingConfig().minScore).toBe(0.65);
+    setEnv({ MISMEM_EMBEDDING_MIN_SCORE: value, MISMEM_EMBEDDING_MODEL: "bge-m3" });
     expect(loadEmbeddingConfig().minScore).toBe(0.5);
   });
+
+  it.each([
+    "embeddinggemma-2",
+    "embeddinggemma-2:Q8_0",
+    "google/embeddinggemma-300m",
+    "EmbeddingGemma-300M",
+    "/models/embeddinggemma-2-Q8_0.gguf",
+  ])(
+    "con %s y sin corte elegido, el default es 0,65 (medido en el golden eval)",
+    (model) => {
+      setEnv({ MISMEM_EMBEDDING_MODEL: model });
+      expect(loadEmbeddingConfig().minScore).toBe(0.65);
+    },
+  );
 
   it.each(["nomic-embed-text", "nomic-embed-text:latest"])(
     "con %s y sin corte elegido, el default es 0,65",
@@ -89,7 +105,7 @@ describe("loadEmbeddingConfig", () => {
   });
 
   it("los demás modelos conservan el default de 0,5", () => {
-    setEnv({ MISMEM_EMBEDDING_MODEL: "embeddinggemma-2" });
+    setEnv({ MISMEM_EMBEDDING_MODEL: "bge-m3" });
     expect(loadEmbeddingConfig().minScore).toBe(0.5);
     setEnv({ MISMEM_EMBEDDING_MODEL: "mxbai-embed-large" });
     expect(loadEmbeddingConfig().minScore).toBe(0.5);
