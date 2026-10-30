@@ -7,6 +7,26 @@
   Vale para cualquier id de la familia (`google/embeddinggemma-300m`, una ruta GGUF). Tests en
   `engine/tests/embeddings-provider.test.ts`; `DEPLOY.md` y `docs/recall.md` recogen el valor nuevo.
 
+### El índice semántico detecta cambios de texto y de prefijo (#156)
+
+- Cada vector guarda ahora una huella (`fingerprint`) del texto exacto que se envió al servidor: el prefijo de
+  documento más el texto ya recortado por `MISMEM_EMBEDDING_MAX_CHARS`. El backfill trata como pendiente toda
+  fila cuya huella no coincida con el texto y la configuración actuales, además de las que ya trataba (sin
+  vector, otro modelo, otras dimensiones). Cambiar `MISMEM_EMBEDDING_DOC_PREFIX` o `MISMEM_EMBEDDING_MAX_CHARS`,
+  o editar el texto de una memoria, un rasgo o un episodio por un camino que no borre su vector, ya no deja
+  vectores que describen otro texto: se reembeben solos en el siguiente `mismem-embed`, sin `--force`. Las filas
+  anteriores a la columna se reembeben una sola vez, así que conviene correr `mismem-embed` una vez tras
+  actualizar. Los backfills que se disparan solos (la herramienta `consolidate`, una edición desde el visor y la
+  consolidación nocturna) procesan como mucho 64 filas por llamada y dejan el resto para la siguiente pasada;
+  `mismem-embed` no tiene tope. Cambiar `MISMEM_EMBEDDING_QUERY_PREFIX` no invalida ningún vector guardado.
+- `getEmbeddingIndexStatus` y `mismem-embed --status` cuentan en `outdated`, para memorias y para cada capa, las
+  filas del modelo activo con huella distinta o nula. El conteo de memorias excluye los marcadores de ruido, igual
+  que el backfill.
+- La migración es aditiva y repetible: `migrate()` añade la columna a `memory_embeddings` y a
+  `layer_embeddings` si falta, sin borrar nada. Tests en `engine/tests/embeddings.test.ts` (prefijo, edición de
+  `details`, fila sin huella, migración sobre una base anterior repetida dos veces) y
+  `engine/tests/hybrid-layers.test.ts` (renombrado de un rasgo y `outdated` por capa).
+
 ### Recall híbrido: las tres capas compiten en un solo ranking (#154)
 
 - Con embeddings, `recall` devolvía cero episodios pendientes y cero rasgos: las memorias llenaban el tope y

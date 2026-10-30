@@ -1,8 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 import { openDb } from "../src/db.js";
 import { capture, consolidate, recallHybrid } from "../src/tools.js";
 import { embedPendingMemories } from "../src/embeddings/store.js";
-import { embedTexts, loadEmbeddingConfig } from "../src/embeddings/provider.js";
+import {
+  embedTexts,
+  embeddingFingerprint,
+  loadEmbeddingConfig,
+} from "../src/embeddings/provider.js";
 
 const ENV_KEYS = [
   "MISMEM_EMBEDDINGS",
@@ -13,6 +18,7 @@ const ENV_KEYS = [
   "MISMEM_EMBEDDING_QUERY_PREFIX",
   "MISMEM_EMBEDDING_DOC_PREFIX",
   "MISMEM_EMBEDDING_MIN_SCORE",
+  "MISMEM_EMBEDDING_MAX_CHARS",
   "MISMEM_EMBEDDING_TIMEOUT_MS",
 ] as const;
 const saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
@@ -167,6 +173,34 @@ describe("embedTexts con un servidor compatible con OpenAI", () => {
     expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string).input).toEqual([
       "title: none | text: nota",
     ]);
+  });
+
+  it("la huella guardada es la del input exacto que sale hacia el servidor", async () => {
+    setEnv({ ...GEMMA_ENV, MISMEM_EMBEDDING_MAX_CHARS: "12" });
+    const fetchMock = vi.fn(async (_url: string, init: { body: string }) => {
+      const { input } = JSON.parse(init.body) as { input: string[] };
+      return openAiResponse(input.map(() => [1, 0]));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const db = openDb(":memory:");
+    const source = capture(db, { scope: "t", body: "fuente" });
+    const gist = "una memoria que se recorta";
+    consolidate(db, { scope: "t", gist, source_episode_ids: [source.id] });
+    await embedPendingMemories(db);
+
+    const { input } = JSON.parse(fetchMock.mock.calls[0]![1].body as string) as { input: string[] };
+    const sent = input[0]!;
+    const cfg = loadEmbeddingConfig();
+    const stored = db.prepare("SELECT fingerprint FROM memory_embeddings").get() as {
+      fingerprint: string;
+    };
+
+    expect(sent).toBe(cfg.docPrefix + gist.slice(0, cfg.maxChars));
+    expect(stored.fingerprint).toBe(embeddingFingerprint(gist, cfg));
+    // The stored hash must describe the string that crossed the wire, not another one.
+    expect(stored.fingerprint).toBe(createHash("sha256").update(sent).digest("hex").slice(0, 16));
+    db.close();
   });
 
   it("un servidor caído devuelve null, como con Ollama", async () => {

@@ -53,8 +53,8 @@ Las tablas de la base, en `engine/src/db.ts`:
 | `memories` | `gist` y `details`, `source_episode_ids` (JSON), `salience`, `use_count` y las marcas de tiempo del decay |
 | `traits` | `name` único por `scope`, `evidence_memory_ids` (JSON), `strength` y `polarity` |
 | `co_use` | Pares de memorias usadas en el mismo turno; sólo lo escribe `reinforce` |
-| `memory_embeddings` | Un vector (BLOB) por memoria y el modelo que lo generó |
-| `layer_embeddings` | Un vector (BLOB) por rasgo y por episodio pendiente, con su modelo y dimensión; los disparadores lo borran al consolidar o borrar el item |
+| `memory_embeddings` | Un vector (BLOB) por memoria y el modelo que lo generó, con la huella del texto exacto que se envió al servidor |
+| `layer_embeddings` | Un vector (BLOB) por rasgo y por episodio pendiente, con su modelo, su dimensión y la huella del texto embebido; los disparadores lo borran al consolidar o borrar el item |
 | `episodes_fts`, `memories_fts`, `traits_fts` | Índices FTS5 que mantienen disparadores |
 
 ## Comandos
