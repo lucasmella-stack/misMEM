@@ -64,6 +64,19 @@ describe("recall léxico: frases normales", () => {
     expect(memoryIds("florfitt docker")).toEqual([exact]);
   });
 
+  it("rescata una pregunta larga aunque la mayoría de sus palabras no estén en ningún recuerdo", () => {
+    // The strict query requires every word, and the old rescue demanded 30% of the raw
+    // query words, absent ones included. The target shares only two terms, so both paths
+    // missed even though the question names the memory unambiguously.
+    const target = memory("hogar", "el contrato del piso vence en marzo");
+    memory("hogar", "la notaría cierra los viernes por la tarde");
+    expect(
+      memoryIds(
+        "oye, el otro día cuando firmamos el contrato del piso, ¿qué papeles llevamos a la notaría del centro?",
+      ),
+    ).toContain(target);
+  });
+
   it("al relajar hacen falta dos palabras: una sola en común no alcanza", () => {
     const both = memory("pc", "el teclado retroiluminado tiene luces RGB");
     memory("pc", "el teclado mecánico nuevo");
