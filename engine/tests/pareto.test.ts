@@ -38,6 +38,15 @@ class UserStore {
     }
   });
 
+  it("las palabras de función del rescate no vacían un hecho corto", () => {
+    // The rescue list is wider than the one `contentTerms` uses on purpose. If they become
+    // the same list again, "hacer", "cada" or "solo" leave these facts with two terms of
+    // substance and the prefilter discards them before the LLM, with nobody reading them.
+    for (const text of ["hacer backup el viernes", "cada deploy a mano", "solo usar pnpm"]) {
+      expect(classify(text).level).toBeGreaterThan(0);
+    }
+  });
+
   it("un número suelto no escapa de L0", () => {
     for (const text of ["1", "42", "2026", "ok 2", "1 2 3", "10 20 30"]) {
       expect(classify(text).level).toBe(0);

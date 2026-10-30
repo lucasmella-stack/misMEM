@@ -2,6 +2,19 @@
 
 ## Sin publicar
 
+- Sin servidor de embeddings, el recall léxico pasa de 221/432 a 253/432 en el eval dorado (MRR de 0,48 a 0,54),
+  con las preguntas largas de 5/36 a 17/36 y las coloquiales de 24/36 a 26/36; ningún tipo baja y las ajenas
+  siguen en 8/48 (9 recuerdos frente a 10). El rescate ya no exige el 30 % de todas las palabras: descarta las
+  que no aparecen en ningún candidato, ordena por IDF y pide dos coincidencias con al menos una informativa, así
+  que una pregunta llena de contexto ("oye", "ayer") puede rescatar su memoria. Ignora además un relleno
+  coloquial propio ("podemos", "antes", "cada", "todo"...), en una lista aparte de la compartida: esa sigue
+  mandando en la consulta estricta y en la medida de sustancia del prefiltro Pareto, que con las palabras nuevas
+  descartaba hechos cortos como ruido. La puerta del 30 % se mide sobre la consulta entera y no sobre las
+  palabras que caben en el tope de doce, y el suelo de dos coincidencias ya no finge crecer con la pregunta. Los
+  suelos de `engine/eval/golden/floor.json` suben por tipo y la mitad de validación pasa de 104/216 a 123/216.
+  Tests nuevos en `engine/tests/recall-relaxed.test.ts` (pregunta larga, puerta del 30 % a ambos lados y tope de
+  doce), `engine/tests/terms.test.ts` y `engine/tests/pareto.test.ts`; la línea base nueva está en
+  `docs/recall.md`.
 - Con EmbeddingGemma 2 y sin `MISMEM_EMBEDDING_MIN_SCORE`, el corte por defecto pasa de 0,5 a 0,65: en el
   golden eval, las preguntas ajenas que traen algo bajan de 48/48 a 11/48 sin perder ningún acierto (#158).
   Vale para cualquier id de la familia (`google/embeddinggemma-300m`, una ruta GGUF). Tests en

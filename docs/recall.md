@@ -12,9 +12,16 @@ FTS5 exige que estén **todas** las palabras de la consulta, sin contar las vac�
 ### El rescate
 
 Si esa consulta estricta no devuelve nada y no hay capa semántica, `recall` reintenta con una consulta OR
-y conserva sólo los candidatos que comparten al menos dos términos informativos. Con una sola palabra
-basta una; en consultas largas, el 30 % de sus palabras. Devuelve hasta 3 por capa. El rescate alcanza a
-rasgos, episodios y memorias, y no altera una búsqueda que ya encontró algo.
+sobre las mismas palabras menos un relleno más amplio: la estricta conserva las palabras de función que un
+recuerdo puede contener, y el rescate ignora además verbos y adverbios coloquiales ("podemos", "antes", "cada",
+"todo"). Antes de puntuar descarta las palabras que no aparecen en ningún candidato: en una pregunta larga
+suelen ser contexto ("ayer", "oye") y antes contaban para exigir el 30 % de la frase entera. Conserva los
+candidatos que comparten al menos dos términos, uno de ellos informativo (los que aparecen en el 5 % de memorias
+más raras, con un mínimo de tres, o en todas); con una sola palabra de consulta basta una. Si las palabras
+presentes no llegan al 30 % de las palabras de contenido de la consulta entera, antes del tope de doce términos
+del rescate, no hay rescate: la pregunta habla de otra cosa. Los candidatos se ordenan por la suma de IDF de los
+términos que comparten, y después por términos informativos y coincidencias. Devuelve hasta 3 por capa. El
+rescate alcanza a rasgos, episodios y memorias, y no altera una búsqueda que ya encontró algo.
 
 ## Por significado (opcional)
 
@@ -95,7 +102,7 @@ Línea base del 2026-10-30 (tope 5, aciertos dentro del tope; caduca cuando camb
 
 | Modo | Global | MRR | Paráfrasis | Episodio | Rasgo | Ajenas con algo | Recuerdos por pregunta |
 |---|---|---|---|---|---|---|---|
-| Léxico | 221/432 | 0,48 | 1/72 | 20/24 | 8/24 | 8/48 | 0,9 |
+| Léxico | 253/432 | 0,54 | 2/72 | 21/24 | 9/24 | 8/48 | 1,63 |
 | Semántico (`embeddinggemma-2`, corte 0,65) | 411/432 | 0,87 | 64/72 | 23/24 | 19/24 | 11/48 | 4,87 |
 
 En el semántico, las tres capas compiten en el mismo ranking: rasgos y episodios pendientes pasan de 0/24 a
