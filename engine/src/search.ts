@@ -18,8 +18,8 @@ const SALIENCE_RRF_WEIGHT = 0.0002;
 // trait dropped memory first hits from 329 to 293; keeping only the best one and up to two
 // episodes (the rest of the result stays memories) restored 328 without losing a question
 // type against the lexical baseline.
-const MAX_TRAIT_HITS = 1;
-const MAX_EPISODE_HITS = 2;
+export const MAX_TRAIT_HITS = 1;
+export const MAX_EPISODE_HITS = 2;
 // A memory is already distilled and curated; an episode is raw and a trait is a compressed
 // rule. On near-equal cosine, prefer the consolidated record. A layer still wins when its
 // meaning is clearly closer, so this is a tie-break, not a restored layer order.
@@ -333,8 +333,6 @@ export function lexicalCandidates(
   traits: RecallHit[];
   memories: RecallHit[];
   episodes: RecallHit[];
-  /** True when the lists came from the relaxed query, so the fusion can down-weight them. */
-  rescued: boolean;
 } {
   const strict = escapeFts(input.query);
   const scopeFilter = input.scope ? "AND t.scope = @scope" : "";
@@ -446,7 +444,6 @@ export function lexicalCandidates(
     traits,
     memories,
     episodes,
-    rescued: rescuedTerms !== null,
   };
 }
 
@@ -534,29 +531,4 @@ export function fuseHits(sources: readonly RankedSource[]): RecallHit[] {
       );
     })
     .map(({ hit }) => hit);
-}
-
-/**
- * Keeps the first `maxTraits` traits and `maxEpisodes` episodes and drops the rest. Fed
- * with the cosine-ordered semantic list it keeps the closest of each layer; fed with the
- * fused result it bounds how many of them can occupy the limit and push a memory out.
- */
-export function capLayerHits(
-  hits: readonly RecallHit[],
-  maxTraits = MAX_TRAIT_HITS,
-  maxEpisodes = MAX_EPISODE_HITS,
-): RecallHit[] {
-  let traits = 0;
-  let episodes = 0;
-  return hits.filter((hit) => {
-    if (hit.layer === "trait") {
-      traits += 1;
-      return traits <= maxTraits;
-    }
-    if (hit.layer === "episode") {
-      episodes += 1;
-      return episodes <= maxEpisodes;
-    }
-    return true;
-  });
 }

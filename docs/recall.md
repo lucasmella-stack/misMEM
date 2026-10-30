@@ -29,8 +29,9 @@ backfill, nunca al vuelo en una consulta. En el ranking por significado las tres
 ordenada por coseno, con una prima de 0,05 para la memoria consolidada; ninguna capa hereda una posición fija.
 Un rasgo exige 0,06 de margen sobre el corte y un episodio pendiente 0,01, porque una regla corta y general se
 parece a cualquier pregunta de su tema. Cuando hay vectores, el resultado se queda con el mejor rasgo y como
-mucho dos episodios por consulta: sin ese tope, los rasgos y los episodios desplazaban a la memoria concreta
-que responde. El modo léxico, sin vectores, no aplica el tope. Backfill y reindexado: `mismem-embed`
+mucho dos episodios por consulta, elegidos por coseno antes de la fusión: una coincidencia exacta de palabras
+no puede adelantar a un rasgo o un episodio que está más cerca por significado. Sin ese tope, los rasgos y los
+episodios desplazaban a la memoria concreta que responde. El modo léxico, sin vectores, no aplica el tope. Backfill y reindexado: `mismem-embed`
 (`--status`, `--force`), que recorre memorias, rasgos y episodios pendientes.
 
 También habla con cualquier servidor compatible con OpenAI (`/v1/embeddings`, por ejemplo

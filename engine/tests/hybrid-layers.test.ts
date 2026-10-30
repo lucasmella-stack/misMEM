@@ -158,6 +158,54 @@ describe("capas semánticas en el recall", () => {
     expect(hits.map((hit) => hit.id)).not.toContain(second);
   });
 
+  it("no deja que un rasgo con coincidencia léxica desplace al de mayor coseno", async () => {
+    const source = capture(db, { scope: "dev", body: "origen" });
+    const memory = consolidate(db, {
+      scope: "dev",
+      gist: "memoria de apoyo",
+      source_episode_ids: [source.id],
+    }).memory_id;
+    const closest = crystallize(db, {
+      scope: "dev",
+      name: "prefiere avisar antes",
+      evidence_memory_ids: [memory],
+    }).trait_id;
+    // The lexical trait is newer on purpose: on an RRF tie the newer row wins, so only a
+    // cap that runs before the fusion can keep it from displacing the closest one.
+    const lexical = crystallize(db, {
+      scope: "dev",
+      name: "despliegue por la noche",
+      evidence_memory_ids: [memory],
+    }).trait_id;
+    db.prepare("UPDATE traits SET created_at = ? WHERE id IN (?, ?)").run(
+      1,
+      lexical,
+      closest,
+    );
+    db.prepare("UPDATE traits SET created_at = ? WHERE id = ?").run(2, lexical);
+
+    const query = "despliegue";
+    const embed = tableEmbed({
+      [query]: axis(1),
+      "memoria de apoyo": axis(0.8),
+      "despliegue por la noche": axis(0.75),
+      "prefiere avisar antes": axis(0.95),
+    });
+    await embedPendingMemories(db, { embedFn: embed, model: "fake" });
+
+    const { hits } = await recallHybrid(
+      db,
+      { query, limit: 5 },
+      embed,
+      { reinforce: false, embeddingModel: "fake" },
+    );
+
+    // FTS put the lexical trait first in the fused list; the cap must still pick the
+    // closest trait by cosine, even though the query never names it.
+    expect(hits.filter((hit) => hit.layer === "trait").map((hit) => hit.id)).toEqual([closest]);
+    expect(hits.map((hit) => hit.id)).not.toContain(lexical);
+  });
+
   it("deja dos episodios, los de mayor coseno, en el resultado", async () => {
     const source = capture(db, { scope: "dev", body: "origen" });
     const memory = consolidate(db, {
@@ -366,6 +414,59 @@ describe("vectores de capa y ciclo de vida", () => {
       db
         .prepare("SELECT 1 FROM layer_embeddings WHERE layer = 'episode' AND item_id = ?")
         .get(episode),
+    ).toBeUndefined();
+  });
+
+  it("no guarda el vector de un episodio consolidado durante el backfill", async () => {
+    const episode = capture(db, { scope: "dev", body: "episodio en vuelo" }).id;
+    const embed: EmbedFn = async (texts) => {
+      if (texts.includes("episodio en vuelo")) {
+        consolidate(db, {
+          scope: "dev",
+          gist: "absorbe el episodio en vuelo",
+          source_episode_ids: [episode],
+        });
+      }
+      return texts.map(() => axis(1));
+    };
+
+    await embedPendingMemories(db, { embedFn: embed, model: "fake" });
+
+    expect(
+      db
+        .prepare("SELECT 1 FROM layer_embeddings WHERE layer = 'episode' AND item_id = ?")
+        .get(episode),
+    ).toBeUndefined();
+  });
+
+  it("no guarda el vector si el nombre del rasgo cambia mientras se embebe", async () => {
+    const source = capture(db, { scope: "dev", body: "origen" });
+    const memory = consolidate(db, {
+      scope: "dev",
+      gist: "memoria de apoyo",
+      source_episode_ids: [source.id],
+    }).memory_id;
+    const trait = crystallize(db, {
+      scope: "dev",
+      name: "nombre viejo",
+      evidence_memory_ids: [memory],
+    }).trait_id;
+    let release: (vectors: Float32Array[] | null) => void = () => undefined;
+    const waiting = new Promise<Float32Array[] | null>((resolve) => {
+      release = resolve;
+    });
+    const pending = embedLayerItem(db, "trait", trait, {
+      embedFn: () => waiting,
+      model: "fake",
+    });
+    db.prepare("UPDATE traits SET name = ? WHERE id = ?").run("nombre nuevo", trait);
+    release([axis(1)]);
+
+    expect(await pending).toBe(false);
+    expect(
+      db
+        .prepare("SELECT 1 FROM layer_embeddings WHERE layer = 'trait' AND item_id = ?")
+        .get(trait),
     ).toBeUndefined();
   });
 
