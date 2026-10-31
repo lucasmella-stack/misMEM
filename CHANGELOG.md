@@ -2,6 +2,8 @@
 
 ## Sin publicar
 
+## 0.8.0 — 2026-11-01
+
 ### La pantalla de entrada perdía su logo al instalar desde npm
 
 - El logo se leía de `"dist/ui"`, una ruta **relativa al directorio de trabajo**. Dentro del repo
