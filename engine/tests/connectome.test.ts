@@ -3,16 +3,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it, expect, beforeEach } from "vitest";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
-import { capture, consolidate, reinforce } from "../src/tools.js";
-import { reinforceMemories } from "../src/salience.js";
+import { openDb } from "../src/store/db.js";
+import { capture } from "../src/memory/capture.js";
+import { consolidate } from "../src/memory/consolidate.js";
+import { reinforce } from "../src/memory/reinforce.js";
+import { reinforceMemories } from "../src/memory/salience.js";
 import {
   associationStrength,
   coUseEdges,
   hubs,
   seedTurnsFromUse,
   turnsRegistered,
-} from "../src/connectome.js";
+} from "../src/store/connectome.js";
 
 let db: DB;
 

@@ -43,7 +43,7 @@ describe("parseConsolidateArgs", () => {
   it("--scope sin valor corta: consolidaba todos los ámbitos", () => {
     expect(() => parseConsolidateArgs(["--scope"])).toThrow(/--scope necesita un valor/);
     expect(() => parseConsolidateArgs(["--scope", "--dry-run"])).toThrow(/--scope necesita un valor/);
-    // Un ámbito en blanco tampoco: no filtra nada y consolidaba todos los ámbitos en silencio.
+    // A blank scope counts too: it filters nothing and silently consolidated every scope.
     expect(() => parseConsolidateArgs(["--scope", ""])).toThrow(/--scope necesita un valor/);
   });
 

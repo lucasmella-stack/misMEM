@@ -2,7 +2,7 @@ import { readdir, stat, readFile } from "node:fs/promises";
 import { join, relative, extname, basename } from "node:path";
 import type { Dirent } from "node:fs";
 import type { Database as DB } from "better-sqlite3";
-import { capture } from "../tools.js";
+import { capture } from "../memory/capture.js";
 
 const TEXT_EXT = new Set([
   ".md", ".txt", ".json", ".jsonl", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",

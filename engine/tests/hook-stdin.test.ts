@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { PassThrough } from "node:stream";
-import { readStdin } from "../src/hook-client.js";
+import { readStdin } from "../src/hooks/client.js";
 
 const real = Object.getOwnPropertyDescriptor(process, "stdin")!;
 

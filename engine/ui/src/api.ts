@@ -1,4 +1,4 @@
-/** Lo que devuelve la API del viewer (engine/src/viewer.ts y viewer-api.ts). */
+/** What the viewer API returns (engine/src/http/viewer/). */
 
 export type Layer = "episode" | "memory" | "trait";
 
@@ -77,22 +77,39 @@ export interface GraphNode {
   label: string;
   salience?: number;
   strength?: number;
+  /** Only with the connectome on: accumulated association and neighbours above the floor. */
+  co_use?: { degree: number; strength: number };
 }
 
 export interface GraphLink {
   source: string;
   target: string;
-  kind: "origin" | "evidence" | "related";
+  kind: "origin" | "evidence" | "related" | "co_use";
+  /** Cosine, `related` only. */
   score?: number;
+  /** Turns backing the edge, `co_use` only: strength does not read without its support. */
+  n?: number;
+  /** NPMI, `co_use` only. */
+  strength?: number;
+}
+
+/** The sample behind the lateral layer: what lets the panel say the figures mean nothing yet. */
+export interface ConnectomeSummary {
+  turns: number;
+  pairs: number;
+  shown: number;
+  min_n: number;
+  hubs: Array<{ id: string; degree: number; strength: number }>;
 }
 
 export interface GraphData {
   nodes: GraphNode[];
   links: GraphLink[];
   truncated: { memories: boolean; traits: boolean; episodes: boolean };
+  connectome?: ConnectomeSummary;
 }
 
-/** Una página de `/api/recent?layer=episode&pending=1`. */
+/** One page of `/api/recent?layer=episode&pending=1`. */
 export interface RecentPage {
   rows: EpisodeItem[];
   total: number;
@@ -103,7 +120,7 @@ export interface MemoriesPage {
   memories: MemoryItem[];
 }
 
-/** Cuántas filas se piden por página. El tope del servidor es 200. */
+/** Rows requested per page. The server cap is 200. */
 const PAGE_SIZE = 50;
 
 export const isMissing = (item: object): item is Missing => "missing" in item;
@@ -116,7 +133,7 @@ async function get<T>(
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) if (value) query.set(key, value);
   const qs = query.toString();
-  // Relativo a /viewer/: funciona igual detrás de un proxy que monte misMEM en otra ruta.
+  // Relative to /viewer/: works the same behind a proxy that mounts misMEM on another path.
   const res = await fetch(`../api/${path}${qs ? `?${qs}` : ""}`, { signal });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -125,7 +142,7 @@ async function get<T>(
   return (await res.json()) as T;
 }
 
-/** Las escrituras: POST con JSON, que es lo que pide el servidor (viewer-actions.ts). */
+/** Writes: a JSON POST, which is what the server requires (viewer-actions.ts). */
 async function post<T>(path: string, body: unknown = {}): Promise<T> {
   const res = await fetch(`../api/${path}`, {
     method: "POST",
@@ -139,7 +156,7 @@ async function post<T>(path: string, body: unknown = {}): Promise<T> {
   return (await res.json()) as T;
 }
 
-/** El primer paso de un forget: no borra, devuelve lo que se perdería y el token para confirmar. */
+/** First step of a forget: deletes nothing, returns what would be lost and the confirmation token. */
 export interface ForgetChallenge {
   confirm_token: string;
   expires_in: number;
@@ -210,11 +227,28 @@ export const api = {
     ),
   traits: (scope: string | undefined, signal?: AbortSignal) =>
     get<{ rows: TraitItem[] }>("recent", { layer: "trait", scope, limit: "200" }, signal),
-  // Los 50 mejores: es una lista por relevancia y la cola no aporta.
+  // The top 50: this is a relevance list and the tail adds nothing.
   search: (q: string, scope: string | undefined, signal?: AbortSignal) =>
     get<{ hits: SearchHit[] }>("search", { q, scope, limit: "50" }, signal),
-  graph: (scope: string | undefined, episodes: boolean, signal?: AbortSignal) =>
-    get<GraphData>("graph", { scope, related: "1", episodes: episodes ? "1" : undefined }, signal),
+  // `co_use_min_n` goes to the server and not to the client so the hubs and the sample it
+  // reports describe the same edges that get drawn.
+  graph: (
+    scope: string | undefined,
+    episodes: boolean,
+    coUse: { enabled: boolean; minN: number },
+    signal?: AbortSignal,
+  ) =>
+    get<GraphData>(
+      "graph",
+      {
+        scope,
+        related: "1",
+        episodes: episodes ? "1" : undefined,
+        co_use: coUse.enabled ? "1" : undefined,
+        co_use_min_n: coUse.enabled ? String(coUse.minN) : undefined,
+      },
+      signal,
+    ),
   memory: (id: string, signal?: AbortSignal) => get<MemoryDetail>(`memory/${encodeURIComponent(id)}`, {}, signal),
   trait: (id: string, signal?: AbortSignal) => get<TraitDetail>(`trait/${encodeURIComponent(id)}`, {}, signal),
 };

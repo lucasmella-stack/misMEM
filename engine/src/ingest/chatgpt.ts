@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { Database as DB } from "better-sqlite3";
-import { capture } from "../tools.js";
+import { capture } from "../memory/capture.js";
 import { chunkText } from "./walk.js";
 
 interface ChatGPTMessage {

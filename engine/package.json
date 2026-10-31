@@ -3,7 +3,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Cooperative persistent memory for LLMs via MCP — episodes → memories → traits over SQLite (FTS5 + Hebbian recall)",
   "mcpName": "io.github.lucasmella-stack/mismem",
   "type": "module",
@@ -49,7 +49,8 @@
     "mismem-obsidian": "./dist/obsidian-cli.js"
   },
   "scripts": {
-    "build": "tsc && vite build --config ui/vite.config.ts",
+    "clean": "node --eval \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "pnpm clean && tsc && vite build --config ui/vite.config.ts",
     "dev": "tsx src/server.ts",
     "dev:http": "tsx src/server-http.ts",
     "dev:ui": "vite --config ui/vite.config.ts",

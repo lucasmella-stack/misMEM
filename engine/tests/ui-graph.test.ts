@@ -26,6 +26,7 @@ const filters = (overrides: Partial<GraphFilters> = {}): GraphFilters => ({
   orphans: true,
   related: true,
   episodes: true,
+  coUse: true,
   query: "",
   local: { enabled: false, depth: 2 },
   ...overrides,

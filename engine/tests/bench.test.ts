@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
-import { capture, consolidate } from "../src/tools.js";
+import { openDb } from "../src/store/db.js";
+import { capture } from "../src/memory/capture.js";
+import { consolidate } from "../src/memory/consolidate.js";
 import { embedPendingMemories } from "../src/embeddings/store.js";
 import type { EmbedFn } from "../src/embeddings/provider.js";
-import { meanRank, mrr, parseBank, recallAt, runBench } from "../src/bench.js";
+import { meanRank, mrr, parseBank, recallAt, runBench } from "../src/recall/bench.js";
 
 let db: DB;
 
@@ -86,7 +87,7 @@ describe("runBench", () => {
     const primero = makeMemory("Tiene deudas con el banco");
     const segundo = makeMemory("La deuda del alquiler sigue sin pagarse");
     await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
-    // A igual parecido manda la saliencia, así que el orden queda fijo.
+    // Equal similarity leaves it to salience, so the order is fixed.
     db.prepare("UPDATE memories SET salience = 0.9 WHERE id = ?").run(primero);
     db.prepare("UPDATE memories SET salience = 0.2 WHERE id = ?").run(segundo);
 
@@ -96,7 +97,7 @@ describe("runBench", () => {
 
     expect(score.found).toBe(1);
     expect(score.ranks).toEqual([0, 1, 0, 0, 0]);
-    // Un cliente que muestra uno solo no lo ve, aunque el recall del tope diga que sí.
+    // A client that shows one hit misses it even if recall at the cap says otherwise.
     expect(recallAt(score, 1)).toBe(0);
     expect(recallAt(score, 3)).toBe(1);
     expect(mrr(score)).toBeCloseTo(0.5);

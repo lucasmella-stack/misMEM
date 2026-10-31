@@ -3,7 +3,7 @@
 `recall` devuelve traits, después memories, después episodes. Dentro de las memories fusiona dos señales
 con RRF: las palabras (FTS5) y, si hay un servidor de embeddings, el significado. La relevancia va antes
 que la saliencia, que sólo desempata. Esta página cuenta el comportamiento; las constantes están en
-`engine/src/search.ts` y las variables, en la tabla de [DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única).
+`engine/src/recall/` y las variables, en la tabla de [DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única).
 
 ## Por palabras (siempre)
 
@@ -15,6 +15,15 @@ Si esa consulta estricta no devuelve nada y no hay capa semántica, `recall` rei
 y conserva sólo los candidatos que comparten al menos dos términos informativos. Con una sola palabra
 basta una; en consultas largas, el 30 % de sus palabras. Devuelve hasta 3 por capa. El rescate alcanza a
 rasgos, episodios y memorias, y no altera una búsqueda que ya encontró algo.
+
+Con capa semántica el rescate apenas suma aciertos, empuja hacia abajo la respuesta buena y trae
+memorias de preguntas que no vienen al caso; sin ella es lo que hace aparecer la paráfrasis que la
+consulta estricta deja fuera. Por eso sólo entra cuando no hay nada que puntuar.
+
+La rareza de un término que cuenta para el rescate tiene un suelo de 3 documentos y una fracción del 5 % de
+la base, de modo que "pocos" significa lo mismo con 300 memorias que con 3.000. Se calibró con
+`mismem-bench --off-topic`: se sube la fracción mientras las preguntas fuera de tema no devuelvan nada, y se
+elige la mayor que las deje a cero.
 
 ## Por significado (opcional)
 
@@ -32,7 +41,7 @@ servidor no hubiera respondido, en vez de guardar un vector que nunca puntuaría
 esos vectores inválidos en `invalid`.
 
 También habla con cualquier servidor compatible con OpenAI (`/v1/embeddings`, por ejemplo
-`llama-server --embedding`). **Si tus memorias no están en inglés, usa EmbeddingGemma 2**: con memorias en
+`llama-server --embedding`). **Si las memorias no están en inglés, conviene EmbeddingGemma 2**: con memorias en
 castellano encontró 34 de 50 paráfrasis frente a 4 de 50 de `nomic-embed-text` (medido en la issue #72), y
 en CPU no gasta VRAM. Va con sus prefijos y un corte de 0,65 (con 0,68 sale casi igual):
 
@@ -62,5 +71,5 @@ variables, con sus defaults, están en
 
 `mismem-bench` informa la posición del acierto (MRR, 1ª, entre las 3), los recuerdos devueltos por
 pregunta y `noiseHits` (marcadores que se escaparon: tiene que ser 0). Se corre antes y después de tocar
-`tools.ts`, `search.ts` o `embeddings/`. El banco de preguntas es privado y sale de la propia memoria.
+`recall/` o `embeddings/`. El banco de preguntas es privado y sale de la propia memoria.
 Cómo usarlo en un servidor: [DEPLOY.md](../DEPLOY.md#medir-el-recall).

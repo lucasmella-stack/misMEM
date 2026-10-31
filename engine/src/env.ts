@@ -1,8 +1,6 @@
-/**
- * Numeric env vars, parsed one way everywhere: finite and above zero, anything else
- * (unset, empty, "abc", 0, negative) counts as not set. A zero or negative window, timeout
- * or batch size is never a useful setting and used to mean different things per module.
- */
+// Numeric env vars, parsed one way everywhere: finite and above zero; anything else (unset,
+// empty, "abc", 0, negative) counts as not set, because a zero window, timeout or batch size
+// is never a useful setting.
 export function envPositiveNumber(
   name: string,
   fallback: number,

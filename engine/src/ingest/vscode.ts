@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import type { Database as DB } from "better-sqlite3";
-import { capture } from "../tools.js";
+import { capture } from "../memory/capture.js";
 import { chunkText } from "./walk.js";
 
 export interface JsonlStats {

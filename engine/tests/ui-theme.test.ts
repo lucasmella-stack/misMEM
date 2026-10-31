@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyTheme, loadTheme, resolveTheme, saveTheme, type ThemeChoice } from "../ui/src/lib/theme";
 
-/** La lectura del tema nunca puede romper el arranque: un localStorage hostil se trata como vacío. */
+/** Reading the theme must never break startup: a hostile localStorage counts as empty. */
 function reader(value: string | null): Pick<Storage, "getItem"> {
   return {
     getItem: (key) => {
@@ -29,7 +29,7 @@ function writer(): Pick<Storage, "setItem"> & { entries: Map<string, string> } {
   };
 }
 
-/** El DOM no existe en el entorno de test: basta con el contrato de atributos que usa applyTheme. */
+/** The DOM does not exist in the test environment: the attribute contract applyTheme uses is enough. */
 function rootStub(): HTMLElement {
   const attributes = new Map<string, string>();
   return {
