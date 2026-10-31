@@ -1,4 +1,9 @@
-<h1 align="center">misMEM</h1>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.webp">
+    <img alt="misMEM" src="docs/assets/logo.webp" width="200">
+  </picture>
+</p>
 
 <p align="center">
   <strong>Memoria persistente cooperativa para LLMs.</strong><br>
@@ -133,7 +138,8 @@ Y en `mcp.json`: `"command": "node", "args": ["<ruta-al-repo>/misMEM/engine/dist
 
 ## El visor
 
-Capturas del visor (`/viewer`): memorias por saliencia efectiva y grafo episodio, memoria y rasgo.
+Capturas del visor (`/viewer`): el grafo entero con sus ajustes, y el grafo local alrededor de una
+memoria con su detalle al costado.
 
 <p align="center">
   <img alt="Visor: grafo de episodios, memorias y rasgos, con los ajustes del grafo abiertos" src="docs/assets/viewer-grafo.webp" width="48%">

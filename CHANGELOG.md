@@ -2,11 +2,20 @@
 
 ## Sin publicar
 
+### El logo oficial encabeza el README
+
+- `docs/assets/logo.webp` y `logo-dark.webp`, el mismo logo con el fondo blanco quitado y la tinta en
+  `#141311` o `#e8e4dc` según el tema; el rosa de marca no cambia. Un `<picture>` con
+  `prefers-color-scheme` elige cuál, así que se lee igual en claro y en oscuro.
+- Sustituyen al `<h1>` de texto: el logo ya lleva el nombre, y su `alt` lo conserva para quien no ve
+  la imagen.
+
 ### Capturas nuevas del visor en el README
 
-- Las dos capturas pasan a ser del grafo: la vista completa con los ajustes abiertos y el grafo local
+- Las dos capturas pasan a ser del grafo: la vista entera con los ajustes abiertos y el grafo local
   alrededor de una memoria con su detalle al costado.
-- En `webp` en vez de `png`: **79 kB y 119 kB** frente a los 127 kB y 160 kB de las anteriores, con el
+- Sin la barra del navegador, que al 48 % de ancho tapaba lo que la captura muestra.
+- En `webp` en vez de `png`: **72 kB y 115 kB** frente a los 127 kB y 160 kB de las anteriores, con el
   texto igual de nítido.
 
 ### Los tests de uso de los CLI dejan de depender de la carga de la máquina (#213)
