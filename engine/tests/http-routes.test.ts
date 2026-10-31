@@ -333,3 +333,27 @@ describe("http/routes: el formulario de sesión", () => {
     expect((await request(handler, "/login")).statusCode).toBe(404);
   });
 });
+
+describe("http/routes: salir desde el visor", () => {
+  it("dice si hay una sesión que cerrar", async () => {
+    // Without credentials the viewer is open and a "salir" button would promise something that
+    // does not exist, so the interface has to be able to tell the two apart.
+    const conClave = JSON.parse((await request(makeHandler(), "/api/session", {
+      headers: { authorization: basic(AUTH.user, AUTH.pass) },
+    })).body) as { active?: boolean };
+    const sinClave = JSON.parse((await request(makeHandler({ auth: null }), "/api/session")).body) as {
+      active?: boolean;
+    };
+
+    expect(conClave.active).toBe(true);
+    expect(sinClave.active).toBe(false);
+  });
+
+  it("cerrar sesión vuelve al formulario con la cookie vencida", async () => {
+    const res = await request(makeHandler(), "/logout", { method: "POST" });
+
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe("/login");
+    expect(res.headers["set-cookie"]).toContain("Max-Age=0");
+  });
+});

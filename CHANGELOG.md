@@ -2,6 +2,16 @@
 
 ## Sin publicar
 
+### Salir del visor desde la propia interfaz
+
+- Un botón de icono al lado de *Consolidar ahora*, para poder cerrar la sesión sin borrar cookies a mano
+  —que es lo único que había— cuando el visor queda guardado como aplicación.
+- **Sólo aparece si hay sesión que cerrar.** `GET /api/session` dice si hay credenciales configuradas: sin
+  ellas el visor es abierto y el botón prometería algo que no existe.
+- No usa un formulario: la CSP del visor fija `form-action 'none'`, así que el botón llama a `POST /logout`
+  y luego navega.
+
+
 ### El refuerzo escribía pocos pares, y la capa lateral sólo aprende de pares
 
 - Medido sobre 565 turnos reales de ocho días: sólo el **6,7 %** escribía un par, que es lo único que alimenta

@@ -160,6 +160,9 @@ export function createRequestHandler(deps: HttpRoutesDeps): RequestHandler {
           methodNotAllowed(res);
           return;
         }
+        // Whether there is a session to end. Without credentials the viewer is open and a way
+        // out would promise something that is not there.
+        if (url.pathname === "/api/session") return jsonPlain(res, 200, { active: auth !== null });
         if (url.pathname === "/api/stats") return handleStats(db, res);
         if (url.pathname === "/api/recent") return handleRecent(db, res, url);
         if (url.pathname === "/api/search") {
