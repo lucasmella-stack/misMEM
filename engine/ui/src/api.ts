@@ -217,6 +217,7 @@ export const actions = {
 };
 
 export const api = {
+  session: (signal?: AbortSignal) => get<{ active: boolean }>("session", {}, signal),
   scopes: (signal?: AbortSignal) => get<{ scopes: ScopeCount[] }>("scopes", {}, signal),
   consolidation: (signal?: AbortSignal) => get<ConsolidationState>("consolidate", {}, signal),
   memories: (scope: string | undefined, offset: number, signal?: AbortSignal) =>
