@@ -14,7 +14,10 @@ interface InjectOptions {
   alreadyPresent?: ReadonlySet<string>;
 }
 
-export const DEFAULT_MAX_MEMORIES = 3;
+// Pairs grow with the square of what is in front: three memories give at most three pairs and
+// five give ten, and the lateral layer only learns from pairs. The character budget below is
+// what actually caps the cost.
+export const DEFAULT_MAX_MEMORIES = 5;
 export const DEFAULT_MAX_CHARS = 1200;
 // "dale", "ok", "y eso?" have nothing to search yet cost the same; with 3 this also dropped
 // "deploy florfitt", a short but legitimate question.

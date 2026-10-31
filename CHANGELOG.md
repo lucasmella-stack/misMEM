@@ -2,6 +2,21 @@
 
 ## Sin publicar
 
+### El refuerzo escribía pocos pares, y la capa lateral sólo aprende de pares
+
+- Medido sobre 565 turnos reales de ocho días: sólo el **6,7 %** escribía un par, que es lo único que alimenta
+  `co_use`. Con 42 pares repartidos sobre 1.414 coincidencias posibles, que ninguno se repitiera era **cara o
+  cruz** (47 % por simulación): `max(n) = 1` en producción no era un fallo, era poco volumen.
+- **El piso de palabras compartidas baja de 3 a 2.** Es el umbral que de verdad decide: con recuerdos de ~17
+  palabras, un piso de 3 equivale a una fracción de 0,18, así que bajar la fracción por debajo de 0,12 no hacía
+  nada. De 147 pares a **187**, con la señal sobre el azar casi intacta: de 3,0× a 2,9×.
+- **La inyección pasa de 3 recuerdos a 5.** Los pares crecen al cuadrado de lo que hay delante: 3 dan 3 pares
+  como mucho, 5 dan 10. El presupuesto de caracteres sigue acotando el costo.
+- La fracción **no se toca**: de 0,20 a 0,10 la señal cae de 3,0× a 2,1×, casi la mitad por casualidad.
+- Calibrado contra un modelo nulo —la misma respuesta comparada con recuerdos de otros turnos, 25 barajadas—
+  y comprobado que no aparece sesgo por longitud ni concentración en unos pocos recuerdos. Las cifras, en
+  [`docs/hooks.md`](docs/hooks.md).
+
 ### El visor tiene su propia pantalla de entrada
 
 - Hasta ahora el visor pedía la contraseña con el diálogo del navegador. Ahora `GET /viewer` sin
