@@ -192,7 +192,7 @@
 - Nada de eso cambia lo que se publica: `dist/server.js`, `dist/server-http.js` y `dist/*-cli.js` conservan
   su ruta y su nombre.
 
-### El conectoma se puede ver
+### El conectoma se puede ver (#208)
 
 - El visor gana un modo de iluminación sobre el mismo grafo: en *Ajustes del grafo* → **Conectoma**
   se encienden las aristas por co-uso, y los caminos y los nodos se alumbran según su asociación.
@@ -209,7 +209,17 @@
   pocos datos, dos recuerdos usados una vez y juntos esa vez dan el máximo. Comprobado con una
   base de un solo turno, que es como se ve una instalación recién actualizada.
 
-## 0.6.0 — 2026-10-29
+### El paquete que se publica es el que compilan las fuentes (#210)
+
+- `pnpm build` borra `dist/` antes de compilar. `tsc` sólo añade, así que un módulo borrado de
+  `src/` seguía compilado en disco y viajaba dentro del tarball: medido sobre este repositorio,
+  **81 ficheros sobrantes y 27 módulos muertos** de la estructura anterior a la reorganización
+  (`viewer.js`, `search.js`, `salience.js`, `tools/`, `pareto/`…). Lo que se publicaba dependía de
+  lo que el publicador tuviera en disco, no de las fuentes.
+- El job `packaging` de CI lo vigila con dos comprobaciones nuevas: que un fichero plantado en
+  `dist/` no sobreviva al siguiente `build`, y que el tarball lleve `dist/ui/index.html`. Sin la
+  interfaz compilada, `/viewer` responde 503 sólo a quien instala desde npm, porque en el
+  repositorio siempre está construida al lado.
 
 ### El olvido respeta `before_days` también al borrar memorias
 
