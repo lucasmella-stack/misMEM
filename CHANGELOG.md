@@ -2,6 +2,15 @@
 
 ## Sin publicar
 
+### Un vector inválido ya no esconde una memoria de la búsqueda (#155)
+
+- Cada vector se valida y se normaliza a norma 1 al entrar, venga del servidor de embeddings o de un
+  `embedFn` inyectado: `NaN`, `Infinity`, un componente nulo o no numérico y la norma cero dejan de
+  guardarse. Un vector malo sólo se pierde a sí mismo, sin arrastrar a sus compañeros de lote; un lote con
+  menos vectores que textos o con dimensiones mezcladas cuenta como fallido.
+- El backfill reescribe los vectores que una versión anterior guardó inválidos, y `mismem-embed --status`
+  los cuenta en `invalid`. La consulta degrada a búsqueda por palabras cuando su propio vector no es válido.
+
 ### Los tests de uso de los CLI dejan de depender de la carga de la máquina (#213)
 
 - `cli-usage-exit.test.ts` lanzaba el CLI con `npx tsx`: resolver el binario costaba más que la

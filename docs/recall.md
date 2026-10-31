@@ -33,7 +33,12 @@ Los vectores se guardan como BLOB en la misma SQLite y la búsqueda es coseno en
 nativas. Si el servidor no responde, todo degrada silenciosamente a FTS5 puro.
 
 La semántica cubre deliberadamente sólo `memories`; `episodes` y `traits` conservan búsqueda FTS5.
-Backfill y reindexado: `mismem-embed` (`--status`, `--force`).
+Backfill y reindexado: `mismem-embed` (`--status`, `--force`). Los vectores se normalizan a norma 1
+al entrar. Un vector con un componente no finito o con norma cero sólo se pierde a sí mismo: sus
+compañeros de lote se guardan igual. El backfill reescribe además los vectores inválidos que una
+versión anterior ya había guardado. Un lote con dimensiones mezcladas se descarta entero como si el
+servidor no hubiera respondido, en vez de guardar un vector que nunca puntuaría. `--status` cuenta
+esos vectores inválidos en `invalid`.
 
 También habla con cualquier servidor compatible con OpenAI (`/v1/embeddings`, por ejemplo
 `llama-server --embedding`). **Si las memorias no están en inglés, conviene EmbeddingGemma 2**: con memorias en
