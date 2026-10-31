@@ -2,6 +2,13 @@
 
 ## Sin publicar
 
+### Capturas nuevas del visor en el README
+
+- Las dos capturas pasan a ser del grafo: la vista completa con los ajustes abiertos y el grafo local
+  alrededor de una memoria con su detalle al costado.
+- En `webp` en vez de `png`: **79 kB y 119 kB** frente a los 127 kB y 160 kB de las anteriores, con el
+  texto igual de nítido.
+
 ### Los tests de uso de los CLI dejan de depender de la carga de la máquina (#213)
 
 - `cli-usage-exit.test.ts` lanzaba el CLI con `npx tsx`: resolver el binario costaba más que la
