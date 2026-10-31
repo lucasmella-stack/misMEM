@@ -2,6 +2,8 @@
 
 ## Sin publicar
 
+## 0.7.0 — 2026-10-31
+
 ### La exportación a Obsidian no escribe fuera de `<bóveda>/misMEM/` (#206)
 
 - Las rutas se comparan por su ruta real: una nota que es un enlace simbólico, o una carpeta enlazada que
