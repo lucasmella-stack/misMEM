@@ -7,6 +7,7 @@ import { AppHeader } from "./components/AppHeader";
 import { Consolidate } from "./components/Consolidate";
 import { CrystallizeDialog } from "./components/CrystallizeDialog";
 import { DetailPanel } from "./components/Detail";
+import { EmbeddingNotice } from "./components/EmbeddingNotice";
 import { MemoryList } from "./components/list/MemoryList";
 import { PendingList } from "./components/list/PendingList";
 import { SearchResults } from "./components/list/SearchResults";
@@ -138,6 +139,8 @@ export function App() {
         onThemeChange={setThemeChoice}
         onConsolidate={() => setConsolidating(true)}
       />
+
+      <EmbeddingNotice />
 
       <div
         className={`flex min-h-0 flex-1 flex-col md:grid md:overflow-hidden ${

@@ -3,6 +3,8 @@
 // salience is the effective one, as in recall; the stored one is the last checkpoint's.
 import type { ServerResponse } from "node:http";
 import type { Database as DB } from "better-sqlite3";
+import { getEmbeddingIndexStatus } from "../../embeddings/store.js";
+import { loadEmbeddingConfig } from "../../embeddings/provider.js";
 import { graphData, type GraphCaps } from "../../queries/graph.js";
 import { listMemories, memoryDetail } from "../../queries/memories.js";
 import { scopeCounts } from "../../queries/scopes.js";
@@ -28,6 +30,16 @@ export function parseDetailPath(pathname: string): DetailPath | "bad" | null {
   } catch {
     return "bad";
   }
+}
+
+/**
+ * Read-only view of the semantic index. It reads the config and the database only: the
+ * provider URL may carry credentials, so it never leaves the server and no request is made.
+ */
+export function handleEmbeddings(db: DB, res: ServerResponse): void {
+  const cfg = loadEmbeddingConfig();
+  const status = getEmbeddingIndexStatus(db, cfg.model);
+  json(res, 200, { enabled: cfg.enabled, provider: cfg.provider, model: cfg.model, ...status });
 }
 
 export function handleScopes(db: DB, res: ServerResponse): void {

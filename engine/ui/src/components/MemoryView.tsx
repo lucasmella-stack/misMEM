@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useMemoryActions } from "@/hooks/use-memory-actions";
 import { actions, api, isMissing, type MemoryDetail } from "../api";
-import { ago, exact, percent } from "../format";
+import { percent, when } from "../format";
 import { errorMessage } from "../lib/errors";
 import { inkPercent } from "../lib/ink";
 import { forgetText, unconsolidateText } from "../lib/memory-text";
@@ -20,10 +20,17 @@ import {
   type DetailViewProps,
 } from "./DetailParts";
 import { EditForm } from "./memory/EditForm";
+import { MemoryFacts } from "./MemoryFacts";
 
 export function MemoryView({ id, onSelect, onChanged, onAnnounce }: DetailViewProps) {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["memory", id], queryFn: ({ signal }) => api.memory(id, signal) });
+  // The notice already caches the index status; reuse it to tell a current vector from a stale one.
+  const embeddings = useQuery({
+    queryKey: ["embeddings"],
+    queryFn: ({ signal }) => api.embeddings(signal),
+    staleTime: 60_000,
+  });
   const [editing, setEditing] = useState(false);
 
   const data = query.data;
@@ -103,16 +110,7 @@ export function MemoryView({ id, onSelect, onChanged, onAnnounce }: DetailViewPr
         )}
       </div>
 
-      <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-        <dt className="text-ink-muted">Ámbito</dt>
-        <dd className="text-ink-soft">{memory.scope}</dd>
-        <dt className="text-ink-muted">Consolidada</dt>
-        <dd className="text-ink-soft" title={exact(memory.created_at)}>
-          {ago(memory.created_at)}
-        </dd>
-        <dt className="text-ink-muted">Último uso</dt>
-        <dd className="text-ink-soft">{ago(memory.last_accessed_at)}</dd>
-      </dl>
+      <MemoryFacts memory={memory} activeModel={embeddings.data?.model} />
 
       {!editing && (
         <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Acciones sobre la memoria">
@@ -143,7 +141,7 @@ export function MemoryView({ id, onSelect, onChanged, onAnnounce }: DetailViewPr
                 <li key={episode.id} className="rounded-md bg-field px-2.5 py-2">
                   <p className="text-sm leading-relaxed text-ink-soft">{episode.text}</p>
                   <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-ink-muted">
-                    <span title={exact(episode.created_at)}>{ago(episode.created_at)}</span>
+                    <span>{when(episode.created_at)}</span>
                     {episode.linked_here === false && <span>ahora consolidado en otra memoria</span>}
                   </p>
                 </li>

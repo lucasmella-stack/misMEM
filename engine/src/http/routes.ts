@@ -8,7 +8,7 @@ import { BodyTooLargeError, InvalidJsonError, isJsonContentType, readJsonBody } 
 import { checkBasicAuth, type BasicCredentials } from "./guard.js";
 import { hostAllowed } from "./host.js";
 import { json, jsonBare, jsonPlain, methodNotAllowed, notFound, payloadTooLarge, unauthorized } from "./respond.js";
-import { handleGraph, handleMemories, handleMemory, handleScopes, handleTrait, parseDetailPath } from "./viewer/api.js";
+import { handleEmbeddings, handleGraph, handleMemories, handleMemory, handleScopes, handleTrait, parseDetailPath } from "./viewer/api.js";
 import {
   ACTION_MAX_BODY_BYTES,
   type ForgetConfirmations,
@@ -143,6 +143,7 @@ export function createRequestHandler(deps: HttpRoutesDeps): RequestHandler {
           return;
         }
         if (url.pathname === "/api/scopes") return handleScopes(db, res);
+        if (url.pathname === "/api/embeddings") return handleEmbeddings(db, res);
         if (url.pathname === "/api/consolidate") {
           json(res, 200, job.state());
           return;
