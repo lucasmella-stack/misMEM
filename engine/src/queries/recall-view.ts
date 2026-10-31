@@ -59,10 +59,8 @@ function selectColumn(
 }
 
 /**
- * Shapes the hits of `recall` for the model that reads them: a readable date, the details of
- * a memory and the polarity of a trait (columns the search rows do not carry), and
- * per-string caps. `salience` and `created_at` pass through untouched. Order is preserved:
- * the ranking is the search's decision.
+ * Adds what the search rows do not carry (a readable date, a memory's details, a trait's
+ * polarity) and the per-string caps. `salience`, `created_at` and the order pass through.
  */
 export function recallForModel(db: DB, hits: readonly RecallHit[]): RecallHitView[] {
   const memoryIds = hits.filter((hit) => hit.layer === "memory").map((hit) => hit.id);

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
+import { openDb } from "../src/store/db.js";
 import {
   MAX_DETAILS_CHARS,
   MAX_TEXT_CHARS,
