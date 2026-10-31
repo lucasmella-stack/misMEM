@@ -1,0 +1,177 @@
+// The graph the viewer draws: memory → trait evidence edges, optional origin episodes, optional
+// similarity and co-use layers. Totals are counted before the caps cut, so a truncated layer is
+// the one that had more rows than its cap, not the one that just filled it.
+import type { Database as DB } from "better-sqlite3";
+import { coUseLinks, parseIds, relatedLinks, type GraphLink } from "./relations.js";
+import { hubs, turnsRegistered, type Hub } from "../store/connectome.js";
+import {
+  excludeNoiseSql,
+  MEMORY_COLUMNS,
+  type ConsolidatedEpisodeRow,
+  type MemoryRow,
+  type TraitRow,
+} from "../store/rows.js";
+import { effectiveSalience } from "../memory/salience.js";
+
+const GRAPH_MAX_MEMORIES = 400;
+const GRAPH_MAX_TRAITS = 200;
+const GRAPH_MAX_EPISODES = 2000;
+const GRAPH_LABEL_CHARS = 120;
+const GRAPH_MAX_HUBS = 20;
+
+/** Caps per layer; the tests lower them so they do not seed hundreds of rows. */
+export interface GraphCaps {
+  memories?: number;
+  traits?: number;
+  episodes?: number;
+}
+
+export interface GraphQuery {
+  scope: string | null;
+  withEpisodes: boolean;
+  withRelated: boolean;
+  withCoUse: boolean;
+  /** Minimum co-use strength; the caller already normalized it from the query parameter. */
+  coUseMinN?: number;
+  at?: number;
+  caps?: GraphCaps;
+}
+
+interface GraphNode {
+  id: string;
+  layer: "memory" | "trait" | "episode";
+  scope: string;
+  label: string;
+  salience?: number;
+  strength?: number;
+  co_use?: { degree: number; strength: number };
+}
+
+export interface GraphBody {
+  nodes: GraphNode[];
+  links: GraphLink[];
+  truncated: { memories: boolean; traits: boolean; episodes: boolean };
+  connectome?: {
+    turns: number;
+    pairs: number;
+    shown: number;
+    min_n: number;
+    hubs: Hub[];
+  };
+}
+
+const label = (text: string): string =>
+  text.length > GRAPH_LABEL_CHARS ? `${text.slice(0, GRAPH_LABEL_CHARS - 1)}…` : text;
+
+export function graphData(db: DB, query: GraphQuery): GraphBody {
+  const { scope } = query;
+  const at = query.at ?? Date.now();
+  const coUseMinN = Math.max(1, query.coUseMinN ?? 1);
+  const maxMemories = query.caps?.memories ?? GRAPH_MAX_MEMORIES;
+  const maxTraits = query.caps?.traits ?? GRAPH_MAX_TRAITS;
+  const maxEpisodes = query.caps?.episodes ?? GRAPH_MAX_EPISODES;
+
+  const memoriesWhere = `(@scope IS NULL OR scope = @scope) AND ${excludeNoiseSql("m")}`;
+  const memoryTotal = (
+    db.prepare(`SELECT COUNT(*) AS n FROM memories m WHERE ${memoriesWhere}`).get({ scope }) as { n: number }
+  ).n;
+  const memories = (
+    db
+      .prepare(`SELECT ${MEMORY_COLUMNS} FROM memories m WHERE ${memoriesWhere}`)
+      .all({ scope }) as MemoryRow[]
+  )
+    .map((row) => ({ row, salience: effectiveSalience(row, at) }))
+    .sort((a, b) => b.salience - a.salience)
+    .slice(0, maxMemories);
+  const traitTotal = (
+    db
+      .prepare(`SELECT COUNT(*) AS n FROM traits WHERE (@scope IS NULL OR scope = @scope)`)
+      .get({ scope }) as { n: number }
+  ).n;
+  const traits = db
+    .prepare(
+      `SELECT id, scope, name, strength, polarity, evidence_memory_ids, created_at, updated_at FROM traits
+       WHERE (@scope IS NULL OR scope = @scope) ORDER BY strength DESC LIMIT @limit`,
+    )
+    .all({ scope, limit: maxTraits }) as TraitRow[];
+
+  const truncated = {
+    memories: memoryTotal > maxMemories,
+    traits: traitTotal > maxTraits,
+    episodes: false,
+  };
+
+  const nodes: GraphNode[] = [];
+  const links: GraphLink[] = [];
+  const memoryIds = new Set(memories.map((m) => m.row.id));
+
+  for (const { row, salience } of memories) {
+    nodes.push({ id: row.id, layer: "memory", scope: row.scope, label: label(row.gist), salience });
+  }
+  for (const t of traits) {
+    nodes.push({ id: t.id, layer: "trait", scope: t.scope, label: label(t.name), strength: t.strength });
+    for (const memoryId of parseIds(t.evidence_memory_ids)) {
+      if (memoryIds.has(memoryId)) links.push({ source: memoryId, target: t.id, kind: "evidence" });
+    }
+  }
+  if (query.withEpisodes && memoryIds.size > 0) {
+    const idsJson = JSON.stringify([...memoryIds]);
+    // The graph's episodes are those hanging from the visible memories; the cut happens over
+    // that set, so the total is counted with the same WHERE.
+    const episodeTotal = (
+      db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM episodes
+           WHERE consolidated_into IN (SELECT value FROM json_each(?))`,
+        )
+        .get(idsJson) as { n: number }
+    ).n;
+    truncated.episodes = episodeTotal > maxEpisodes;
+    const episodes = db
+      .prepare(
+        `SELECT id, scope, body, created_at, consolidated_into FROM episodes
+         WHERE consolidated_into IN (SELECT value FROM json_each(?))
+         ORDER BY created_at DESC LIMIT ?`,
+      )
+      .all(idsJson, maxEpisodes) as ConsolidatedEpisodeRow[];
+    for (const e of episodes) {
+      nodes.push({ id: e.id, layer: "episode", scope: e.scope, label: label(e.body) });
+      links.push({ source: e.id, target: e.consolidated_into, kind: "origin" });
+    }
+  }
+
+  if (query.withRelated) links.push(...relatedLinks(db, [...memoryIds]));
+
+  if (!query.withCoUse) return { nodes, links, truncated };
+
+  const drawn = [...memoryIds];
+  const lateral = coUseLinks(db, drawn, coUseMinN);
+  const degrees = new Map<string, { degree: number; strength: number }>();
+  for (const link of lateral) {
+    for (const id of [link.source, link.target]) {
+      const current = degrees.get(id) ?? { degree: 0, strength: 0 };
+      current.degree += 1;
+      if ((link.strength ?? 0) > 0) current.strength += link.strength ?? 0;
+      degrees.set(id, current);
+    }
+  }
+  links.push(...lateral);
+
+  return {
+    nodes: nodes.map((node) => {
+      const own = degrees.get(node.id);
+      return own ? { ...node, co_use: own } : node;
+    }),
+    links,
+    truncated,
+    // The side panels must not present noise as topology: with few turns, a pair seen
+    // once scores maximum strength by construction.
+    connectome: {
+      turns: turnsRegistered(db),
+      pairs: coUseLinks(db, drawn, 1).length,
+      shown: lateral.length,
+      min_n: coUseMinN,
+      hubs: hubs(db, { ids: drawn, minN: coUseMinN }).slice(0, GRAPH_MAX_HUBS),
+    },
+  };
+}

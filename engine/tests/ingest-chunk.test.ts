@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
+import { openDb } from "../src/store/db.js";
 import { CHUNK_BYTES, chunkText } from "../src/ingest/walk.js";
 import { ingestChatGPTExport } from "../src/ingest/chatgpt.js";
 import { ingestVSCodeTranscripts } from "../src/ingest/vscode.js";

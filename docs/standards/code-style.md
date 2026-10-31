@@ -6,7 +6,7 @@ Las convenciones de lenguaje, idioma, CLI, formato y esquema están en
 
 ## Ficheros
 
-- Minúsculas con guiones: `server-http.ts`, `hook-readiness.ts`.
+- Minúsculas con guiones: `server-http.ts`, `migrate-engram-cli.ts`.
 - Un fichero que supera con claridad su responsabilidad se parte por responsabilidades, no por tamaño.
 
 ## Lint y dependencias

@@ -25,7 +25,7 @@ export function TraitView({ id, onSelect, onChanged, onAnnounce }: DetailViewPro
   }
   const { trait, evidence } = data;
 
-  // Como la memoria: primero el servidor da el token que confirma, y sólo con él borra.
+  // Like memory: the server hands out the confirming token first, and only with it does it delete.
   const askForget = async () => {
     setConfirm(true);
     setChallenge(undefined);

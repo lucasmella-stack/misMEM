@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { openDb } from "../src/db.js";
+import { openDb } from "../src/store/db.js";
 import { createServer } from "../src/server-core.js";
 
 function readJson(relativeToTests: string): Record<string, unknown> {

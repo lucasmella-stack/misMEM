@@ -135,7 +135,7 @@ describe("distill", () => {
   const cfg = { apiKey: "k", model: "deepseek-chat", baseUrl: "https://llm.test/v1", maxTokens: 1234 };
 
   it("un proveedor que no responde corta en el tope en vez de colgar la corrida", async () => {
-    // Acepta el pedido y nunca contesta: sólo termina si alguien aborta la señal.
+    // It accepts the request and never answers: only an aborted signal ends it.
     const hang = vi.fn(
       (_url: string, init: RequestInit) =>
         new Promise<Response>((_resolve, reject) => {

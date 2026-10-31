@@ -6,7 +6,7 @@ import {
   parseScopeList,
   selectForInjection,
   worthRecalling,
-} from "../src/inject.js";
+} from "../src/hooks/inject.js";
 import type { RecallHit } from "../src/schema.js";
 
 const hit = (over: Partial<RecallHit> & { id: string }): RecallHit => ({

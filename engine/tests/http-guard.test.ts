@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { bindHost, httpPort, loadAuth } from "../src/http-guard.js";
+import { bindHost, httpPort, loadAuth } from "../src/http/guard.js";
 
 describe("http-guard: loadAuth", () => {
   it("sin ninguna variable no hay auth: es el uso local", () => {
