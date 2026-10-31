@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { GraphData, GraphLink, GraphNode } from "../ui/src/api";
 import {
   coUseGlow,
+  supportConfidence,
   filterGraph,
   hubGlow,
   THIN_SAMPLE_TURNS,
@@ -66,9 +67,12 @@ describe("filtro de la capa lateral", () => {
 });
 
 describe("iluminación de una arista lateral", () => {
+  // Every case below fixes the support, so what it compares is strength and nothing else.
+  const SOPORTE = 10;
+
   it("una asociación fuerte se dibuja más viva y más gruesa que una débil", () => {
-    const fuerte = coUseGlow(0.9);
-    const debil = coUseGlow(0.1);
+    const fuerte = coUseGlow(0.9, SOPORTE);
+    const debil = coUseGlow(0.1, SOPORTE);
 
     expect(fuerte.alpha).toBeGreaterThan(debil.alpha);
     expect(fuerte.width).toBeGreaterThan(debil.width);
@@ -76,24 +80,27 @@ describe("iluminación de una arista lateral", () => {
 
   it("una fuerza negativa no ilumina: el par se evita, no se asocia", () => {
     // Below zero, NPMI says they show up together less often than chance predicts.
-    expect(coUseGlow(-0.5)).toEqual(coUseGlow(0));
+    expect(coUseGlow(-0.5, SOPORTE)).toEqual(coUseGlow(0, SOPORTE));
   });
 
   it("sin fuerza se dibuja como la arista más apagada", () => {
-    expect(coUseGlow(undefined)).toEqual(coUseGlow(0));
+    expect(coUseGlow(undefined, SOPORTE)).toEqual(coUseGlow(0, SOPORTE));
   });
 
-  it("nunca pasa de opaca por mucha fuerza que traiga", () => {
-    expect(coUseGlow(1).alpha).toBeLessThanOrEqual(1);
+  it("nunca pasa de opaca por mucha fuerza y mucho soporte que traiga", () => {
+    expect(coUseGlow(1, 1000).alpha).toBeLessThanOrEqual(1);
   });
 });
 
 describe("halo de un nodo del conectoma", () => {
+  // Support is fixed and high wherever only the normalization is under test.
+  const PROBADO = 1000;
+
   it("se normaliza contra el nodo más fuerte a la vista", () => {
     // Unnormalized, a graph of weak associations reads as dark and one of strong associations
     // as burnt: what matters is who stands out among what is drawn.
-    expect(hubGlow(2, 2)).toBeCloseTo(1, 5);
-    expect(hubGlow(1, 2)).toBeCloseTo(0.5, 5);
+    expect(hubGlow(2, 2, PROBADO)).toBeCloseTo(1, 2);
+    expect(hubGlow(1, 2, PROBADO)).toBeCloseTo(0.5, 2);
   });
 
   it("sin nadie fuerte a la vista no inventa un halo", () => {
@@ -104,6 +111,15 @@ describe("halo de un nodo del conectoma", () => {
   it("una fuerza negativa acumulada no ilumina", () => {
     expect(hubGlow(-3, 5)).toBe(0);
   });
+
+  it("un hub cuya única prueba es una coincidencia no se enciende", () => {
+    // Its accumulated strength is the maximum in view, but nothing behind it ever repeated.
+    expect(hubGlow(1, 1, 1)).toBe(0);
+  });
+
+  it("a igual fuerza, el que repitió más brilla más", () => {
+    expect(hubGlow(2, 2, 10)).toBeGreaterThan(hubGlow(2, 2, 2));
+  });
 });
 
 describe("tamaño de muestra", () => {
@@ -111,5 +127,35 @@ describe("tamaño de muestra", () => {
     // With few turns, two memories used once and together that once score 1: the interface
     // has to be able to say the figure means nothing yet.
     expect(THIN_SAMPLE_TURNS).toBeGreaterThan(1);
+  });
+});
+
+describe("soporte de un par", () => {
+  // NPMI reads 1 both for "always together" and for "once, and that was the only turn either
+  // appeared in". Strength alone cannot tell evidence from coincidence, so the drawing has to
+  // read the support that already travels with every lateral edge.
+  it("un par visto una sola vez no aporta nada en que creer", () => {
+    expect(supportConfidence(1)).toBe(0);
+    expect(supportConfidence(undefined)).toBe(0);
+  });
+
+  it("crece con las repeticiones y nunca llega a la certeza", () => {
+    expect(supportConfidence(2)).toBeCloseTo(0.5, 5);
+    expect(supportConfidence(4)).toBeCloseTo(0.75, 5);
+    expect(supportConfidence(1000)).toBeLessThan(1);
+  });
+
+  it("un par visto una vez no puede brillar más que una asociación medida", () => {
+    // The real shape of production on 2026-10-31: 37 pairs, every one with n=1 and both ends
+    // used once, so every one scores a perfect 1 while a pair backed by eight turns scores 0.40.
+    const coincidencia = coUseGlow(1, 1);
+    const medida = coUseGlow(0.4, 8);
+    expect(coincidencia.alpha).toBeLessThan(medida.alpha);
+    expect(coincidencia.width).toBeLessThan(medida.width);
+  });
+
+  it("sin soporte cae al suelo del trazo, que es no decir nada", () => {
+    // Drawn, but with the same ink as a pair nobody measured: absence of evidence is not a path.
+    expect(coUseGlow(1, 1)).toEqual(coUseGlow(0, 99));
   });
 });

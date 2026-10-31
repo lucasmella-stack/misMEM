@@ -22,11 +22,25 @@ export interface GraphFilters {
 export const THIN_SAMPLE_TURNS = 20;
 
 /**
+ * How much of a pair's co-occurrence was repetition, in [0, 1). NPMI reads 1 both for "always
+ * together" and for "once, and that was the only turn either appeared in", so strength alone
+ * cannot tell evidence from coincidence. One sighting repeats nothing and is worth nothing.
+ */
+export function supportConfidence(n: number | undefined): number {
+  if (n === undefined || n <= 1) return 0;
+  return (n - 1) / n;
+}
+
+/**
  * How brightly a lateral edge is drawn. Only a positive association lights up: at zero the pair
  * is indistinguishable from chance and below it they avoid each other, and neither deserves ink.
+ * Weighted by support, so an unrepeated pair falls to the same floor as one nobody measured.
  */
-export function coUseGlow(strength: number | undefined): { alpha: number; width: number } {
-  const lit = Math.min(1, Math.max(0, strength ?? 0));
+export function coUseGlow(
+  strength: number | undefined,
+  n?: number,
+): { alpha: number; width: number } {
+  const lit = Math.min(1, Math.max(0, strength ?? 0)) * supportConfidence(n);
   return { alpha: 0.2 + 0.8 * lit, width: 0.7 + 2.3 * lit };
 }
 
@@ -35,9 +49,9 @@ export function coUseGlow(strength: number | undefined): { alpha: number; width:
  * otherwise read as dark and one of strong associations as burnt, when what matters is who
  * stands out among what is drawn.
  */
-export function hubGlow(strength: number | undefined, max: number): number {
+export function hubGlow(strength: number | undefined, max: number, support?: number): number {
   if (max <= 0 || strength === undefined || strength <= 0) return 0;
-  return Math.min(1, strength / max);
+  return Math.min(1, strength / max) * supportConfidence(support);
 }
 
 /** A link at two moments: fresh from the API and already mutated by force-graph. */

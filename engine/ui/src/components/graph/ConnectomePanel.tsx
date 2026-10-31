@@ -13,7 +13,9 @@ interface Props {
  * through. It leads with the sample because with few turns every figure below it is noise.
  */
 export function ConnectomePanel({ summary, labels, onSelect }: Props) {
-  const thin = summary.turns < THIN_SAMPLE_TURNS;
+  // Turns alone never dilute the degeneracy: NPMI scores a pair seen once at the maximum no
+  // matter how long the sample runs. What tells evidence from coincidence is a pair repeating.
+  const thin = summary.max_n < 2 || summary.turns < THIN_SAMPLE_TURNS;
   const max = summary.hubs[0]?.strength ?? 0;
 
   return (
@@ -33,9 +35,9 @@ export function ConnectomePanel({ summary, labels, onSelect }: Props) {
 
       {thin && (
         <p className="rounded-md border border-edge px-2 py-1.5 text-ink-muted">
-          Con {summary.turns} {summary.turns === 1 ? "turno medido" : "turnos medidos"} la fuerza
-          todavía no significa nada: dos recuerdos usados una vez, esa vez juntos, dan el máximo.
-          Se separa sola a medida que se usa.
+          {summary.max_n < 2
+            ? "Ningún par se repitió todavía: dos recuerdos usados una vez, esa vez juntos, dan el máximo. La cifra se separa cuando un par vuelve a salir junto, no con los turnos."
+            : `Con ${summary.turns} ${summary.turns === 1 ? "turno medido" : "turnos medidos"} la muestra todavía es corta para comparar unos pares con otros.`}
         </p>
       )}
 
@@ -54,7 +56,7 @@ export function ConnectomePanel({ summary, labels, onSelect }: Props) {
                   <span
                     aria-hidden="true"
                     className="size-2 shrink-0 rounded-full bg-brand"
-                    style={{ opacity: 0.25 + 0.75 * hubGlow(hub.strength, max) }}
+                    style={{ opacity: 0.25 + 0.75 * hubGlow(hub.strength, max, hub.support) }}
                   />
                   <span className="min-w-0 flex-1 truncate text-ink-soft">
                     {labels.get(hub.id) ?? hub.id}

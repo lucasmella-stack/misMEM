@@ -44,7 +44,7 @@ interface GraphNode {
   label: string;
   salience?: number;
   strength?: number;
-  co_use?: { degree: number; strength: number };
+  co_use?: { degree: number; strength: number; support: number };
 }
 
 export interface GraphBody {
@@ -56,6 +56,8 @@ export interface GraphBody {
     pairs: number;
     shown: number;
     min_n: number;
+    /** Best support among the edges drawn: with every pair at 1, no figure above means anything. */
+    max_n: number;
     hubs: Hub[];
   };
 }
@@ -146,32 +148,31 @@ export function graphData(db: DB, query: GraphQuery): GraphBody {
 
   const drawn = [...memoryIds];
   const lateral = coUseLinks(db, drawn, coUseMinN);
-  const degrees = new Map<string, { degree: number; strength: number }>();
-  for (const link of lateral) {
-    for (const id of [link.source, link.target]) {
-      const current = degrees.get(id) ?? { degree: 0, strength: 0 };
-      current.degree += 1;
-      if ((link.strength ?? 0) > 0) current.strength += link.strength ?? 0;
-      degrees.set(id, current);
-    }
-  }
   links.push(...lateral);
+
+  // One accumulator for the whole lateral layer, in the module that owns it: the halo on the
+  // canvas and the list in the panel have to answer to the same definition of a hub.
+  const ranked = hubs(db, { ids: drawn, minN: coUseMinN });
+  const byId = new Map(ranked.map((hub) => [hub.id, hub]));
 
   return {
     nodes: nodes.map((node) => {
-      const own = degrees.get(node.id);
-      return own ? { ...node, co_use: own } : node;
+      const own = byId.get(node.id);
+      return own
+        ? { ...node, co_use: { degree: own.degree, strength: own.strength, support: own.support } }
+        : node;
     }),
     links,
     truncated,
-    // The side panels must not present noise as topology: with few turns, a pair seen
-    // once scores maximum strength by construction.
+    // Nothing here may present noise as topology: a pair seen once scores maximum strength by
+    // construction, so the support travels beside every figure that depends on it.
     connectome: {
       turns: turnsRegistered(db),
       pairs: coUseLinks(db, drawn, 1).length,
       shown: lateral.length,
       min_n: coUseMinN,
-      hubs: hubs(db, { ids: drawn, minN: coUseMinN }).slice(0, GRAPH_MAX_HUBS),
+      max_n: lateral.reduce((top, link) => Math.max(top, link.n ?? 0), 0),
+      hubs: ranked.slice(0, GRAPH_MAX_HUBS),
     },
   };
 }

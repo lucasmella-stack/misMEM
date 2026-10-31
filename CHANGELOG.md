@@ -2,6 +2,27 @@
 
 ## Sin publicar
 
+### El conectoma dejaba de avisar justo cuando más mentía
+
+- Medido en producción el 2026-10-31: 3.885 memorias, 37 pares en `co_use`, **todos con `n = 1`** y
+  ningún par repetido nunca, con el contador de turnos en 23. En ese estado NPMI vale **1 exacto**
+  para los 37 —`log(T)/log(T)`, para cualquier `T`—, así que el ruido se dibujaba con el alfa y el
+  grosor **máximos**: el triple que una arista por parecido, y más del doble que una asociación real
+  medida (`n = 8` sobre 200 turnos puntúa 0,40).
+- El aviso de muestra fina miraba `turns`, que es la variable equivocada: acumular turnos no diluye
+  la degeneración, y al pasar de 20 el aviso **se apagó solo** mientras los datos seguían vacíos.
+  Ahora mira el soporte, y el resumen viaja con `max_n` para que la interfaz pueda decirlo.
+- La fuerza no se lee sin su soporte, que es lo que el tipo de la arista decía desde siempre y
+  ningún consumidor leía. Lo leen los cuatro: el trazo, el halo, el aviso y el ranking de hubs.
+  Un par visto una vez cae al suelo del trazo, que es no decir nada.
+- `hubs()` ponderaba la suma sin soporte, así que un nodo con tres coincidencias le ganaba a un par
+  repetido: "ordenados por asociación acumulada, no por vecinos" era falso en los datos reales. Cada
+  `Hub` lleva ahora su `support` y la suma va ponderada.
+- La regla vive en `engine/src/domain/support.ts`; la interfaz no puede importar de `src/`, así que
+  conserva su copia y `tests/support.test.ts` falla si las dos dejan de coincidir.
+- De paso, `queries/graph.ts` deja de reimplementar el acumulador de `store/connectome.ts`: el halo
+  del lienzo y la lista del panel responden ya a una sola definición de hub.
+
 ### Los tests de uso de los CLI dejan de depender de la carga de la máquina (#213)
 
 - `cli-usage-exit.test.ts` lanzaba el CLI con `npx tsx`: resolver el binario costaba más que la

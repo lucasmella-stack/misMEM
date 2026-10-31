@@ -57,7 +57,7 @@ export function paintNode(node: Node, ctx: CanvasRenderingContext2D, scale: numb
 
   // The halo is the whole point of the connectome view: a node that orients others glows,
   // and it is drawn under the circle so it never hides the colour of its scope.
-  const glow = hubGlow(node.co_use?.strength, paint.maxHubStrength);
+  const glow = hubGlow(node.co_use?.strength, paint.maxHubStrength, node.co_use?.support);
   if (glow > 0 && lit) {
     const halo = radius * (1.8 + 1.4 * glow);
     const gradient = ctx.createRadialGradient(node.x, node.y, radius, node.x, node.y, halo);
@@ -104,14 +104,14 @@ export function colorOfLink(link: Link, active: string | null): string {
   if (touching) return tokens.brand;
   // A measured path is the one worth following, so it keeps its colour when nothing is hovered
   // and fades with its own strength instead of with the rest of the drawing.
-  if (link.kind === "co_use") return withAlpha(tokens.brand, coUseGlow(link.strength).alpha);
+  if (link.kind === "co_use") return withAlpha(tokens.brand, coUseGlow(link.strength, link.n).alpha);
   return tokens.edge;
 }
 
 export function widthOfLink(link: Link, active: string | null): number {
   const touching = active !== null && (endId(link.source) === active || endId(link.target) === active);
   if (touching) return 1.6;
-  if (link.kind === "co_use") return coUseGlow(link.strength).width;
+  if (link.kind === "co_use") return coUseGlow(link.strength, link.n).width;
   return link.kind === "related" ? 0.7 : 0.6;
 }
 

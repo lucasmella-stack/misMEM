@@ -78,7 +78,7 @@ export interface GraphNode {
   salience?: number;
   strength?: number;
   /** Only with the connectome on: accumulated association and neighbours above the floor. */
-  co_use?: { degree: number; strength: number };
+  co_use?: { degree: number; strength: number; support: number };
 }
 
 export interface GraphLink {
@@ -99,7 +99,9 @@ export interface ConnectomeSummary {
   pairs: number;
   shown: number;
   min_n: number;
-  hubs: Array<{ id: string; degree: number; strength: number }>;
+  /** Best support among the edges drawn: with every pair at 1, no figure above means anything. */
+  max_n: number;
+  hubs: Array<{ id: string; degree: number; strength: number; support: number }>;
 }
 
 export interface GraphData {
