@@ -10,3 +10,12 @@ export function supportConfidence(n: number | undefined): number {
   if (n === undefined || n <= 1) return 0;
   return (n - 1) / n;
 }
+
+/**
+ * A minimum support usable as a floor: at least 1 and a whole number. The value reaches the
+ * engine from a query string, where `1e400` parses as Infinity and `abc` as NaN.
+ */
+export function integerFloor(n: number | undefined): number {
+  if (n === undefined || !Number.isFinite(n)) return 1;
+  return Math.max(1, Math.trunc(n));
+}

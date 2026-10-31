@@ -3,12 +3,13 @@
 // the one that had more rows than its cap, not the one that just filled it.
 import type { Database as DB } from "better-sqlite3";
 import { coUseLinks, parseIds, relatedLinks, type GraphLink } from "./relations.js";
-import { hubs, turnsRegistered, type Hub } from "../store/connectome.js";
+import { integerFloor } from "../domain/support.js";
+import { coUsePairs, hubs, turnsRegistered, type Hub } from "../store/connectome.js";
 import {
   excludeNoiseSql,
-  MEMORY_COLUMNS,
+  MEMORY_NODE_COLUMNS,
   type ConsolidatedEpisodeRow,
-  type MemoryRow,
+  type MemoryNodeRow,
   type TraitRow,
 } from "../store/rows.js";
 import { effectiveSalience } from "../memory/salience.js";
@@ -16,8 +17,10 @@ import { effectiveSalience } from "../memory/salience.js";
 const GRAPH_MAX_MEMORIES = 400;
 const GRAPH_MAX_TRAITS = 200;
 const GRAPH_MAX_EPISODES = 2000;
-const GRAPH_LABEL_CHARS = 120;
-const GRAPH_MAX_HUBS = 20;
+/** Trimmed again on the canvas to `CANVAS_LABEL_CHARS`: this has to stay the longer. */
+export const GRAPH_LABEL_CHARS = 120;
+/** Sent to the panel, which lists `PANEL_MAX_HUBS` of them: this has to stay the larger. */
+export const GRAPH_MAX_HUBS = 20;
 
 /** Caps per layer; the tests lower them so they do not seed hundreds of rows. */
 export interface GraphCaps {
@@ -68,7 +71,9 @@ const label = (text: string): string =>
 export function graphData(db: DB, query: GraphQuery): GraphBody {
   const { scope } = query;
   const at = query.at ?? Date.now();
-  const coUseMinN = Math.max(1, query.coUseMinN ?? 1);
+  // A floor arrives from the query string: `1e400` parses as Infinity, which SQLite matches
+  // against nothing and JSON serialises as null, leaving a hole where the panel prints it.
+  const coUseMinN = integerFloor(query.coUseMinN);
   const maxMemories = query.caps?.memories ?? GRAPH_MAX_MEMORIES;
   const maxTraits = query.caps?.traits ?? GRAPH_MAX_TRAITS;
   const maxEpisodes = query.caps?.episodes ?? GRAPH_MAX_EPISODES;
@@ -79,8 +84,8 @@ export function graphData(db: DB, query: GraphQuery): GraphBody {
   ).n;
   const memories = (
     db
-      .prepare(`SELECT ${MEMORY_COLUMNS} FROM memories m WHERE ${memoriesWhere}`)
-      .all({ scope }) as MemoryRow[]
+      .prepare(`SELECT ${MEMORY_NODE_COLUMNS} FROM memories m WHERE ${memoriesWhere}`)
+      .all({ scope }) as MemoryNodeRow[]
   )
     .map((row) => ({ row, salience: effectiveSalience(row, at) }))
     .sort((a, b) => b.salience - a.salience)
@@ -168,7 +173,7 @@ export function graphData(db: DB, query: GraphQuery): GraphBody {
     // construction, so the support travels beside every figure that depends on it.
     connectome: {
       turns: turnsRegistered(db),
-      pairs: coUseLinks(db, drawn, 1).length,
+      pairs: coUsePairs(db),
       shown: lateral.length,
       min_n: coUseMinN,
       max_n: lateral.reduce((top, link) => Math.max(top, link.n ?? 0), 0),

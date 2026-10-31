@@ -237,6 +237,7 @@ export const api = {
   graph: (
     scope: string | undefined,
     episodes: boolean,
+    related: boolean,
     coUse: { enabled: boolean; minN: number },
     signal?: AbortSignal,
   ) =>
@@ -244,7 +245,9 @@ export const api = {
       "graph",
       {
         scope,
-        related: "1",
+        // Conditioned like every other layer: similarity is O(n²) cosines over the drawn
+        // memories, and asking for it to throw it away on the client was the whole cost.
+        related: related ? "1" : undefined,
         episodes: episodes ? "1" : undefined,
         co_use: coUse.enabled ? "1" : undefined,
         co_use_min_n: coUse.enabled ? String(coUse.minN) : undefined,

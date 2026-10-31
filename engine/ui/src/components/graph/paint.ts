@@ -1,6 +1,6 @@
 import type { LinkObject, NodeObject } from "react-force-graph-2d";
 import type { GraphLink, GraphNode } from "../../api";
-import { coUseGlow, hubGlow } from "../../lib/graph";
+import { CANVAS_LABEL_CHARS, coUseGlow, hubGlow } from "../../lib/graph";
 import { tokensNow } from "../../lib/graph-tokens";
 
 export type Node = NodeObject<GraphNode>;
@@ -85,7 +85,9 @@ export function paintNode(node: Node, ctx: CanvasRenderingContext2D, scale: numb
   const focused = paint.active !== null && lit;
   if (scale > paint.textThreshold || focused) {
     const fontSize = 11 / scale;
-    const text = node.label.length > 48 ? `${node.label.slice(0, 47)}…` : node.label;
+    const text = node.label.length > CANVAS_LABEL_CHARS
+      ? `${node.label.slice(0, CANVAS_LABEL_CHARS - 1)}…`
+      : node.label;
     // On hover a neighbour's label reads regardless of the zoom.
     ctx.globalAlpha *= Math.min(1, scale - paint.textThreshold + (focused ? 1 : 0.4));
     ctx.font = `${fontSize}px "JetBrains Mono Variable", ui-monospace, monospace`;

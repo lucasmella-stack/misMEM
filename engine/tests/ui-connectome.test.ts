@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { GRAPH_MAX_HUBS } from "../src/queries/graph.js";
 import type { GraphData, GraphLink, GraphNode } from "../ui/src/api";
 import {
   coUseGlow,
+  PANEL_MAX_HUBS,
   supportConfidence,
   filterGraph,
   hubGlow,
@@ -39,6 +41,38 @@ const lateral = (source: string, target: string, strength: number, n = 3): Graph
   kind: "co_use",
   n,
   strength,
+});
+
+describe("el conectoma de un nodo se recalcula sobre lo que queda dibujado", () => {
+  it("un vecino no conserva la fuerza de aristas que ya no se dibujan", () => {
+    // The server measures over everything it sent; the canvas draws a subset. Keeping the
+    // server's figure makes a node wear the halo of a hub with a single edge on screen.
+    const centro: GraphNode = { ...node("centro"), co_use: { degree: 2, strength: 1.4, support: 9 } };
+    const queda: GraphNode = { ...node("queda"), co_use: { degree: 1, strength: 0.7, support: 9 } };
+    const sale: GraphNode = { ...node("sale"), co_use: { degree: 1, strength: 0.7, support: 4 } };
+
+    const out = filterGraph(
+      data([centro, queda, sale], [lateral("centro", "queda", 0.7, 9), lateral("centro", "sale", 0.7, 4)]),
+      filters({ query: "c" }),
+    );
+
+    // Only `centro` matches the query, so every lateral edge is gone with its neighbours.
+    expect(out.nodes.map((n) => n.id)).toEqual(["centro"]);
+    expect(out.nodes[0]?.co_use).toBeUndefined();
+  });
+
+  it("conserva el soporte y el grado de las aristas que sí sobreviven", () => {
+    const a: GraphNode = { ...node("a"), co_use: { degree: 2, strength: 1.4, support: 9 } };
+    const b: GraphNode = { ...node("b"), co_use: { degree: 1, strength: 0.7, support: 9 } };
+
+    const out = filterGraph(data([a, b], [lateral("a", "b", 0.7, 9)]), filters());
+
+    const propio = out.nodes.find((n) => n.id === "a")?.co_use;
+    expect(propio?.degree).toBe(1);
+    expect(propio?.support).toBe(9);
+    // Weighted by support, the same way the server accumulates it.
+    expect(propio?.strength).toBeCloseTo(0.7 * (8 / 9), 10);
+  });
 });
 
 describe("filtro de la capa lateral", () => {
@@ -157,5 +191,13 @@ describe("soporte de un par", () => {
   it("sin soporte cae al suelo del trazo, que es no decir nada", () => {
     // Drawn, but with the same ink as a pair nobody measured: absence of evidence is not a path.
     expect(coUseGlow(1, 1)).toEqual(coUseGlow(0, 99));
+  });
+});
+
+describe("topes de la lista de hubs", () => {
+  it("el servidor manda al menos los que el panel dibuja", () => {
+    // Two caps for one list: if the server's drops below the panel's, the list runs short and
+    // nothing says so.
+    expect(GRAPH_MAX_HUBS).toBeGreaterThanOrEqual(PANEL_MAX_HUBS);
   });
 });

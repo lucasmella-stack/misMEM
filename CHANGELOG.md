@@ -2,6 +2,33 @@
 
 ## Sin publicar
 
+### El panel del conectoma y el lienzo no miraban lo mismo
+
+- `Pares: X de Y` contaba **Y sólo entre las memorias dibujadas** mientras `Turnos medidos` era
+  global. Con 3.885 memorias y un tope de 400, el panel podía decir «0 de 0» habiendo pares
+  medidos, y aconsejar bajar el soporte cuando lo que los dejaba fuera era el tope. Ahora `pairs`
+  cuenta sobre toda la base, con un `COUNT` en el módulo que posee `co_use` en vez de materializar
+  cada arista para leerle el `.length`, y el texto distingue los tres casos.
+- `filterGraph` filtraba el conjunto de nodos pero **no recalculaba** su `co_use`: un vecino
+  conservaba la fuerza de aristas que ya no se dibujaban y llevaba halo de hub con una sola arista
+  en pantalla. Se reacumula sobre lo que queda, con la misma regla que el motor.
+- **Dos máximos para el mismo brillo**: el lienzo normalizaba sobre lo filtrado y el panel sobre lo
+  que mandó el servidor, así que el mismo nodo iba con halo lleno en el dibujo y punto apagado al
+  lado. Ahora se mide una vez y se pasa a los dos.
+- «Por dónde entrar» ofrecía nodos que la búsqueda o el grafo local habían dejado fuera; al pulsarlos
+  la cámara perseguía un nodo inexistente y se rendía en silencio. La lista se limita a lo dibujado.
+- Con las aristas por parecido **apagadas** se pedían igual: `relatedLinks` es O(n²) cosenos sobre
+  hasta 400 memorias, unos 160.000 por petición, para descartarlos en el cliente. Van condicionadas
+  como las demás capas.
+- Dos pares de topes sin relación declarada —20 hubs del servidor contra 10 del panel, 120 caracteres
+  de etiqueta contra 48 del lienzo— quedan nombrados y atados por un test.
+- El grafo pedía `details` y `source_episode_ids` de **todas** las memorias del ámbito para dibujar un
+  `gist` recortado a 120: el pico de memoria por petición crecía con el texto de la base. Lee sólo las
+  columnas que dibuja.
+- `co_use_min_n=1e400` llegaba como `Infinity` y salía en la respuesta como `null`, dejando un hueco
+  donde el panel imprime el soporte mínimo. Y `escapeHtml` no cubría la comilla simple: basta para el
+  cuerpo del tooltip de hoy, no para un atributo el día que alguien lo reutilice.
+
 ### El conectoma dejaba de avisar justo cuando más mentía
 
 - Medido en producción el 2026-10-31: 3.885 memorias, 37 pares en `co_use`, **todos con `n = 1`** y

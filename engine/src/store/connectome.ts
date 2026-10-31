@@ -2,7 +2,7 @@
 // The weight is NPMI, not a raw count: see `docs/architecture.md#el-índice-hebbiano`.
 // `origin` and `evidence` stay vertical: episode -> memory -> trait.
 import type { Database as DB } from "better-sqlite3";
-import { supportConfidence } from "../domain/support.js";
+import { integerFloor, supportConfidence } from "../domain/support.js";
 
 const TURNS_KEY = "connectome.turns";
 
@@ -114,7 +114,7 @@ interface RawEdge {
 }
 
 function rawEdges(db: DB, query: EdgeQuery): RawEdge[] {
-  const minN = Math.max(1, query.minN ?? 1);
+  const minN = integerFloor(query.minN);
   const scoped = query.ids !== undefined;
   return db
     .prepare(
@@ -133,6 +133,16 @@ function rawEdges(db: DB, query: EdgeQuery): RawEdge[] {
       minN,
       scoped: scoped ? 1 : 0,
     }) as RawEdge[];
+}
+
+/**
+ * How many pairs the whole base has measured above the floor. A count, not a list: the caller
+ * only shows it next to how many are drawn, and materialising every edge to read its length
+ * made the figure grow with the base instead of with the answer.
+ */
+export function coUsePairs(db: DB, minN = 1): number {
+  const floor = integerFloor(minN);
+  return (db.prepare("SELECT COUNT(*) AS n FROM co_use WHERE n >= ?").get(floor) as { n: number }).n;
 }
 
 /** Lateral edges, most associated first. */
