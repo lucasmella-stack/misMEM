@@ -6,6 +6,8 @@ import type { Database as DB } from "better-sqlite3";
 import type { ConsolidationJob } from "../consolidation/job.js";
 import { BodyTooLargeError, InvalidJsonError, isJsonContentType, readJsonBody } from "./body.js";
 import { checkBasicAuth, type BasicCredentials } from "./guard.js";
+import { handleLogin, type LoginAttempts } from "./login.js";
+import { SESSION_COOKIE, readCookie, verifySession } from "./session.js";
 import { hostAllowed } from "./host.js";
 import { json, jsonBare, jsonPlain, methodNotAllowed, notFound, payloadTooLarge, unauthorized } from "./respond.js";
 import { handleGraph, handleMemories, handleMemory, handleScopes, handleTrait, parseDetailPath } from "./viewer/api.js";
@@ -32,12 +34,19 @@ export interface HttpRoutesDeps {
   handleMcp: (req: IncomingMessage, res: ServerResponse, parsedBody: unknown) => Promise<void>;
   /** The compiled interface; it lives in the root because it reads dist/ui. */
   serveUi: (res: ServerResponse, pathname: string) => void;
+  /** Failed sign-ins, so the password cannot be tried over and over. */
+  attempts: LoginAttempts;
+  /** The sign-in page's stylesheet, served apart because the CSP forbids inline scripts. */
+  loginCss: string;
+  /** Images the sign-in page needs, by served path: it cannot reach anything under /viewer. */
+  loginAssets: ReadonlyMap<string, Buffer>;
 }
 
 export type RequestHandler = (req: IncomingMessage, res: ServerResponse) => Promise<void>;
 
 export function createRequestHandler(deps: HttpRoutesDeps): RequestHandler {
   const { db, auth, allowedHosts, maxBodyBytes, job, allowDelete, confirmations, handleMcp, serveUi } = deps;
+  const { attempts, loginCss, loginAssets } = deps;
 
   return async (req, res) => {
     try {
@@ -94,15 +103,30 @@ export function createRequestHandler(deps: HttpRoutesDeps): RequestHandler {
         return;
       }
 
-      // Viewer and its API, same BasicAuth as /mcp; writes also go through writeGuard.
+      // Sign-in, before the guard below: there would be no way in otherwise.
+      if (await handleLogin(req, res, url.pathname, { auth, attempts, css: loginCss, assets: loginAssets })) return;
+
+      // Viewer and its API. Basic still works, for a script or a client that already sends it;
+      // a person gets the form instead of the browser's dialog. /mcp above never sees the
+      // cookie: an MCP client cannot fill a form, and a session is not a key to the tools.
       if (
         url.pathname === "/viewer" ||
         url.pathname.startsWith("/viewer/") ||
         url.pathname === "/" ||
         url.pathname.startsWith("/api/")
       ) {
-        if (!checkBasicAuth(req.headers.authorization, auth)) {
-          unauthorized(res);
+        const signedIn =
+          checkBasicAuth(req.headers.authorization, auth) ||
+          verifySession(readCookie(req.headers.cookie, SESSION_COOKIE), auth);
+        if (!signedIn) {
+          // The API answers 401 so the other side reads a clean error instead of parsing HTML.
+          if (url.pathname.startsWith("/api/")) {
+            unauthorized(res);
+            return;
+          }
+          res.statusCode = 302;
+          res.setHeader("location", "/login");
+          res.end();
           return;
         }
         if (req.method === "POST" && url.pathname.startsWith("/api/")) {
