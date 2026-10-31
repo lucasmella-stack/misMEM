@@ -190,7 +190,7 @@ describe("embedTexts con un servidor compatible con OpenAI", () => {
 
   it.each([
     { label: "norma cero", vector: [0, 0] },
-    // 1e39 desborda Float32Array y llega como Infinity: JSON no puede llevar NaN.
+    // 1e39 overflows Float32Array into Infinity: JSON cannot carry NaN itself.
     { label: "un componente no finito", vector: [1e39, 1] },
     { label: "un componente null", vector: [1, null, 2] },
   ])("un vector con $label es null, pero no arrastra al resto del lote", async ({ vector }) => {

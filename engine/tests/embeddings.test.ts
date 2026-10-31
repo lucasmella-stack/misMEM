@@ -376,7 +376,7 @@ describe("recallHybrid", () => {
   it("una consulta con vector inválido degrada a léxico sin lanzar", async () => {
     makeMemory("vida", "cashflow apretado");
     await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
-    // Sólo el rescate léxico lo encuentra: es la prueba de que la capa semántica está apagada.
+    // Only the lexical rescue finds it: proof that the semantic layer is off.
     const rescatado = capture(db, { scope: "vida", body: "configurar servidor nginx" }).id;
     const poisonedQuery: EmbedFn = async () => [new Float32Array([Number.NaN, 0, 0])];
 

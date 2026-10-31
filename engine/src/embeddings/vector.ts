@@ -21,12 +21,9 @@ export function cosine(a: Float32Array, b: Float32Array): number {
 }
 
 /**
- * Copy of `vector` scaled to unit L2 norm, or null when that one vector cannot be trusted.
- *
- * One NaN component makes every cosine NaN, and `NaN >= minScore` is false: that memory
- * vanishes from semantic search for good while the backfill already counts it as embedded.
- * `Number.isFinite` catches a sparse hole, a JSON `null` and any non-numeric value before
- * it is copied, because `copy[i] = null` would silently store a zero.
+ * Copy of `vector` scaled to unit L2 norm, or null when it cannot be trusted. One NaN makes
+ * every cosine NaN and `NaN >= minScore` false, so the memory would vanish from semantic search
+ * while counted as embedded. `Number.isFinite` also rejects a hole or a JSON `null`.
  */
 export function unitVector(vector: ArrayLike<number>): Float32Array | null {
   const dims = vector.length;
@@ -50,14 +47,9 @@ export function unitVector(vector: ArrayLike<number>): Float32Array | null {
 }
 
 /**
- * Copies of `vectors` scaled to unit L2 norm, one entry per input, with `null` for each
- * vector that cannot be trusted. Returns null only when the batch shape itself is impossible.
- *
- * A bad vector only loses itself: rejecting the whole batch would make its good neighbours
- * pending forever, because the pending order is stable across runs and they would always
- * land in the same poisoned batch. The batch is null for an empty list, a vector without
- * dimensions, or valid vectors with different dimensions; callers treat that exactly like
- * an unreachable server.
+ * Unit copies of `vectors`, with `null` for each one that cannot be trusted, or null when the
+ * batch shape is impossible (empty, dimensionless or mixed dimensions). A bad vector only loses
+ * itself: the pending order is stable, so failing the batch would strand its good neighbours.
  */
 export function checkedUnitVectors(
   vectors: readonly (ArrayLike<number> | null | undefined)[],
