@@ -80,6 +80,21 @@
   conserva su copia y `tests/support.test.ts` falla si las dos dejan de coincidir.
 - De paso, `queries/graph.ts` deja de reimplementar el acumulador de `store/connectome.ts`: el halo
   del lienzo y la lista del panel responden ya a una sola definición de hub.
+### El logo oficial encabeza el README
+
+- `docs/assets/logo.webp` y `logo-dark.webp`, el mismo logo con el fondo blanco quitado y la tinta en
+  `#141311` o `#e8e4dc` según el tema; el rosa de marca no cambia. Un `<picture>` con
+  `prefers-color-scheme` elige cuál, así que se lee igual en claro y en oscuro.
+- Van encima del `<h1>`, que se conserva: el logo encabeza y el título sigue siendo texto, que es lo
+  que leen el índice de GitHub y quien no ve la imagen.
+
+### Capturas nuevas del visor en el README
+
+- Las dos capturas pasan a ser del grafo: la vista entera con los ajustes abiertos y el grafo local
+  alrededor de una memoria con su detalle al costado.
+- Sin la barra del navegador, que al 48 % de ancho tapaba lo que la captura muestra.
+- En `webp` en vez de `png`: **72 kB y 115 kB** frente a los 127 kB y 160 kB de las anteriores, con el
+  texto igual de nítido.
 
 ### Los tests de uso de los CLI dejan de depender de la carga de la máquina (#213)
 
