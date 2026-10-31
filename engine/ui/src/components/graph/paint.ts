@@ -19,10 +19,30 @@ const endId = (end: End): string | undefined => {
  * so the circle and the force field cannot disagree.
  */
 export const nodeWeight = (node: Node): number =>
-  node.layer === "trait" ? 5 : 1 + 2.5 * (node.salience ?? 0.5);
+  node.layer === "trait"
+    ? TRAIT_WEIGHT
+    : MEMORY_MIN_WEIGHT + MEMORY_WEIGHT_RANGE * (node.salience ?? UNKNOWN_SALIENCE);
 
-/** The radius grows with salience and the chosen size; traits have their own base. */
-const radiusOf = (node: Node, size: number): number => Math.sqrt(nodeWeight(node) * size) * 2.2;
+/**
+ * A trait outweighs every memory because it is the layer that organizes them, and a memory of
+ * unknown salience sits mid-scale rather than vanishing. Weight becomes pixels through a square
+ * root so a node four times as salient reads twice as wide, not four times.
+ */
+const TRAIT_WEIGHT = 5;
+const MEMORY_MIN_WEIGHT = 1;
+const MEMORY_WEIGHT_RANGE = 2.5;
+const UNKNOWN_SALIENCE = 0.5;
+const WEIGHT_TO_PIXELS = 2.2;
+
+/** Outside the lit set the graph keeps a trace of context instead of going black. */
+const DIMMED_ALPHA = 0.15;
+
+/** The halo grows from just outside the circle and never swallows its neighbours. */
+const HALO_MIN_SCALE = 1.8;
+const HALO_GROWTH = 1.4;
+const HALO_MAX_ALPHA = 0.5;
+
+const radiusOf = (node: Node, size: number): number => Math.sqrt(nodeWeight(node) * size) * WEIGHT_TO_PIXELS;
 
 export function colorOfNode(node: Node, palette: Map<string, string>, colorByScope: boolean): string {
   if (node.layer === "trait") return tokensNow().brand;
@@ -53,17 +73,17 @@ export function paintNode(node: Node, ctx: CanvasRenderingContext2D, scale: numb
   const radius = radiusOf(node, paint.nodeSize);
 
   // Outside the active node and its neighbours the graph dims: focus reads at a glance.
-  ctx.globalAlpha = lit ? 1 : 0.15;
+  ctx.globalAlpha = lit ? 1 : DIMMED_ALPHA;
 
   // The halo is the whole point of the connectome view: a node that orients others glows,
   // and it is drawn under the circle so it never hides the colour of its scope.
   const glow = hubGlow(node.co_use?.strength, paint.maxHubStrength, node.co_use?.support);
   if (glow > 0 && lit) {
-    const halo = radius * (1.8 + 1.4 * glow);
+    const halo = radius * (HALO_MIN_SCALE + HALO_GROWTH * glow);
     const gradient = ctx.createRadialGradient(node.x, node.y, radius, node.x, node.y, halo);
     gradient.addColorStop(0, tokens.brand);
     gradient.addColorStop(1, "transparent");
-    ctx.globalAlpha = 0.5 * glow;
+    ctx.globalAlpha = HALO_MAX_ALPHA * glow;
     ctx.beginPath();
     ctx.arc(node.x, node.y, halo, 0, 2 * Math.PI);
     ctx.fillStyle = gradient;

@@ -35,6 +35,15 @@ export const PANEL_MAX_HUBS = 10;
 export const CANVAS_LABEL_CHARS = 48;
 
 /**
+ * The floor is what an unmeasured pair gets: drawn, because the pair exists, but saying nothing.
+ * The ceiling is what the strongest measured association earns, and it has to beat the fixed
+ * width of a `related` edge (0.7) so a measured path reads over a similar one.
+ */
+const EDGE_MIN_ALPHA = 0.2;
+const EDGE_MIN_WIDTH = 0.7;
+const EDGE_MAX_WIDTH = 3;
+
+/**
  * How much of a pair's co-occurrence was repetition, in [0, 1). NPMI reads 1 both for "always
  * together" and for "once, and that was the only turn either appeared in", so strength alone
  * cannot tell evidence from coincidence. One sighting repeats nothing and is worth nothing.
@@ -54,7 +63,10 @@ export function coUseGlow(
   n?: number,
 ): { alpha: number; width: number } {
   const lit = Math.min(1, Math.max(0, strength ?? 0)) * supportConfidence(n);
-  return { alpha: 0.2 + 0.8 * lit, width: 0.7 + 2.3 * lit };
+  return {
+    alpha: EDGE_MIN_ALPHA + (1 - EDGE_MIN_ALPHA) * lit,
+    width: EDGE_MIN_WIDTH + (EDGE_MAX_WIDTH - EDGE_MIN_WIDTH) * lit,
+  };
 }
 
 /**

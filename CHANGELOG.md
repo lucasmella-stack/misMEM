@@ -2,6 +2,14 @@
 
 ## Sin publicar
 
+### La calibración del dibujo deja de estar en números sueltos
+
+- `graphData` hacía cinco cosas en 112 líneas; la capa lateral sale a su propia función por el corte
+  que ya marcaba su retorno temprano, y baja a 84.
+- Los números que deciden cómo se ve el grafo —el peso de un rasgo frente al de una memoria, cuánto
+  crece el halo, el suelo y el techo del trazo lateral, cuánto se apaga lo que no está iluminado—
+  pasan a constantes con nombre y con el porqué de **ese** valor, no de que exista el umbral.
+
 ### La forma del grafo estaba escrita tres veces y nada ataba las copias
 
 - `GraphNode`, `GraphLink` y el resumen se declaran en el motor, **a mano otra vez** en la interfaz

@@ -150,32 +150,40 @@ export function graphData(db: DB, query: GraphQuery): GraphBody {
   if (query.withRelated) links.push(...relatedLinks(db, [...memoryIds]));
 
   if (!query.withCoUse) return { nodes, links, truncated };
+  return withLateralLayer(db, { nodes, links, truncated }, [...memoryIds], coUseMinN);
+}
 
-  const drawn = [...memoryIds];
-  const lateral = coUseLinks(db, drawn, coUseMinN);
-  links.push(...lateral);
-
-  // One accumulator for the whole lateral layer, in the module that owns it: the halo on the
-  // canvas and the list in the panel have to answer to the same definition of a hub.
-  const ranked = hubs(db, { ids: drawn, minN: coUseMinN });
+/**
+ * Adds the measured co-use layer and the sample behind it. Nothing here may present noise as
+ * topology: a pair seen once scores maximum strength by construction, so the support travels
+ * beside every figure that depends on it.
+ */
+function withLateralLayer(
+  db: DB,
+  body: GraphBody,
+  drawn: readonly string[],
+  minN: number,
+): GraphBody {
+  const lateral = coUseLinks(db, drawn, minN);
+  // One accumulator for the whole layer, in the module that owns it: the halo on the canvas and
+  // the list in the panel have to answer to the same definition of a hub.
+  const ranked = hubs(db, { ids: drawn, minN });
   const byId = new Map(ranked.map((hub) => [hub.id, hub]));
 
   return {
-    nodes: nodes.map((node) => {
+    nodes: body.nodes.map((node) => {
       const own = byId.get(node.id);
       return own
         ? { ...node, co_use: { degree: own.degree, strength: own.strength, support: own.support } }
         : node;
     }),
-    links,
-    truncated,
-    // Nothing here may present noise as topology: a pair seen once scores maximum strength by
-    // construction, so the support travels beside every figure that depends on it.
+    links: [...body.links, ...lateral],
+    truncated: body.truncated,
     connectome: {
       turns: turnsRegistered(db),
       pairs: coUsePairs(db),
       shown: lateral.length,
-      min_n: coUseMinN,
+      min_n: minN,
       max_n: lateral.reduce((top, link) => Math.max(top, link.n ?? 0), 0),
       hubs: ranked.slice(0, GRAPH_MAX_HUBS),
     },
