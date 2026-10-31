@@ -2,6 +2,12 @@
 
 ## Sin publicar
 
+### `recall` por MCP le da al modelo la fecha, los detalles y la polaridad (#153)
+
+- Cada resultado trae `date` legible en UTC, los `details` de una memoria, la `polarity` de un rasgo cuando
+  no es neutra y `truncated` si un texto se recortó (2.000 caracteres de `text`, 1.200 de `details`). Las
+  respuestas MCP van sin indentación. Los alias `mem_*`, el visor y su API no cambian.
+
 ### Los tests de uso de los CLI dejan de depender de la carga de la máquina (#213)
 
 - `cli-usage-exit.test.ts` lanzaba el CLI con `npx tsx`: resolver el binario costaba más que la
