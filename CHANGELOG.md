@@ -2,6 +2,29 @@
 
 ## Sin publicar
 
+### La forma del grafo estaba escrita tres veces y nada ataba las copias
+
+- `GraphNode`, `GraphLink` y el resumen se declaran en el motor, **a mano otra vez** en la interfaz
+  (que no puede importar de `src/`) y una tercera en los tests. Justo `label`, `scope` y `salience`
+  —los tres que la pantalla dibuja— no los miraba ningún test. Comprobado: renombrar `label` en todo
+  el motor dejaba `tsc` del motor **en cero errores** y la suite en verde, con el visor roto.
+- `tests/graph-contract.test.ts` asigna lo que devuelve el motor al tipo que declara la interfaz, así
+  que la divergencia falla en `pnpm typecheck` antes de que nadie abra el visor, y comprueba que esos
+  tres campos viajen poblados.
+- `paint.ts` tenía cinco funciones exportadas y **cero tests**, y `scopePalette` ninguno: su rama de
+  más ámbitos que colores nunca se había ejecutado. Cubiertas las puras; el componente del panel sigue
+  sin poder probarse porque el proyecto no tiene renderizador.
+
+### Documentación que el código dejó mintiendo
+
+- `docs/architecture.md` enmarcaba la degeneración como problema de pocos datos. Es del estimador: con
+  `n = useA = useB` el NPMI da 1 con 20 turnos y con 10.000. Ahora lo dice, y documenta `max_n`, la
+  ponderación por soporte, la diferencia entre `pairs` y `shown`, los parámetros `?scope=` y
+  `?episodes=1`, y el bloque `truncated`.
+- El `0` del NPMI está sobrecargado —"azar" y "no sé"— y los documentos se leían al revés entre sí.
+- `AGENTS.md` no listaba la tabla `meta`, de la que depende el denominador del conectoma, y describía
+  de menos a `connectome.ts` y a `relations.ts`.
+
 ### El panel del conectoma y el lienzo no miraban lo mismo
 
 - `Pares: X de Y` contaba **Y sólo entre las memorias dibujadas** mientras `Turnos medidos` era

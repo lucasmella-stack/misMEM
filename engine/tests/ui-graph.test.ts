@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GraphData, GraphLink, GraphNode } from "../ui/src/api";
-import { escapeHtml, filterGraph, neighborsOf, type GraphFilters } from "../ui/src/lib/graph";
+import { escapeHtml, filterGraph, neighborsOf, scopePalette, type GraphFilters } from "../ui/src/lib/graph";
 import { CANVAS_LABEL_CHARS } from "../ui/src/lib/graph";
 import { GRAPH_LABEL_CHARS } from "../src/queries/graph.js";
 
@@ -125,5 +125,27 @@ describe("topes de la etiqueta", () => {
     // Two cuts for one label: if the server's drops below the canvas's, the canvas cut stops
     // running and nothing says so.
     expect(GRAPH_LABEL_CHARS).toBeGreaterThanOrEqual(CANVAS_LABEL_CHARS);
+  });
+});
+
+describe("paleta por ámbito", () => {
+  it("reparte los colores por cantidad de nodos", () => {
+    const paleta = scopePalette(["a", "a", "a", "b", "b", "c"]);
+
+    expect(paleta.get("a")).toBeTruthy();
+    expect(paleta.get("b")).toBeTruthy();
+    expect(paleta.get("a")).not.toBe(paleta.get("b"));
+  });
+
+  it("con más ámbitos que colores los últimos se quedan sin color, no con uno repetido", () => {
+    // Thirteen scopes against twelve tones: the branch that leaves one out had never run.
+    const ambitos = Array.from({ length: 13 }, (_, i) => `s${i}`).flatMap((s, i) =>
+      Array.from({ length: 13 - i }, () => s),
+    );
+    const paleta = scopePalette(ambitos);
+
+    expect(paleta.size).toBe(12);
+    expect(paleta.get("s12")).toBeUndefined();
+    expect(new Set(paleta.values()).size).toBe(12);
   });
 });
