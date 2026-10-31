@@ -223,6 +223,8 @@
   interfaz compilada, `/viewer` responde 503 sólo a quien instala desde npm, porque en el
   repositorio siempre está construida al lado.
 
+## 0.6.0 — 2026-10-29
+
 ### El olvido respeta `before_days` también al borrar memorias
 
 - `forget` borraba los episodios de una memoria de saliencia baja aunque alguno fuera más nuevo que `before_days`. Con los defaults de `mismem-forget` (90 y 30 días), un episodio de 40 días atado a una memoria olvidable se borraba antes de los 90 que promete `before_days`. Ahora la memoria sólo es olvidable cuando todos sus episodios ya superaron `before_days`; mientras quede uno más nuevo, la memoria y sus episodios esperan. Las memorias sin episodios o con todos viejos se borran igual que antes, y sus episodios con ellas para que `ON DELETE SET NULL` no los devuelva a pendientes.
