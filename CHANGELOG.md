@@ -2,6 +2,26 @@
 
 ## Sin publicar
 
+### El visor tiene su propia pantalla de entrada
+
+- Hasta ahora el visor pedía la contraseña con el diálogo del navegador. Ahora `GET /viewer` sin
+  sesión lleva a `/login`, una pantalla con el logo y los tokens del visor. **La API sigue
+  respondiendo 401**: un script tiene que leer un error, no una página.
+- **`/mcp` no acepta la cookie.** Un cliente MCP manda `Basic` y no puede rellenar un formulario;
+  una sesión del visor no es una llave de las herramientas. El `Basic` también sigue valiendo en el
+  visor, para quien ya lo tenga puesto.
+- La cookie va firmada con HMAC, `HttpOnly`, `SameSite=Strict` y `Secure` cuando la petición llega
+  por TLS —en claro no, o el navegador la tiraría sin decir nada—. La clave se **deriva** de
+  `MISMEM_AUTH_*` y no se guarda: cambiar la contraseña cierra todas las sesiones vivas, que es lo
+  que tiene que pasar cuando se cambia porque se filtró.
+- Tope de intentos fallidos por ventana: pasado el tope deja de comparar la contraseña y responde
+  429, antes incluso de leer el cuerpo.
+- **El formulario no usa JavaScript**: la CSP del visor prohíbe los scripts en línea, y un
+  formulario que no depende de JS no se puede romper. La página lleva su propia CSP, más estrecha
+  que la del visor salvo por el `form-action 'self'` que necesita para poder enviarse.
+- Dos variables nuevas en [`DEPLOY.md`](DEPLOY.md): `MISMEM_SESSION_HOURS` y
+  `MISMEM_LOGIN_MAX_BODY_BYTES`.
+
 ### La calibración del dibujo deja de estar en números sueltos
 
 - `graphData` hacía cinco cosas en 112 líneas; la capa lateral sale a su propia función por el corte
