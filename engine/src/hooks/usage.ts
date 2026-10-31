@@ -16,11 +16,12 @@ export interface UsageOptions {
   minShared?: number;
 }
 
-// Calibrated on 573 memories returned in real turns: the median overlap is 0.07 and the 90th
-// percentile 0.25. These thresholds count 9% as used, about one per recall call; 0.30/4 drops
-// it to 4%.
+// Calibrated against a null model, the same reply scored against other turns' memories: over
+// 898 memories in eight days, 0.20 passes 3.0x what chance does, and lowering the fraction only
+// trades that ratio away, because the floor of shared words is the binding one. The sweep and
+// its numbers live in docs/hooks.md.
 const DEFAULT_MIN_OVERLAP = 0.2;
-const DEFAULT_MIN_SHARED = 3;
+const DEFAULT_MIN_SHARED = 2;
 
 interface Block {
   type?: string;
