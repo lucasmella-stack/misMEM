@@ -9,12 +9,10 @@ import { parseHostList } from "./http/host.js";
 import { loadMaxBodyBytes } from "./http/body.js";
 import { bindHost, httpPort, loadAuth } from "./http/guard.js";
 import { LoginAttempts } from "./http/login.js";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { LOGIN_CSS } from "./http/login-css.js";
 import { createRequestHandler } from "./http/routes.js";
 import { createServer } from "./server-core.js";
-import { serveUi } from "./viewer-static.js";
+import { loginAssets, serveUi } from "./viewer-static.js";
 import { ForgetConfirmations, loadAllowDelete } from "./http/viewer/actions.js";
 import { ConsolidationJob } from "./consolidation/job.js";
 
@@ -82,21 +80,3 @@ const shutdown = (): void => {
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
 
-/**
- * The sign-in page's logo, read once at start from the built interface. Missing it only costs
- * the image: the form still works on a package built without `dist/ui`.
- */
-function loginAssets(): Map<string, Buffer> {
-  const assets = new Map<string, Buffer>();
-  for (const [served, file] of [
-    ["/login-logo.webp", "logo.webp"],
-    ["/login-logo-dark.webp", "logo-dark.webp"],
-  ] as const) {
-    try {
-      assets.set(served, readFileSync(join("dist", "ui", file)));
-    } catch {
-      // Built without the interface: the page renders without its logo rather than failing.
-    }
-  }
-  return assets;
-}

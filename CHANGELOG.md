@@ -2,6 +2,17 @@
 
 ## Sin publicar
 
+### La pantalla de entrada perdía su logo al instalar desde npm
+
+- El logo se leía de `"dist/ui"`, una ruta **relativa al directorio de trabajo**. Dentro del repo
+  resolvía porque el servidor arranca desde `engine/`; instalado desde npm y arrancado desde
+  cualquier otra carpeta, daba 404 y la pantalla quedaba sin imagen.
+- Pasa a resolverse contra el propio módulo, como ya hacía `serveUi` para el resto de la interfaz,
+  y el único dueño de dónde vive `dist/ui` vuelve a ser `viewer-static.ts`.
+- Encontrado empaquetando con `pnpm pack` e instalando en un directorio limpio, que es lo que hace
+  cualquiera: dentro del repo el fallo era invisible.
+
+
 ### Salir del visor desde la propia interfaz
 
 - Un botón de icono al lado de *Consolidar ahora*, para poder cerrar la sesión sin borrar cookies a mano
