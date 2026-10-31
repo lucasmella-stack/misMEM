@@ -2,6 +2,17 @@
 
 ## Sin publicar
 
+### Los tests de uso de los CLI dejan de depender de la carga de la máquina (#213)
+
+- `cli-usage-exit.test.ts` lanzaba el CLI con `npx tsx`: resolver el binario costaba más que la
+  corrida, **1,6 s de 1,6 s**. El caso que lanza dos procesos se iba a 6 s con la máquina cargada y
+  se pasaba del límite de 5 s de vitest, tumbando un `pnpm publish` entero desde `prepublishOnly`.
+- Pasa a lanzar por `process.execPath` con `--import tsx`, como ya hacía `obsidian-cli.test.ts`:
+  **de 6,0 s a 1,3 s** el caso que fallaba, y de 2,8 s a 0,7 s el otro. Además cada caso recibe el
+  mismo presupuesto que ya le concedía a su subproceso, 60 s, en vez de los 5 s por defecto: el
+  test se daba a sí mismo doce veces menos tiempo del que le daba al proceso que lanzaba.
+
+
 ## 0.7.0 — 2026-10-31
 
 ### La exportación a Obsidian no escribe fuera de `<bóveda>/misMEM/` (#206)
