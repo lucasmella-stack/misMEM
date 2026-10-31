@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { ServerResponse } from "node:http";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
-import { capture, consolidate, crystallize, reinforce } from "../src/tools.js";
+import { openDb } from "../src/store/db.js";
+import { capture } from "../src/memory/capture.js";
+import { consolidate } from "../src/memory/consolidate.js";
+import { crystallize } from "../src/memory/crystallize.js";
+import { reinforce } from "../src/memory/reinforce.js";
 import { saveMemoryEmbedding } from "../src/embeddings/store.js";
 import {
   handleGraph,
@@ -11,8 +14,8 @@ import {
   handleScopes,
   handleTrait,
   parseDetailPath,
-} from "../src/viewer-api.js";
-import { relatedLinks } from "../src/relations.js";
+} from "../src/http/viewer/api.js";
+import { relatedLinks } from "../src/queries/relations.js";
 
 const DAY = 86_400_000;
 let db: DB;
@@ -219,7 +222,7 @@ describe("viewer-api: /api/graph", () => {
     const { memoryId } = memoryFrom("a", "una", ["e1", "e2"]);
     crystallize(db, { scope: "a", name: "r1", evidence_memory_ids: [memoryId] });
 
-    // Exactamente el tope de cada capa no es un recorte.
+    // Exactly the cap of each layer is not a truncation.
     const exact = call((res) =>
       handleGraph(db, res, url("/api/graph?episodes=1"), Date.now(), { memories: 1, traits: 1, episodes: 2 }),
     ).body;
@@ -237,7 +240,7 @@ describe("viewer-api: /api/graph", () => {
     ).body;
     expect(traitsOver.truncated).toEqual({ memories: false, traits: true, episodes: false });
 
-    // Tres episodios para dos de tope; sin episodes=1 la capa ni se pide ni se marca.
+    // Three episodes for a cap of two; without episodes=1 the layer is neither requested nor marked.
     const episodesOver = call((res) =>
       handleGraph(db, res, url("/api/graph?episodes=1"), Date.now(), { episodes: 2 }),
     ).body;
@@ -270,8 +273,8 @@ describe("viewer-api: aristas por parecido", () => {
   });
 
   it("cada memoria aporta como mucho perNode vecinas", () => {
-    // a-b 0,99, a-c 0,97, b-c 0,995: con una vecina por memoria, a elige b, b y c se eligen
-    // entre sí, y a-c (que nadie eligió primero) queda fuera.
+    // a-b 0.99, a-c 0.97, b-c 0.995: with one neighbour per memory, a picks b, b and c pick
+    // each other, and a-c (which nobody picked first) is left out.
     const a = withVector("a", vec(1, 0));
     const b = withVector("b", vec(0.99, 0.141));
     const c = withVector("c", vec(0.97, 0.243));
@@ -314,7 +317,7 @@ describe("viewer-api: aristas por co-uso", () => {
   }
 
   it("sin co_use=1 no aparece nada: ni aristas, ni grado, ni resumen", () => {
-    // Es el contrato que ya consume la interfaz: no puede cambiar por agregar esto.
+    // This is the contract the UI already consumes: adding this must not change it.
     tresUsadas();
 
     const body = call((res) => handleGraph(db, res, url("/api/graph"))).body;
@@ -386,8 +389,8 @@ describe("viewer-api: aristas por co-uso", () => {
   });
 
   it("el resumen propone por dónde entrar, ordenado por asociación y no por vecinos", () => {
-    // El que más vecinos tiene es el que se usa en todos los turnos: no orienta a
-    // ninguno. Si los costados lo ponen primero, el panel miente.
+    // The one with the most neighbours is the one used in every turn: it points nowhere.
+    // If the side panels put it first, the panel lies.
     const siempre = memoryFrom("a", "hablamos en español y sin rodeos", ["e1"]).memoryId;
     const v1 = memoryFrom("a", "el deploy usa docker compose", ["e2"]).memoryId;
     const v2 = memoryFrom("a", "el backup corre a las tres", ["e3"]).memoryId;
@@ -410,7 +413,7 @@ describe("viewer-api: aristas por co-uso", () => {
   });
 
   it("el resumen dice de qué tamaño es la muestra, para no mentir en los costados", () => {
-    // Con pocos turnos la fuerza es ruido: el panel tiene que poder decirlo.
+    // With few turns strength is noise: the panel must be able to say so.
     tresUsadas();
 
     const body = call((res) => handleGraph(db, res, url("/api/graph?co_use=1&co_use_min_n=2"))).body;

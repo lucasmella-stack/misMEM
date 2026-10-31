@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatInjection } from "../src/inject.js";
+import { formatInjection } from "../src/hooks/inject.js";
 import {
   assistantReply,
   injectedMemories,
@@ -7,7 +7,7 @@ import {
   overlap,
   recalledMemories,
   usedMemoryIds,
-} from "../src/usage.js";
+} from "../src/hooks/usage.js";
 
 const user = (text: string) => ({ type: "user", message: { content: [{ type: "text", text }] } });
 const assistant = (text: string) => ({
@@ -80,7 +80,7 @@ describe("usedMemoryIds", () => {
 });
 
 describe("injectedMemories", () => {
-  // Claude Code guarda el additionalContext de un hook así, no como tool_result.
+  // Claude Code stores a hook's additionalContext this way, not as tool_result.
   const adjunto = (texto: unknown, tipo = "hook_additional_context") => ({
     type: "attachment",
     attachment: { type: tipo, content: texto },

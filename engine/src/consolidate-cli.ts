@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { defaultDbPath, openDefaultDb } from "./db.js";
+import { defaultDbPath, openDefaultDb } from "./store/db.js";
 import { runConsolidation } from "./consolidation/run.js";
 import { ArgsError, EXIT_USAGE } from "./cli-args.js";
 import { parseConsolidateArgs } from "./consolidate-args.js";

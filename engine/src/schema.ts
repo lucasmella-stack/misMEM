@@ -12,7 +12,7 @@ export const RecallInput = z.object({
   query: z.string().min(1),
   scope: Scope.optional(),
   limit: z.number().int().positive().max(50).default(10),
-  /** Una búsqueda que el usuario no pidió (un hook que inyecta) no es uso: no refuerza. */
+  /** A search the user did not ask for (a hook injecting) is not use: it does not reinforce. */
   reinforce: z.boolean().optional(),
 });
 export type RecallInput = z.infer<typeof RecallInput>;
@@ -42,7 +42,7 @@ export const ForgetInput = z.object({
 });
 export type ForgetInput = z.infer<typeof ForgetInput>;
 
-/** Los recuerdos que de verdad se usaron en una respuesta, no los que el recall devolvió. */
+/** The memories an answer actually used, not the ones recall returned. */
 export const ReinforceInput = z.object({
   memory_ids: z.array(z.string().min(1)).min(1).max(50),
   boost: z.number().min(0).max(1).optional(),
@@ -59,6 +59,6 @@ export interface RecallHit {
   text: string;
   salience?: number;
   created_at: number;
-  /** Presente cuando el hit vino de la búsqueda semántica y no del FTS5. */
+  /** Present when the hit came from semantic search rather than FTS5. */
   via?: "semantic";
 }

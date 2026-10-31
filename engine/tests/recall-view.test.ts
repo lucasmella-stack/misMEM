@@ -6,7 +6,7 @@ import {
   MAX_TEXT_CHARS,
   recallForModel,
   type RecallHitView,
-} from "../src/recall-view.js";
+} from "../src/queries/recall-view.js";
 import type { RecallHit } from "../src/schema.js";
 
 // Fixed clock near midnight UTC: a local-time formatter would report the next day in

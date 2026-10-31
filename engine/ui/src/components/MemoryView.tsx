@@ -1,12 +1,15 @@
-// Owns the memory view of the detail panel: its edit form and the unconsolidate and forget confirmations.
-import { useEffect, useState, type FormEvent } from "react";
+// Owns the memory view of the detail panel: the record and its wiring. The edit form, the two-step
+// confirmation and their copy live in their own modules.
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { actions, api, isMissing, type ForgetChallenge, type MemoryDetail } from "../api";
+import { useMemoryActions } from "@/hooks/use-memory-actions";
+import { actions, api, isMissing, type MemoryDetail } from "../api";
 import { ago, exact, percent } from "../format";
 import { errorMessage } from "../lib/errors";
 import { inkPercent } from "../lib/ink";
+import { forgetText, unconsolidateText } from "../lib/memory-text";
 import {
   ConfirmDialog,
   DetailFailure,
@@ -16,20 +19,22 @@ import {
   truncate,
   type DetailViewProps,
 } from "./DetailParts";
+import { EditForm } from "./memory/EditForm";
 
 export function MemoryView({ id, onSelect, onChanged, onAnnounce }: DetailViewProps) {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["memory", id], queryFn: ({ signal }) => api.memory(id, signal) });
   const [editing, setEditing] = useState(false);
-  const [confirm, setConfirm] = useState<"unconsolidate" | "forget" | null>(null);
-  const [challenge, setChallenge] = useState<ForgetChallenge>();
-  const [busy, setBusy] = useState(false);
-  const [actionError, setActionError] = useState<string>();
 
   const data = query.data;
   useEffect(() => {
     if (data) onAnnounce(`Memoria abierta: ${truncate(data.memory.text, 120)}`);
   }, [data, onAnnounce]);
+
+  const { confirm, challenge, busy, actionError, openUnconsolidate, askForget, runAction, dismiss } = useMemoryActions(
+    data?.memory.id,
+    onChanged,
+  );
 
   if (!data) {
     return query.isError ? <DetailFailure what="la memoria" error={query.error} /> : <DetailLoading label="Cargando la memoria…" />;
@@ -39,63 +44,13 @@ export function MemoryView({ id, onSelect, onChanged, onAnnounce }: DetailViewPr
 
   const save = async (gist: string, details: string | null) => {
     await actions.editMemory(memory.id, gist, details);
-    // D6: el detalle pinta el texto nuevo antes de que termine la recarga.
+    // D6: the detail renders the new text before the refetch finishes.
     queryClient.setQueryData<MemoryDetail>(["memory", memory.id], (previous) =>
       previous ? { ...previous, memory: { ...previous.memory, text: gist, details } } : previous,
     );
     setEditing(false);
     toast.success("Memoria corregida.");
     void queryClient.invalidateQueries();
-  };
-
-  // Olvidar va en dos pasos (viewer-actions.ts): el servidor dice qué se pierde y da el token
-  // que confirma; sin él no borra. El diálogo enseña ese impacto, no uno calculado aquí.
-  const askForget = async () => {
-    setConfirm("forget");
-    setChallenge(undefined);
-    setActionError(undefined);
-    try {
-      setChallenge(await actions.forgetMemoryChallenge(memory.id));
-    } catch (err) {
-      setActionError(errorMessage(err));
-    }
-  };
-
-  const runAction = async (kind: "unconsolidate" | "forget") => {
-    setBusy(true);
-    setActionError(undefined);
-    try {
-      if (kind === "unconsolidate") {
-        const out = await actions.unconsolidate(memory.id);
-        setConfirm(null);
-        toast.success(
-          out.episodes_released === 1
-            ? "Consolidación deshecha: el episodio vuelve a estar pendiente."
-            : `Consolidación deshecha: ${out.episodes_released} episodios vuelven a estar pendientes.`,
-        );
-      } else {
-        if (!challenge) return;
-        const out = await actions.forgetMemory(memory.id, challenge.confirm_token);
-        setConfirm(null);
-        toast.success(
-          out.episodes_deleted === 1
-            ? "Memoria olvidada con su episodio."
-            : `Memoria olvidada con ${out.episodes_deleted} episodios.`,
-        );
-      }
-      onChanged(null);
-    } catch (err) {
-      const message = errorMessage(err);
-      setActionError(message);
-      toast.error(`No se pudo: ${message}`);
-      // El token se gastó en el intento: sin uno nuevo, el siguiente clic tampoco borraría.
-      if (kind === "forget") {
-        setChallenge(undefined);
-        actions.forgetMemoryChallenge(memory.id).then(setChallenge, () => undefined);
-      }
-    } finally {
-      setBusy(false);
-    }
   };
 
   return (
@@ -164,7 +119,7 @@ export function MemoryView({ id, onSelect, onChanged, onAnnounce }: DetailViewPr
           <Button type="button" variant="outline" size="sm" onClick={() => setEditing(true)}>
             Corregir
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => setConfirm("unconsolidate")}>
+          <Button type="button" variant="outline" size="sm" onClick={openUnconsolidate}>
             Deshacer consolidación
           </Button>
           <Button type="button" variant="outline" size="sm" className="text-danger" onClick={() => void askForget()}>
@@ -236,100 +191,9 @@ export function MemoryView({ id, onSelect, onChanged, onAnnounce }: DetailViewPr
         busy={busy}
         blocked={confirm === "forget" && !challenge}
         error={actionError}
-        onDismiss={() => {
-          setConfirm(null);
-          setChallenge(undefined);
-          setActionError(undefined);
-        }}
+        onDismiss={dismiss}
         onConfirm={() => void runAction(confirm ?? "forget")}
       />
     </>
-  );
-}
-
-function unconsolidateText(linked: number): string {
-  return linked === 0
-    ? "La memoria desaparece; no tenía episodios atados."
-    : `La memoria desaparece y ${linked === 1 ? "su episodio vuelve" : `sus ${linked} episodios vuelven`} a estar sin consolidar. La próxima consolidación ${linked === 1 ? "lo" : "los"} leerá de nuevo.`;
-}
-
-function forgetText(linked: number, traits: number): string {
-  const base =
-    linked === 0
-      ? "Se borra la memoria."
-      : `Se borran la memoria y ${linked === 1 ? "su episodio" : `sus ${linked} episodios`}.`;
-  const citing =
-    traits === 0
-      ? ""
-      : traits === 1
-        ? " Un rasgo la cita y seguirá existiendo sin ella."
-        : ` ${traits} rasgos la citan y seguirán existiendo sin ella.`;
-  return `${base} No se puede deshacer.${citing}`;
-}
-
-function EditForm({
-  gist,
-  details,
-  onSave,
-  onCancel,
-}: {
-  gist: string;
-  details: string | null;
-  onSave: (gist: string, details: string | null) => Promise<void>;
-  onCancel: () => void;
-}) {
-  const [draftGist, setDraftGist] = useState(gist);
-  const [draftDetails, setDraftDetails] = useState(details ?? "");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setError(undefined);
-    try {
-      await onSave(draftGist, draftDetails.trim() || null);
-    } catch (err) {
-      setError(errorMessage(err));
-      setBusy(false);
-    }
-  };
-
-  return (
-    <form className="flex flex-col gap-3" onSubmit={submit}>
-      <label className="flex flex-col gap-1 text-xs text-ink-muted">
-        <span>Lo que recuerda</span>
-        <textarea
-          className="min-h-20 w-full rounded-md border border-edge bg-field px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
-          value={draftGist}
-          onChange={(event) => setDraftGist(event.target.value)}
-          rows={3}
-          required
-          autoFocus
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-xs text-ink-muted">
-        <span>Detalles</span>
-        <textarea
-          className="min-h-28 w-full rounded-md border border-edge bg-field px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
-          value={draftDetails}
-          onChange={(event) => setDraftDetails(event.target.value)}
-          rows={6}
-        />
-      </label>
-      {error && (
-        <p role="alert" className="text-sm text-danger">
-          No se pudo guardar: {error}
-        </p>
-      )}
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" size="sm" disabled={busy || !draftGist.trim()}>
-          {busy ? "Guardando…" : "Guardar cambios"}
-        </Button>
-        <Button type="button" variant="outline" size="sm" onClick={onCancel}>
-          Cancelar
-        </Button>
-      </div>
-    </form>
   );
 }

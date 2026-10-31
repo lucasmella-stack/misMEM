@@ -27,8 +27,8 @@ const POLL_MS = 2000;
 type Phase = "loading" | "error" | "confirm" | "running" | "done";
 
 /**
- * Consolidar ahora: confirma el gasto, arranca la corrida en el servidor y enseña cómo va.
- * Si al abrirlo ya hay una en curso (otra pestaña), muestra esa en vez de lanzar otra.
+ * Consolidate now: confirms the cost, starts the run on the server and shows how it goes.
+ * If one is already running when it opens (another tab), it shows that one instead of starting another.
  */
 export function Consolidate({ open, scope, scopes, onClose }: Props) {
   const queryClient = useQueryClient();
@@ -56,7 +56,7 @@ export function Consolidate({ open, scope, scopes, onClose }: Props) {
     wasRunning.current = false;
   }, [open, scope]);
 
-  // La corrida terminó: las listas y los ámbitos ya pueden leer memorias nuevas.
+  // The run finished: lists and scopes can already read new memories.
   const job = jobQuery.data;
   useEffect(() => {
     if (!job) return;

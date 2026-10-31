@@ -1,24 +1,51 @@
 import type { GraphData } from "../api";
 
 /**
- * Lo que el panel deja tocar. `episodes` no sólo oculta la capa: también decide si se
- * pide al servidor, que es el único que sabe qué episodios siguen pendientes.
+ * What the panel lets you touch. `episodes` does not only hide the layer: it also decides
+ * whether it is requested from the server, the only one that knows which episodes are pending.
  */
 export interface GraphFilters {
   traits: boolean;
   orphans: boolean;
   related: boolean;
   episodes: boolean;
+  /** The lateral layer: edges from measured co-use, which also light the drawing. */
+  coUse: boolean;
   query: string;
   local: { enabled: boolean; depth: 1 | 2 | 3; centerId?: string };
 }
 
-/** Una arista en dos momentos: recién llegada de la API y ya mutada por force-graph. */
+/**
+ * Below this many measured turns the strength is noise by construction: two memories used once,
+ * that once together, score 1. The panel says so instead of letting the drawing lie.
+ */
+export const THIN_SAMPLE_TURNS = 20;
+
+/**
+ * How brightly a lateral edge is drawn. Only a positive association lights up: at zero the pair
+ * is indistinguishable from chance and below it they avoid each other, and neither deserves ink.
+ */
+export function coUseGlow(strength: number | undefined): { alpha: number; width: number } {
+  const lit = Math.min(1, Math.max(0, strength ?? 0));
+  return { alpha: 0.2 + 0.8 * lit, width: 0.7 + 2.3 * lit };
+}
+
+/**
+ * A node's halo, normalized against the strongest in view: a graph of weak associations would
+ * otherwise read as dark and one of strong associations as burnt, when what matters is who
+ * stands out among what is drawn.
+ */
+export function hubGlow(strength: number | undefined, max: number): number {
+  if (max <= 0 || strength === undefined || strength <= 0) return 0;
+  return Math.min(1, strength / max);
+}
+
+/** A link at two moments: fresh from the API and already mutated by force-graph. */
 type LinkEnd = string | { id: string };
 
 const idOf = (end: LinkEnd): string => (typeof end === "string" ? end : end.id);
 
-/** Vecinos directos, sin importar si la librería ya sustituyó los ids por objetos nodo. */
+/** Direct neighbours, whether or not the library has already swapped ids for node objects. */
 export function neighborsOf(links: Array<{ source: LinkEnd; target: LinkEnd }>, id: string): Set<string> {
   const neighbors = new Set<string>();
   for (const link of links) {
@@ -30,7 +57,7 @@ export function neighborsOf(links: Array<{ source: LinkEnd; target: LinkEnd }>, 
   return neighbors;
 }
 
-/** El tooltip de la librería se inyecta como HTML: la etiqueta nunca puede traer marcado. */
+/** The library's tooltip is injected as HTML: a label can never carry markup. */
 export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -40,9 +67,9 @@ export function escapeHtml(value: string): string {
 }
 
 /*
- * Doce tonos medios, uno por ámbito, elegidos para pasar 3:1 (contraste de objeto gráfico)
- * contra las cuatro superficies de los dos temas: #1a1917, #21201d, #cbc9c3 y #d6d3cc.
- * Un tono más claro desaparece en claro; uno más oscuro, en oscuro.
+ * Twelve mid tones, one per scope, chosen to pass 3:1 (graphical object contrast) against the
+ * four surfaces of both themes: #1a1917, #21201d, #cbc9c3 and #d6d3cc. A lighter tone vanishes
+ * in light; a darker one, in dark.
  */
 const SCOPE_COLORS = [
   "#d42300",
@@ -59,7 +86,7 @@ const SCOPE_COLORS = [
   "#b63d8d",
 ];
 
-/** Reparte los doce colores entre los ámbitos con más nodos; el resto se queda sin color. */
+/** Spreads the twelve colours over the scopes with the most nodes; the rest get none. */
 export function scopePalette(scopes: string[]): Map<string, string> {
   const counts = new Map<string, number>();
   for (const scope of scopes) counts.set(scope, (counts.get(scope) ?? 0) + 1);
@@ -73,32 +100,35 @@ export function scopePalette(scopes: string[]): Map<string, string> {
 }
 
 /**
- * Devuelve una copia lista para force-graph, que muta `source`/`target` y añade x/y a los
- * nodos. El orden importa: si se recortara al final, el grafo local recorrería aristas que
- * ya no existen y el filtro de huérfanas contaría enlaces invisibles.
+ * Returns a copy ready for force-graph, which mutates `source`/`target` and adds x/y to the nodes.
+ * Order matters: trimming at the end would make the local graph walk links that already vanished
+ * and the orphan filter count invisible links.
  */
 export function filterGraph(data: GraphData, filters: GraphFilters): GraphData {
   const query = filters.query.trim().toLowerCase();
 
-  // 1. Capas apagadas.
+  // 1. Layers turned off.
   let nodes = data.nodes.filter((node) =>
     node.layer === "memory" || (node.layer === "trait" ? filters.traits : filters.episodes),
   );
 
-  // 2. Consulta sobre etiqueta o ámbito, igual que la lista.
+  // 2. Query over label or scope, same as the list.
   if (query) {
     nodes = nodes.filter(
       (node) => node.label.toLowerCase().includes(query) || node.scope.toLowerCase().includes(query),
     );
   }
-  let links = data.links.filter((link) => filters.related || link.kind !== "related");
+  let links = data.links.filter(
+    (link) =>
+      (filters.related || link.kind !== "related") && (filters.coUse || link.kind !== "co_use"),
+  );
 
-  // Las aristas de un nodo que ya no está no cuentan para nada de lo que sigue.
+  // Links of a node that is gone count for nothing that follows.
   let alive = new Set(nodes.map((node) => node.id));
   links = links.filter((link) => alive.has(link.source) && alive.has(link.target));
 
-  // 3. Grafo local: sólo si el centro sigue visible. Si la consulta lo quitó, no se
-  //    devuelve un grafo vacío: se ignora el modo local, como si estuviera apagado.
+  // 3. Local graph: only if the centre is still visible. If the query removed it, do not
+  //    return an empty graph: local mode is ignored, as if it were off.
   const center = filters.local.centerId;
   if (filters.local.enabled && center && alive.has(center)) {
     const adjacency = new Map<string, string[]>();
@@ -131,13 +161,13 @@ export function filterGraph(data: GraphData, filters: GraphFilters): GraphData {
     links = links.filter((link) => keep.has(link.source) && keep.has(link.target));
   }
 
-  // 4. Sin huérfanas: un nodo que se quedó sin ninguna arista no aporta nada al dibujo.
+  // 4. Without orphans: a node left with no link adds nothing to the drawing.
   if (!filters.orphans) {
     const linked = new Set(links.flatMap((link) => [link.source, link.target]));
     nodes = nodes.filter((node) => linked.has(node.id));
   }
 
-  // 5. Última pasada: ninguna arista puede apuntar a un nodo que ya no se pinta.
+  // 5. Last pass: no link may point to a node that is no longer painted.
   const visible = new Set(nodes.map((node) => node.id));
   links = links.filter((link) => visible.has(link.source) && visible.has(link.target));
 

@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
-import { capture } from "../src/tools.js";
-import { runConsolidation, truncateEpisode } from "../src/consolidation/run.js";
+import { openDb } from "../src/store/db.js";
+import { capture } from "../src/memory/capture.js";
+import { runConsolidation } from "../src/consolidation/run.js";
+import { truncateEpisode } from "../src/consolidation/budget.js";
 import { LlmFatalError, LlmInvalidJsonError, LlmTruncatedError } from "../src/consolidation/llm.js";
 
 let db: DB;
@@ -269,7 +270,7 @@ describe("runConsolidation", () => {
 
     expect(summary.episodes_consolidated).toBe(2);
     expect(summary.episodes_uncited_pending).toBe(1);
-    // Volver a mandarlo en la misma corrida sería pagar dos veces por el mismo episodio.
+    // Sending it again in the same run would pay twice for the same episode.
     expect(distillFn).toHaveBeenCalledTimes(1);
 
     const left = db
@@ -285,7 +286,7 @@ describe("runConsolidation", () => {
       captureOld("mix", "porque npm duplicaba dependencias", 48),
       captureOld("mix", "jaja dale nos vemos", 48),
     ];
-    // Cita siempre el primero que le llega: el último queda sin citar en cada tanda.
+    // Always cites the first one it receives: the last stays uncited on every batch.
     const distillFn = vi.fn(async (_cfg: unknown, _sys: string, user: string) => {
       const first = ids.find((id) => user.includes(id));
       return first ? [{ gist: `memoria de ${first}`, evidence_episode_ids: [first] }] : [];
@@ -550,12 +551,61 @@ describe("runConsolidation", () => {
     expect(summary.scopes_failed).toBe(0);
   });
 
+  it("el tope estrechado por una respuesta cortada no se filtra al ámbito siguiente", async () => {
+    const big = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => captureOld("cortado-a", `charla ${n} con decisiones`, 48));
+    const small = [1, 2, 3, 4, 5, 6].map((n) => captureOld("cortado-b", `nota ${n} con decisiones`, 48));
+    const sizes: number[] = [];
+    const distillFn = vi.fn(async (_cfg: unknown, _sys: string, user: string) => {
+      const batch = [...big, ...small].filter((id) => user.includes(id));
+      sizes.push(batch.length);
+      // 8 gets cut, so the scope narrows its cap to 4; a full 6-episode batch still fits.
+      if (batch.length > 6) throw new LlmTruncatedError("cortada");
+      return [{ gist: `tanda de ${batch.length}`, evidence_episode_ids: batch }];
+    });
+
+    const summary = await runConsolidation(db, {
+      minEpisodesPerScope: 1,
+      paretoPrefilter: false,
+      maxEpisodesPerBatch: 8,
+      llm: llmCfg,
+      distillFn,
+      log: () => {},
+    });
+
+    // The cap is per scope: the 6 of the second one must ride in a single call, not 4 + 2.
+    expect(sizes).toEqual([8, 4, 4, 6]);
+    expect(summary.episodes_consolidated).toBe(big.length + small.length);
+  });
+
+  it("un episodio salteado en un ámbito no se cuenta como salteado en el siguiente", async () => {
+    const poison = captureOld("salta-a", "episodio que el LLM no logra procesar", 48);
+    const ok = [1, 2].map((n) => captureOld("salta-a", `decisión ${n} sobre el stack elegido`, 47));
+    const later = captureOld("salta-b", "decisión suelta sobre el despliegue", 46);
+    const distillFn = vi.fn(async (_cfg: unknown, _sys: string, user: string) => {
+      if (user.includes(poison)) throw new LlmTruncatedError("cortada");
+      const batch = [poison, ...ok, later].filter((id) => user.includes(id));
+      return [{ gist: `tanda de ${batch.length}`, evidence_episode_ids: batch }];
+    });
+
+    const summary = await runConsolidation(db, {
+      minEpisodesPerScope: 1,
+      paretoPrefilter: false,
+      llm: llmCfg,
+      distillFn,
+      log: () => {},
+    });
+
+    // Only the poison episode is skipped; a leaked set would make the next scope add it again.
+    expect(summary.episodes_skipped).toBe(1);
+    expect(pendingIds()).toEqual([poison]);
+  });
+
   it("respeta el tope de llamadas por corrida y deja el resto para la próxima", async () => {
     const ids: string[] = [];
     for (const scope of ["a", "b", "c"]) {
       for (const n of [1, 2, 3]) ids.push(captureOld(scope, `nota ${scope} ${n} sobre el despliegue`, 48));
     }
-    // Cita todo lo que le llega: cada llamada consolida su ámbito entero.
+    // Cites everything it receives: each call consolidates its whole scope.
     const distillFn = vi.fn().mockResolvedValue([{ gist: "despliegue", evidence_episode_ids: ids }]);
 
     const summary = await runConsolidation(db, {
@@ -589,7 +639,7 @@ describe("runConsolidation", () => {
       log: () => {},
     });
 
-    // Todos caen en L0 → no se llama al LLM, se crea 1 memoria stub
+    // All fall into L0 → no LLM call, one stub memory is created.
     expect(distillFn).not.toHaveBeenCalled();
     expect(summary.episodes_dropped_pareto_l0).toBe(3);
     expect(summary.memories_created).toBe(1);

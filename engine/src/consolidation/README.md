@@ -42,7 +42,7 @@ El modelo por defecto en DeepSeek es `deepseek-chat`.
 - **Idempotente**: sólo mira episodios con `consolidated_into IS NULL`.
 - **Ruido**: lo que no llega a memoria queda atado a una memoria marcadora (`[noise] ...` o
   `[pareto:l0] ...`) con `salience=0.05`, y `forget` lo borra a los 30 días **junto con sus episodios**.
-  El marcador no vuelve en el recall ni gasta un embedding (`engine/src/noise.ts`). Pasa en dos casos: el
+  El marcador no vuelve en el recall ni gasta un embedding (`engine/src/domain/noise.ts`). Pasa en dos casos: el
   prefiltro Pareto lo descartó, o el LLM leyó el episodio y no lo citó en
   `MISMEM_CONSOLIDATION_UNCITED_STRIKES` tandas seguidas. El segundo depende del LLM: conviene mirar el
   log de las primeras corridas y tener respaldos que duren más que esos 30 días.

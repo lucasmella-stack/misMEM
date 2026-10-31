@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { inkPercent } from "../ui/src/lib/ink";
 
 /**
- * La tinta es la única licencia visual del proyecto: la saliencia decide cuánto se
- * acerca el texto a `ink`, pero nunca por debajo de `ink-muted`, que es el suelo que
- * pasa AA. El suelo vive en el CSS; aquí sólo se fija la escala.
+ * Ink is the project's only visual licence: salience decides how close text gets to
+ * `ink`, but never below `ink-muted`, the floor that passes AA. The floor lives in
+ * the CSS; here only the scale is pinned.
  */
 describe("inkPercent", () => {
   it("lleva los extremos de 0..1 a 0..100", () => {

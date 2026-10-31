@@ -2,7 +2,243 @@
 
 ## Sin publicar
 
-- La respuesta MCP de `recall` llega como el modelo la necesita: cada hit trae `date` legible en UTC, los `details` de una memoria, la `polarity` de un rasgo cuando no es neutra y `truncated` si el texto se recortó (2.000 caracteres de `text`, 1.200 de `details`), sin indentación y sin hits de 80.000 caracteres. Los alias `mem_*`, el visor y la API no cambian.
+### `recall` por MCP le da al modelo la fecha, los detalles y la polaridad (#153)
+
+- Cada resultado trae `date` legible en UTC, los `details` de una memoria, la `polarity` de un rasgo cuando
+  no es neutra y `truncated` si un texto se recortó (2.000 caracteres de `text`, 1.200 de `details`). Las
+  respuestas MCP van sin indentación. Los alias `mem_*`, el visor y su API no cambian.
+
+### Los tests de uso de los CLI dejan de depender de la carga de la máquina (#213)
+
+- `cli-usage-exit.test.ts` lanzaba el CLI con `npx tsx`: resolver el binario costaba más que la
+  corrida, **1,6 s de 1,6 s**. El caso que lanza dos procesos se iba a 6 s con la máquina cargada y
+  se pasaba del límite de 5 s de vitest, tumbando un `pnpm publish` entero desde `prepublishOnly`.
+- Pasa a lanzar por `process.execPath` con `--import tsx`, como ya hacía `obsidian-cli.test.ts`:
+  **de 6,0 s a 1,3 s** el caso que fallaba, y de 2,8 s a 0,7 s el otro. Además cada caso recibe el
+  mismo presupuesto que ya le concedía a su subproceso, 60 s, en vez de los 5 s por defecto: el
+  test se daba a sí mismo doce veces menos tiempo del que le daba al proceso que lanzaba.
+
+
+## 0.7.0 — 2026-10-31
+
+### La exportación a Obsidian no escribe fuera de `<bóveda>/misMEM/` (#206)
+
+- Las rutas se comparan por su ruta real: una nota que es un enlace simbólico, o una carpeta enlazada que
+  lleva fuera de `<bóveda>/misMEM/`, se omite y cuenta en `skipped`, y la pasada de borrado no la atraviesa.
+  Un manifiesto que es un enlace detiene el export sin tocar la bóveda. Una carpeta enlazada colgante o en
+  bucle cuenta como fuera, en vez de abortar la corrida a medias. Que la propia `misMEM/` sea un enlace sigue
+  valiendo.
+
+### Las dos variables de embeddings que quedaban fuera de `env.ts` (#187)
+
+- `MISMEM_EMBEDDING_MIN_SCORE` y `MISMEM_EMBEDDING_MAX_CHARS` pasan por `envNonNegativeNumber` y
+  `envPositiveNumber`, la convención de `engine/src/env.ts`.
+- Sólo cambia un caso: con `MISMEM_EMBEDDING_MIN_SCORE` en blanco (`" "`) el corte quedaba en `0` y cualquier
+  memoria con vector competía en los candidatos; ahora vuelve al default del modelo. El `0` explícito sigue
+  valiendo como elección, y `MAX_CHARS` no cambia para ningún valor.
+
+### `.env.example` remite a la guía que existe (#203)
+
+- El comentario del servidor compatible con OpenAI apunta a `DEPLOY.md`, «Búsqueda por significado», en vez de a
+  una sección del README que no existe, y el ejemplo de EmbeddingGemma 2 usa el corte de 0,65 que recomienda la guía.
+
+### La documentación dice lo que hace el código (#186)
+
+- `DEPLOY.md` daba a entender que EmbeddingGemma 2 arranca en 0,65: sólo `nomic-embed-text` sube el default a 0,65;
+  cualquier otro modelo, EmbeddingGemma 2 incluido, arranca en 0,5 y hay que fijarlo a mano.
+- `latest` sí se mueve al republicar a mano un tag viejo: el workflow lo habilita para `workflow_dispatch`,
+  y la guía ahora avisa de despachar sólo el release vigente. Los ejemplos de tag pasan a `X.Y.Z` / `X.Y`
+  para no envejecer con cada release.
+- La arquitectura pierde la sección «Pendiente» (un binario con `bun --compile`, que no existe) y la
+  validación menciona la excepción de los hooks, que se parsean a la defensiva.
+- Salen de la guía de operación el relato del incidente de GHCR y las cifras sin base: los 310 MB que el
+  instalador cifra en 296, y la medición del rescate en `docs/recall.md`, sin fecha ni versión. La historia
+  ya está en las versiones anteriores de este fichero.
+- Las tareas programadas se cuentan como son (tres tareas, cuatro entradas de cron) y
+  `docs/standards/tests.md` ubica `distillFn` donde se define.
+- Los tres documentos de operación pasan a formas impersonales, como pide la convención de español neutro, y el comentario del
+  trinquete de tamaño deja de narrar PRs.
+
+### La norma de comentarios se aplica a todo el código fuente (#171)
+
+- Los comentarios de `engine/src`, `engine/ui/src` (sin `components/ui`, que es shadcn) y `engine/tests` están
+  en inglés, con la cabecera y los bloques dentro de sus límites y sin historia ni notas de PR. Las
+  descripciones de `it()` y `describe()`, los textos de la interfaz y los mensajes de error siguen en castellano.
+- El registro de excepciones de `engine/tests/comments.test.ts` queda vacío: el mecanismo sigue ahí para una
+  excepción justificada, pero el test ya no perdona ninguna violación.
+- La calibración del rescate laxo que vivía en `recall/rescue.ts` pasa a `docs/recall.md`, y el comentario
+  enlaza la sección. Los razonamientos largos que quedaban en tests van con el código que explican.
+- Sólo cambian comentarios: el texto sin comentarios es idéntico antes y después. `docs/standards/comments.md`
+  y `AGENTS.md` dejan de describir una lista de excepciones pendiente.
+
+### Los comentarios tienen forma, y un test la comprueba (#171)
+
+- `docs/standards/comments.md` fija la norma: todos los comentarios de `engine/src`, `engine/ui/src` y
+  `engine/tests` en inglés; cabecera de módulo de tres líneas como mucho y sin inventarios; cualquier otro
+  bloque de cinco como mucho, con la calibración en `docs/`; JSDoc de una o dos líneas sólo si la firma no
+  dice el contrato; y nada de código comentado, historia, `TODO` sin issue ni `biome-ignore` sin motivo,
+  cada regla con su ejemplo. `AGENTS.md` recoge lo mismo en sus convenciones.
+- `engine/tests/comments.test.ts` extrae los comentarios y aplica seis reglas con etiqueta: `header`, `block`,
+  `lang`, `todo`, `dead` y `sup`. Cada regla tiene su caso sintético, incluido el límite: tres líneas de
+  cabecera pasan y cuatro no. El escáner vive en `engine/tests/support/source-scan.ts` y es el mismo que usa
+  `architecture.test.ts`: entiende texto JSX con comillas, expresiones `${...}` anidadas y la diferencia entre
+  división y expresión regular.
+- `lang` ignora URLs y texto entrecomillado, exige dos palabras funcionales o un acento en una palabra en
+  minúscula, y ya no basta con `sin` o `los`; `dead` reconoce llamadas, condicionales, funciones, `await`,
+  asignaciones y `console.`, sin marcar prosa que acaba en punto y coma. `sup` exige motivo en cada
+  `biome-ignore`.
+- Las excepciones son un `Record<"ruta (regla)", { motivo, count }>` calculado ejecutando el test sobre el
+  código actual: 173 entradas y 648 violaciones (49 de cabecera, 12 de bloque, 112 de idioma), ninguna de
+  `TODO`, código comentado ni `biome-ignore`. Sólo encogen: el test falla si aparece una violación nueva en un
+  fichero ya exceptuado, si sobra una excepción o si su cuenta cambia. Ningún comentario del código cambia en
+  esta PR; la siguiente aplica la norma y vacía el registro.
+- La norma corrige dos ejemplos que describían mal el código (el contrato de `isMismemDb` y el peso de la
+  saliencia en RRF), alarga el ejemplo "Mal" de bloque a seis líneas, deja de usar `#171` como issue de
+  `TODO`, y dice qué mide el test y qué queda en revisión (la longitud del JSDoc y el porqué).
+
+### La interfaz parte `GraphView.tsx` y `MemoryView.tsx` (#170)
+
+- El grafo deja en `GraphView.tsx` la consulta, el estado y la composición: los colores leídos del tema pasan a `lib/graph-tokens.ts` y el pintado de nodos y aristas a `components/graph/paint.ts`. La ficha de memoria saca el formulario de edición a `components/memory/EditForm.tsx`, los dos pasos de deshacer y olvidar a `hooks/use-memory-actions.ts` y sus textos a `lib/memory-text.ts`, que ahora tiene test. Nada visible cambia.
+
+### La corrida de consolidación recibe un contexto y deja su estado aparte (#168)
+
+- `engine/src/consolidation/run.ts` queda en `runConsolidation`: lee el entorno, arma el contexto de la
+  corrida, recorre los ámbitos y cierra el resumen. `processScope` pasa a
+  `engine/src/consolidation/scope.ts` con dos objetos con nombre, `RunContext` (db, cutoff, limits, llm,
+  distillFn, dryRun, paretoPrefilter, log y uncitedStrikes) y `RunState` (llamadas gastadas, tope de la
+  tanda y episodios saltados o aplazados), en vez de catorce posicionales.
+- El presupuesto del prompt y el recorte pasan a `engine/src/consolidation/budget.ts`: `truncateEpisode`,
+  `PROMPT_OVERHEAD_PER_EPISODE`, `TRUNCATION_MARK` y `fitPrompt`, que arma la tanda.
+- Mismos episodios leídos, mismas llamadas al LLM en el mismo orden, mismos topes, mismos registros de log y
+  mismo `RunSummary`. `engine/tests/architecture.test.ts` pierde la excepción de tamaño de
+  `consolidation/run.ts`; `engine/tests/consolidation-budget.test.ts` fija el presupuesto como pieza pura.
+
+### La exportación a Obsidian separa sus lecturas, su formato y su bóveda (#167)
+
+- `engine/src/export/obsidian.ts` queda en `exportObsidian`, que orquesta: lee, arma los mapas de enlaces y
+  entrega los ficheros al escritor. Las cuatro lecturas (memorias, rasgos, episodios consolidados y ámbitos)
+  pasan a `engine/src/queries/export.ts`; el formato puro de cada nota (nombres, enlaces, frontmatter y
+  cuerpo) a `engine/src/export/notes.ts`; y el manifiesto, la propiedad por frontmatter y la escritura o
+  borrado a `engine/src/export/vault.ts`. `EXPORT_ROOT` sigue exportándose desde `obsidian.ts`.
+- `mismem-obsidian` comprueba que el fichero es una base de misMEM con `engine/src/store/probe.ts`, que la abre
+  en sólo lectura antes de que `openDb` migre el esquema o pase el journal a WAL.
+- Mismos ficheros, mismos bytes, mismo manifiesto y mismas negativas. `engine/tests/export-notes.test.ts` fija el
+  formato sin disco; `engine/tests/architecture.test.ts` pierde las dos excepciones de SQL y la de tamaño de la
+  exportación, y `AGENTS.md` y `docs/architecture.md` describen el corte.
+
+### Los alias de Engram y su migración dejan de escribir SQL (#166)
+
+- `engine/src/mcp/engram-tools.ts` reúne `ENGRAM_TOOLS` y `EngramToolDef`; `engram-compat.ts` queda en el
+  despacho y los helpers de argumentos. `mem_get_observation` lee por `engine/src/queries/observation.ts` y
+  `mem_update` escribe por `engine/src/memory/engram-update.ts`: la memoria y el borrado de su vector, o el
+  nombre de un rasgo, con el mismo fallback al episodio de siempre.
+- `engine/src/migrate-engram-cli.ts` queda en argumentos, ayuda, llamada y salida. `engine/src/ingest/engram.ts`
+  abre la base de Engram en sólo lectura, la lee entera y la migra en una transacción, con el mismo mapeo, los
+  mismos ids determinísticos, la misma idempotencia y los mismos mensajes.
+- `engine/tests/ingest-engram.test.ts` cubre la lectura, el mapeo, la idempotencia y la salida del CLI; los
+  alias siguen fijados por `engine/tests/engram-compat.test.ts` sin cambios. `engine/tests/architecture.test.ts`
+  pierde las dos excepciones de SQL de `mcp/engram-compat.ts` y `migrate-engram-cli.ts`, y `AGENTS.md` y
+  `docs/architecture.md` describen el corte.
+
+### El SQL del visor y de los CLI sale de la entrega (#165)
+
+- Las lecturas de `engine/src/http/viewer/read.ts` y `api.ts` pasan a `engine/src/queries/`: `stats.ts` (los
+  conteos del visor y el resumen de los dos CLI, con una función por forma), `recent.ts`, `scopes.ts`,
+  `memories.ts` (lista y detalle), `traits.ts` (detalle), `graph.ts` y `forget-impact.ts`, más `views.ts` con
+  la forma de una memoria y un rasgo. Las escrituras de `actions.ts` pasan a `engine/src/memory/edit.ts`.
+- Los handlers y `mismem-stats` / `mismem-ingest` quedan en validar, llamar y responder. Las consultas, el
+  orden de las operaciones, las claves y los códigos de las respuestas y la salida de los CLI se mueven sin
+  editarlos.
+- `engine/tests/queries.test.ts` cubre cada módulo, y `engine/tests/architecture.test.ts` pierde las cinco
+  excepciones de SQL que ya no hacen falta. `AGENTS.md` y `docs/architecture.md` describen el corte.
+
+### El despacho HTTP se prueba sin abrir un puerto (#164)
+
+- `engine/src/server-http.ts` queda en leer el entorno, abrir la base, componer y escuchar. El despacho
+  (Host, `/healthz`, `/mcp`, el POST del visor, los GET, 404 y 405) pasa a `engine/src/http/routes.ts`, que
+  recibe por parámetro la base, la auth, los Hosts permitidos, el tope del cuerpo, el job de consolidación,
+  las opciones de borrado, el transporte del MCP y la interfaz compilada.
+- `engine/src/http/respond.ts` reúne `json` (que sale de `viewer/read.ts`) y las respuestas de texto que se
+  repetían: 401 con su reto, 404, 405 y 413. Códigos, cabeceras, cuerpos y el orden de las comprobaciones no
+  cambian.
+- `engine/tests/http-routes.test.ts` llama al handler con peticiones y respuestas simuladas y fija ese orden;
+  `server-http.test.ts` sigue lanzando el proceso real para bind, auth y Host.
+
+### Una herramienta por fichero (#163)
+
+- `engine/src/memory/tools.ts` (419 líneas) queda en `capture.ts`, `pending.ts` (la lista de episodios
+  pendientes), `reinforce.ts` (con el registro de uso), `consolidate.ts`, `crystallize.ts` y `forget.ts`, y
+  el camino del recall se muda a `recall/recall.ts` con `recall`, `recallHybrid` y la forma del hit. No hay
+  barril: cada import nombra el fichero que lo exporta.
+- `memory/` deja de importar de `recall/`: desaparece el único ciclo entre carpetas y, con él, las dos
+  excepciones de capa y la de tamaño de `engine/tests/architecture.test.ts`.
+- Sólo cambian rutas, imports y los nombres de las variables locales en castellano (`registrarUso` pasa a
+  `recordUse`); las consultas y el orden de las operaciones se mueven sin editarlos, y `server-core.ts`
+  sólo cambia sus imports.
+
+### El ranking del recall se parte por política (#162)
+
+- `engine/src/recall/search.ts` (510 líneas) queda en `fts.ts` (sintaxis de la consulta FTS5), `rescue.ts`
+  (rescate laxo y sus constantes), `lexical.ts` (candidatos léxicos y sus tipos) y `fuse.ts` (RRF con la
+  saliencia). No hay barril: cada import nombra el fichero que lo exporta.
+- Sólo cambian rutas e imports: las constantes, las consultas y el orden de las operaciones se mueven sin
+  editarlas, así que el ranking es el mismo.
+
+### Una sola definición de las formas de fila (#161)
+
+- `engine/src/store/rows.ts` reúne `MemoryRow`, `TraitRow` y `EpisodeRow` con los tipos del esquema de `db.ts`,
+  además de `MEMORY_COLUMNS` y `SalienceRow`. El visor y la exportación a Obsidian dejan de declarar sus copias,
+  que ya discrepaban en la anulabilidad de `consolidated_into`; quien selecciona menos columnas las deriva con
+  `Omit` en vez de repetirlas, así que dos lectores ya no pueden discrepar sobre una columna.
+- `excludeNoiseSql` pasa de `domain/noise.ts` a `store/rows.ts`, porque construye SQL: el dominio se queda con
+  `isNoiseGist` y los prefijos. No cambia ninguna consulta ni el comportamiento.
+
+### La interfaz parte `App.tsx` y `Lists.tsx` (#169)
+
+- `App.tsx` (470 líneas) queda en composición: la cabecera, el diálogo de cristalizar, la barra de selección y los hooks de tema, atajos y debounce viven en sus propios ficheros. Las cuatro listas y sus primitivas pasan a `components/list/`, y el tipo `Selection` a `lib/selection.ts`, que rompe el ciclo de imports entre `App` y las listas. Nada visible cambia.
+
+### engine/src se organiza por capacidad (#160)
+
+- `engine/src` deja de ser plano: `hash.ts`, `terms.ts` y `noise.ts` pasan a `domain/`; `db.ts` y
+  `connectome.ts` a `store/`; `tools.ts` y `salience.ts` a `memory/`; `search.ts` y `bench.ts` a `recall/`;
+  `relations.ts` a `queries/`; `obsidian.ts` a `export/`; `engram-compat.ts` a `mcp/`; `inject.ts`, `usage.ts`,
+  `hook-client.ts` y `hook-readiness.ts` a `hooks/`; y los módulos del servidor HTTP a `http/` y
+  `http/viewer/`, con `pareto/classifier.ts` en `consolidation/pareto.ts`. Sólo cambian rutas e imports: no
+  se parte ningún fichero ni cambia lógica.
+- `engine/tests/architecture.test.ts` fija la lista de ficheros de la raíz, la matriz de dependencias entre
+  carpetas, la pureza de `domain/`, la ausencia de SQL en la entrega y el trinquete de 400 líneas, con
+  excepciones explícitas que sólo encogen.
+- Nada de eso cambia lo que se publica: `dist/server.js`, `dist/server-http.js` y `dist/*-cli.js` conservan
+  su ruta y su nombre.
+
+### El conectoma se puede ver (#208)
+
+- El visor gana un modo de iluminación sobre el mismo grafo: en *Ajustes del grafo* → **Conectoma**
+  se encienden las aristas por co-uso, y los caminos y los nodos se alumbran según su asociación.
+  El dibujo que abre no cambia: el modo nace apagado y lo que ya había se pinta igual.
+- La luz sale de la fuerza, no del conteo. Una arista se vuelve más viva y más gruesa cuanto más
+  arriba de lo que predice el azar aparece el par; en 0 o por debajo no se ilumina, porque un par
+  que se evita no es un camino. Cada nodo lleva un halo con su asociación acumulada, normalizado
+  contra el más fuerte a la vista: un grafo de asociaciones flojas se lee solo, sin quedar negro.
+- El costado deja de ser decorativo: dice **cuántos turnos** se midieron, cuántos pares hay y
+  cuántos se dibujan, y lista *por dónde entrar* — los nodos ordenados por asociación acumulada y
+  no por vecinos, cada uno clicable. Un control de soporte mínimo filtra los pares de poca
+  evidencia, y viaja al servidor para que los hubs describan las mismas aristas que se pintan.
+- **Por debajo de 20 turnos medidos el panel lo dice en vez de dejar que el dibujo mienta**: con
+  pocos datos, dos recuerdos usados una vez y juntos esa vez dan el máximo. Comprobado con una
+  base de un solo turno, que es como se ve una instalación recién actualizada.
+
+### El paquete que se publica es el que compilan las fuentes (#210)
+
+- `pnpm build` borra `dist/` antes de compilar. `tsc` sólo añade, así que un módulo borrado de
+  `src/` seguía compilado en disco y viajaba dentro del tarball: medido sobre este repositorio,
+  **81 ficheros sobrantes y 27 módulos muertos** de la estructura anterior a la reorganización
+  (`viewer.js`, `search.js`, `salience.js`, `tools/`, `pareto/`…). Lo que se publicaba dependía de
+  lo que el publicador tuviera en disco, no de las fuentes.
+- El job `packaging` de CI lo vigila con dos comprobaciones nuevas: que un fichero plantado en
+  `dist/` no sobreviva al siguiente `build`, y que el tarball lleve `dist/ui/index.html`. Sin la
+  interfaz compilada, `/viewer` responde 503 sólo a quien instala desde npm, porque en el
+  repositorio siempre está construida al lado.
 
 ## 0.6.0 — 2026-10-29
 

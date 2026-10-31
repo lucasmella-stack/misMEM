@@ -80,7 +80,7 @@ curl http://127.0.0.1:3200/healthz
 ```
 
 Imagen multi-arch (`linux/amd64` y `linux/arm64`), sin clonar nada. El visor queda en `/viewer` y el MCP
-en `/mcp`. Para exponerlo con Traefik y TLS, o para construirla vos en el servidor, ver
+en `/mcp`. Para exponerlo con Traefik y TLS, o para construirla en el servidor, ver
 [DEPLOY.md](DEPLOY.md).
 
 ### npm: sin clonar nada
