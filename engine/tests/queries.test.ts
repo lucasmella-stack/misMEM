@@ -4,6 +4,7 @@ import { openDb } from "../src/store/db.js";
 import { capture } from "../src/memory/capture.js";
 import { consolidate } from "../src/memory/consolidate.js";
 import { crystallize } from "../src/memory/crystallize.js";
+import { reinforce } from "../src/memory/reinforce.js";
 import { viewerStats, statsSummary, ingestStats } from "../src/queries/stats.js";
 import { recentRows } from "../src/queries/recent.js";
 import { scopeCounts } from "../src/queries/scopes.js";
@@ -200,6 +201,21 @@ describe("queries/graph", () => {
     expect(withEpisodes.nodes.filter((n) => n.layer === "episode")).toHaveLength(1);
     expect(withEpisodes.truncated.episodes).toBe(true);
   });
+
+  it("cuenta los pares de toda la base, no sólo los de las memorias dibujadas", () => {
+    // The counter of turns is global, so counting pairs only among the drawn memories put two
+    // different scopes in the same row: the panel then advises lowering a floor that is not
+    // what is hiding them, when what left them out is the cap on how much the canvas draws.
+    const a = memoryFrom("a", "la primera", ["e1"]).memoryId;
+    const b = memoryFrom("a", "la segunda", ["e2"]).memoryId;
+    reinforce(db, { memory_ids: [a, b] });
+    reinforce(db, { memory_ids: [a, b] });
+
+    const cortado = graphData(db, { ...base, withCoUse: true, at: Date.now(), caps: { memories: 1 } });
+    expect(cortado.connectome?.shown).toBe(0);
+    expect(cortado.connectome?.pairs).toBe(1);
+    expect(cortado.truncated.memories).toBe(true);
+  });
 });
 
 describe("queries/forget-impact", () => {
@@ -210,5 +226,20 @@ describe("queries/forget-impact", () => {
 
     expect(forgetImpact(db, "memory", memoryId)).toEqual({ episodes: 2, traits_citing: 2 });
     expect(forgetImpact(db, "trait", t1.trait_id)).toEqual({ memories_cited: 1 });
+  });
+});
+
+describe("soporte mínimo del conectoma", () => {
+  it("un soporte no finito o fraccionario no llega a la respuesta", () => {
+    // `co_use_min_n=1e400` arrives as Infinity, which JSON.stringify turns into null, and the
+    // panel then prints a hole where the floor should be.
+    const a = memoryFrom("a", "la primera", ["e1"]).memoryId;
+    const b = memoryFrom("a", "la segunda", ["e2"]).memoryId;
+    reinforce(db, { memory_ids: [a, b] });
+
+    const base = { scope: null, withEpisodes: false, withRelated: false, withCoUse: true, at: Date.now() } as const;
+    expect(graphData(db, { ...base, coUseMinN: Number.POSITIVE_INFINITY }).connectome?.min_n).toBe(1);
+    expect(graphData(db, { ...base, coUseMinN: Number.NaN }).connectome?.min_n).toBe(1);
+    expect(graphData(db, { ...base, coUseMinN: 2.5 }).connectome?.min_n).toBe(2);
   });
 });

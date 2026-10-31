@@ -5,6 +5,8 @@
   </picture>
 </p>
 
+<h1 align="center">misMEM</h1>
+
 <p align="center">
   <strong>Memoria persistente cooperativa para LLMs.</strong><br>
   Una SQLite, un protocolo MCP, todos tus clientes.

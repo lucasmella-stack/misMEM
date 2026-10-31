@@ -2,13 +2,91 @@
 
 ## Sin publicar
 
+### La calibración del dibujo deja de estar en números sueltos
+
+- `graphData` hacía cinco cosas en 112 líneas; la capa lateral sale a su propia función por el corte
+  que ya marcaba su retorno temprano, y baja a 84.
+- Los números que deciden cómo se ve el grafo —el peso de un rasgo frente al de una memoria, cuánto
+  crece el halo, el suelo y el techo del trazo lateral, cuánto se apaga lo que no está iluminado—
+  pasan a constantes con nombre y con el porqué de **ese** valor, no de que exista el umbral.
+
+### La forma del grafo estaba escrita tres veces y nada ataba las copias
+
+- `GraphNode`, `GraphLink` y el resumen se declaran en el motor, **a mano otra vez** en la interfaz
+  (que no puede importar de `src/`) y una tercera en los tests. Justo `label`, `scope` y `salience`
+  —los tres que la pantalla dibuja— no los miraba ningún test. Comprobado: renombrar `label` en todo
+  el motor dejaba `tsc` del motor **en cero errores** y la suite en verde, con el visor roto.
+- `tests/graph-contract.test.ts` asigna lo que devuelve el motor al tipo que declara la interfaz, así
+  que la divergencia falla en `pnpm typecheck` antes de que nadie abra el visor, y comprueba que esos
+  tres campos viajen poblados.
+- `paint.ts` tenía cinco funciones exportadas y **cero tests**, y `scopePalette` ninguno: su rama de
+  más ámbitos que colores nunca se había ejecutado. Cubiertas las puras; el componente del panel sigue
+  sin poder probarse porque el proyecto no tiene renderizador.
+
+### Documentación que el código dejó mintiendo
+
+- `docs/architecture.md` enmarcaba la degeneración como problema de pocos datos. Es del estimador: con
+  `n = useA = useB` el NPMI da 1 con 20 turnos y con 10.000. Ahora lo dice, y documenta `max_n`, la
+  ponderación por soporte, la diferencia entre `pairs` y `shown`, los parámetros `?scope=` y
+  `?episodes=1`, y el bloque `truncated`.
+- El `0` del NPMI está sobrecargado —"azar" y "no sé"— y los documentos se leían al revés entre sí.
+- `AGENTS.md` no listaba la tabla `meta`, de la que depende el denominador del conectoma, y describía
+  de menos a `connectome.ts` y a `relations.ts`.
+
+### El panel del conectoma y el lienzo no miraban lo mismo
+
+- `Pares: X de Y` contaba **Y sólo entre las memorias dibujadas** mientras `Turnos medidos` era
+  global. Con 3.885 memorias y un tope de 400, el panel podía decir «0 de 0» habiendo pares
+  medidos, y aconsejar bajar el soporte cuando lo que los dejaba fuera era el tope. Ahora `pairs`
+  cuenta sobre toda la base, con un `COUNT` en el módulo que posee `co_use` en vez de materializar
+  cada arista para leerle el `.length`, y el texto distingue los tres casos.
+- `filterGraph` filtraba el conjunto de nodos pero **no recalculaba** su `co_use`: un vecino
+  conservaba la fuerza de aristas que ya no se dibujaban y llevaba halo de hub con una sola arista
+  en pantalla. Se reacumula sobre lo que queda, con la misma regla que el motor.
+- **Dos máximos para el mismo brillo**: el lienzo normalizaba sobre lo filtrado y el panel sobre lo
+  que mandó el servidor, así que el mismo nodo iba con halo lleno en el dibujo y punto apagado al
+  lado. Ahora se mide una vez y se pasa a los dos.
+- «Por dónde entrar» ofrecía nodos que la búsqueda o el grafo local habían dejado fuera; al pulsarlos
+  la cámara perseguía un nodo inexistente y se rendía en silencio. La lista se limita a lo dibujado.
+- Con las aristas por parecido **apagadas** se pedían igual: `relatedLinks` es O(n²) cosenos sobre
+  hasta 400 memorias, unos 160.000 por petición, para descartarlos en el cliente. Van condicionadas
+  como las demás capas.
+- Dos pares de topes sin relación declarada —20 hubs del servidor contra 10 del panel, 120 caracteres
+  de etiqueta contra 48 del lienzo— quedan nombrados y atados por un test.
+- El grafo pedía `details` y `source_episode_ids` de **todas** las memorias del ámbito para dibujar un
+  `gist` recortado a 120: el pico de memoria por petición crecía con el texto de la base. Lee sólo las
+  columnas que dibuja.
+- `co_use_min_n=1e400` llegaba como `Infinity` y salía en la respuesta como `null`, dejando un hueco
+  donde el panel imprime el soporte mínimo. Y `escapeHtml` no cubría la comilla simple: basta para el
+  cuerpo del tooltip de hoy, no para un atributo el día que alguien lo reutilice.
+
+### El conectoma dejaba de avisar justo cuando más mentía
+
+- Medido en producción el 2026-10-31: 3.885 memorias, 37 pares en `co_use`, **todos con `n = 1`** y
+  ningún par repetido nunca, con el contador de turnos en 23. En ese estado NPMI vale **1 exacto**
+  para los 37 —`log(T)/log(T)`, para cualquier `T`—, así que el ruido se dibujaba con el alfa y el
+  grosor **máximos**: el triple que una arista por parecido, y más del doble que una asociación real
+  medida (`n = 8` sobre 200 turnos puntúa 0,40).
+- El aviso de muestra fina miraba `turns`, que es la variable equivocada: acumular turnos no diluye
+  la degeneración, y al pasar de 20 el aviso **se apagó solo** mientras los datos seguían vacíos.
+  Ahora mira el soporte, y el resumen viaja con `max_n` para que la interfaz pueda decirlo.
+- La fuerza no se lee sin su soporte, que es lo que el tipo de la arista decía desde siempre y
+  ningún consumidor leía. Lo leen los cuatro: el trazo, el halo, el aviso y el ranking de hubs.
+  Un par visto una vez cae al suelo del trazo, que es no decir nada.
+- `hubs()` ponderaba la suma sin soporte, así que un nodo con tres coincidencias le ganaba a un par
+  repetido: "ordenados por asociación acumulada, no por vecinos" era falso en los datos reales. Cada
+  `Hub` lleva ahora su `support` y la suma va ponderada.
+- La regla vive en `engine/src/domain/support.ts`; la interfaz no puede importar de `src/`, así que
+  conserva su copia y `tests/support.test.ts` falla si las dos dejan de coincidir.
+- De paso, `queries/graph.ts` deja de reimplementar el acumulador de `store/connectome.ts`: el halo
+  del lienzo y la lista del panel responden ya a una sola definición de hub.
 ### El logo oficial encabeza el README
 
 - `docs/assets/logo.webp` y `logo-dark.webp`, el mismo logo con el fondo blanco quitado y la tinta en
   `#141311` o `#e8e4dc` según el tema; el rosa de marca no cambia. Un `<picture>` con
   `prefers-color-scheme` elige cuál, así que se lee igual en claro y en oscuro.
-- Sustituyen al `<h1>` de texto: el logo ya lleva el nombre, y su `alt` lo conserva para quien no ve
-  la imagen.
+- Van encima del `<h1>`, que se conserva: el logo encabeza y el título sigue siendo texto, que es lo
+  que leen el índice de GitHub y quien no ve la imagen.
 
 ### Capturas nuevas del visor en el README
 
