@@ -21,6 +21,7 @@ function status(overrides: Partial<EmbeddingStatus> = {}): EmbeddingStatus {
     compatible: 10,
     stale_model: 0,
     stale_dims: 0,
+    active_dims: null,
     models: [],
     ...overrides,
   };
@@ -87,13 +88,13 @@ describe("vectorIsCurrent", () => {
 });
 
 describe("activeModelDims", () => {
-  it("toma el ancho más frecuente del modelo activo, como el estado del servidor", () => {
+  it("toma el ancho que el servidor marca como activo, no la mayoría de los vectores", () => {
     const dims = activeModelDims(
       status({
+        active_dims: 768,
         models: [
-          { model: "embeddinggemma-2", dims: 768, count: 8 },
-          { model: "embeddinggemma-2", dims: 512, count: 2 },
-          { model: "viejo", dims: 1024, count: 9 },
+          { model: "embeddinggemma-2", dims: 512, count: 8 },
+          { model: "embeddinggemma-2", dims: 768, count: 2 },
         ],
       }),
     );
@@ -101,9 +102,11 @@ describe("activeModelDims", () => {
     expect(dims).toBe(768);
   });
 
-  it("no inventa un ancho cuando el modelo activo no tiene vectores", () => {
+  it("sin ancho registrado no inventa uno a partir de los vectores guardados", () => {
     expect(
-      activeModelDims(status({ models: [{ model: "viejo", dims: 1024, count: 9 }] })),
+      activeModelDims(
+        status({ active_dims: null, models: [{ model: "embeddinggemma-2", dims: 768, count: 9 }] }),
+      ),
     ).toBeUndefined();
   });
 });
@@ -243,5 +246,31 @@ describe("MemoryFacts", () => {
     );
 
     expect(html).toContain("obsoleto: no lo usa la búsqueda");
+  });
+
+  it("con el ancho activo del servidor separa el vector vigente del de otro ancho", () => {
+    const active = status({ active_dims: 768 });
+    const render = (dims: number): string =>
+      renderToStaticMarkup(
+        createElement(MemoryFacts, {
+          memory: memory({ embedding: { model: "embeddinggemma-2", dims, created_at: NOW } }),
+          activeModel: active.model,
+          activeDims: activeModelDims(active),
+        }),
+      );
+
+    expect(render(512)).toContain("obsoleto: no lo usa la búsqueda");
+    expect(render(768)).not.toContain("obsoleto");
+  });
+
+  it("junto a la fecha relativa enseña la absoluta de una fecha fija", () => {
+    const html = renderToStaticMarkup(
+      createElement(MemoryFacts, {
+        memory: memory({ created_at: NOW, last_accessed_at: NOW }),
+        activeModel: "embeddinggemma-2",
+      }),
+    );
+
+    expect(html).toContain(exact(NOW));
   });
 });

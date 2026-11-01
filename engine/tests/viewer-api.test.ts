@@ -113,6 +113,7 @@ interface EmbeddingBody {
   compatible: number;
   stale_model: number;
   stale_dims: number;
+  active_dims: number | null;
   models: Array<{ model: string; dims: number; count: number }>;
 }
 
@@ -167,6 +168,7 @@ describe("viewer-api: /api/embeddings", () => {
       compatible: 0,
       stale_model: 0,
       stale_dims: 0,
+      active_dims: null,
       models: [],
     });
     expect(fetchSpy).not.toHaveBeenCalled();

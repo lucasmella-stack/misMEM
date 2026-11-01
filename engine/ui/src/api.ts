@@ -37,6 +37,8 @@ export interface EmbeddingStatus {
   enabled: boolean;
   provider: "ollama" | "openai";
   model: string;
+  /** The width search compares against; null when the base has no vector of the model. */
+  active_dims: number | null;
   memories: number;
   embedded: number;
   missing: number;

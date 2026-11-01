@@ -11,6 +11,9 @@
   embeddings sin usar nunca, no hay nada que arreglar y el aviso sobra.
 - El detalle de cada memoria enseña sus usos, su modelo y sus dimensiones, marca como obsoleto el vector que
   la búsqueda no usa y muestra las fechas absolutas junto a las relativas.
+- El ancho activo del índice sale del que produjo el embedder en la última pasada (`active_dims`), no de la
+  mayoría de los vectores guardados: tras un cambio de ancho del proveedor, la mayoría son justo los vectores
+  que la búsqueda ya no lee. Sin ancho registrado, el estado sigue usando la mayoría.
 - `mismem-embed --status` cambia de significado: ya no cuenta los marcadores de ruido como memorias, sólo
   cuenta como `compatible` los vectores del modelo activo con su ancho dominante y añade `stale_dims` para
   los del modelo activo con otro ancho, de modo que `stale_model` queda para los de otro modelo.
