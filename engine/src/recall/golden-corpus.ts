@@ -187,6 +187,8 @@ export function parseFloor(text: string): GoldenFloor {
     if (!(GOLDEN_KINDS as readonly string[]).includes(kind)) {
       throw new Error(`floor.json inválido: tipo desconocido: ${kind}`);
     }
+    // Off-topic questions are not scored per kind: their cap is lexico_ajenas_max.
+    if (kind === "ajena") throw new Error("floor.json inválido: ajena no lleva suelo; su tope es lexico_ajenas_max");
   }
   return parsed.data;
 }

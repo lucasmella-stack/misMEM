@@ -111,6 +111,6 @@ Un objeto JSON por línea, en `engine/eval/golden/<dominio>.jsonl`:
 
 `details`, `salience` y el `scope` de una pregunta son opcionales. Las claves son únicas entre ficheros;
 `expect` nombra cualquiera de ellas y sólo está vacío en `ajena`, una pregunta que no debe traer nada. Un
-`gist` que empieza por `[noise] ` o `[pareto:l0] ` es un marcador de ruido: se carga, nunca se espera y nunca
-se devuelve. Los tipos de pregunta son `literal`, `parafrasis`, `sinonimo`, `coloquial`, `sin_tildes`,
+`gist` que empieza por `[noise] ` o `[pareto:l0] ` es un marcador de ruido: se carga y nunca se devuelve, así que
+ninguna pregunta del corpus lo espera (el validador no lo impide: una pregunta así fallaría siempre). Los tipos de pregunta son `literal`, `parafrasis`, `sinonimo`, `coloquial`, `sin_tildes`,
 `errata`, `ingles`, `larga`, `clave`, `ambito`, `episodio`, `rasgo` y `ajena`.

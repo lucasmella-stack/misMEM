@@ -294,6 +294,10 @@ describe("runGolden", () => {
 });
 
 describe("parseFloor", () => {
+  it("rechaza un suelo para ajena y remite a lexico_ajenas_max", () => {
+    expect(() => parseFloor('{"limit":5,"lexico":{"ajena":{"hits":0}}}')).toThrow(/lexico_ajenas_max/);
+  });
+
   it("lee el suelo por tipo", () => {
     expect(parseFloor('{"limit":5,"lexico":{"literal":{"hits":2}}}')).toEqual({
       limit: 5,

@@ -27,7 +27,7 @@ Vitest, desde `engine/`: `pnpm test`. El typecheck también cubre los tests (`pn
   `~/.mismem`.
 - **Un test no usa memorias reales.** Ni en los fixtures ni en las salidas guardadas.
 - **Un cambio en el ranking, los embeddings o el eval** (`recall/`, `embeddings/`) se mide además con
-  `mismem-bench` y `pnpm eval` antes y después, y las cifras van en el PR (etiqueta `needs-bench`).
+  `mismem-bench` y `pnpm eval --mode lexico` antes y después, y las cifras van en el PR (etiqueta `needs-bench`).
   `mismem-bench` mide la memoria real con el banco privado; `pnpm eval` mide el corpus público y su suelo
   en `engine/eval/golden/floor.json`, que se sube en el mismo PR que mejora el recall.
 - **Un bug se arregla con su test de regresión**, que falla antes del arreglo.
