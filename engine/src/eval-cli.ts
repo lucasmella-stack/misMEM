@@ -8,7 +8,14 @@ import { fileURLToPath } from "node:url";
 import { ArgsError, EXIT_USAGE } from "./cli-args.js";
 import { loadEmbeddingConfig, type EmbedFn } from "./embeddings/provider.js";
 import { embedPendingMemories, getEmbeddingIndexStatus } from "./embeddings/store.js";
-import { EVAL_DEFAULT_LIMIT, parseEvalArgs, type EvalMode } from "./eval-args.js";
+import {
+  EVAL_DEFAULT_LIMIT,
+  jsonPayload,
+  modeLine,
+  parseEvalArgs,
+  type EvalMode,
+  type ModeChoice,
+} from "./eval-args.js";
 import { parseGolden } from "./recall/golden-corpus.js";
 import { loadGolden, runGolden, type GoldenReport, type GoldenScore } from "./recall/golden.js";
 import { openDb } from "./store/db.js";
@@ -28,12 +35,6 @@ ajenas se informan aparte. Un marcador de ruido devuelto es un fallo.
 
 --mode auto (por defecto) usa el semántico si el embedder responde y el léxico si no.
 Base: en memoria (:memory:), nunca ~/.mismem. No escribe nada fuera del proceso.`);
-}
-
-interface ModeChoice {
-  mode: "lexico" | "semantico";
-  embedded: number;
-  failed: number;
 }
 
 /**
@@ -75,12 +76,7 @@ function line(score: GoldenScore): string {
 
 function printReport(report: GoldenReport, chosen: ModeChoice, dir: string): void {
   console.log(`directorio: ${dir}`);
-  if (chosen.mode === "lexico") {
-    console.log("modo: léxico (sin embeddings)");
-  } else {
-    const failed = chosen.failed > 0 ? `, ${chosen.failed} fallidas` : "";
-    console.log(`modo: semántico (${chosen.embedded} memorias embebidas${failed})`);
-  }
+  console.log(modeLine(chosen));
 
   console.log(`global: ${line(report.global)}`);
   console.log("por tipo:");
@@ -135,7 +131,7 @@ async function main(): Promise<void> {
     const report = await runGolden(db, corpus, ids, { limit: args.limit, embedFn, at });
 
     if (args.json) {
-      console.log(JSON.stringify({ mode: chosen.mode, ...report }, null, 2));
+      console.log(JSON.stringify(jsonPayload(chosen, report), null, 2));
       return;
     }
     printReport(report, chosen, dir);

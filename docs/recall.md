@@ -87,12 +87,12 @@ corpus (doce dominios, 40 preguntas por dominio y los tipos esperados) y que `ex
 un id de pregunta; si el corpus no está, el test falla. Quien mejora el recall sube el suelo en el mismo PR.
 No viaja en el paquete npm: se corre desde el repositorio.
 
-Línea base del 2026-10-30 (tope 5, aciertos dentro del tope; caduca cuando cambia el corpus):
+Línea base del 2026-11-01 (tope 5, aciertos dentro del tope; caduca cuando cambia el corpus):
 
 | Modo | Global | MRR | Paráfrasis | Episodio | Rasgo | Ajenas con algo | Recuerdos por pregunta |
 |---|---|---|---|---|---|---|---|
-| Léxico | 221/432 | 0,48 | 1/72 | 20/24 | 8/24 | 8/48 | 0,9 |
-| Semántico (`embeddinggemma-2`, corte 0,65) | 368/432 | 0,80 | 64/72 | 0/24 | 0/24 | 11/48 | 4,8 |
+| Léxico | 221/432 | 0,48 | 1/72 | 20/24 | 8/24 | 4/48 | 0,9 |
+| Semántico (`embeddinggemma-2`, corte 0,65) | 368/432 | 0,80 | 64/72 | 0/24 | 0/24 | 12/48 | 4,8 |
 
 Los dos ceros del semántico son el issue #154.
 
