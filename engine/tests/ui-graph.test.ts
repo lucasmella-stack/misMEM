@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GraphData, GraphLink, GraphNode } from "../ui/src/api";
 import { escapeHtml, filterGraph, neighborsOf, scopePalette, type GraphFilters } from "../ui/src/lib/graph";
-import { CANVAS_LABEL_CHARS, visibleDegrees } from "../ui/src/lib/graph";
+import { CANVAS_LABEL_CHARS, topicPalette, visibleDegrees } from "../ui/src/lib/graph";
 import { pointerRadius, radiusOf, type Node } from "../ui/src/components/graph/paint";
 import { GRAPH_LABEL_CHARS } from "../src/queries/graph.js";
 
@@ -208,5 +208,46 @@ describe("el tamaño de un nodo", () => {
 
     expect(pointerRadius(node("x", "memory", "x") as Node, 1)).toBe(7);
     expect(pointerRadius(node("hub", "memory", "hub") as Node, 3, grande)).toBeGreaterThan(7);
+  });
+});
+
+describe("la paleta por tema", () => {
+  const topic = (...members: string[]) => ({ members });
+  /** The first colour of the shared palette: which one it is does not matter, that it is first does. */
+  const SCOPE_COLORS_FIRST = topicPalette([topic("solo")]).get("solo");
+
+  it("pinta a cada miembro con el color de su tema", () => {
+    const palette = topicPalette([topic("a", "b"), topic("c")]);
+
+    expect(palette.get("a")).toBe(palette.get("b"));
+    expect(palette.get("c")).not.toBe(palette.get("a"));
+  });
+
+  it("deja sin color los temas que pasan de la paleta, en vez de repetir colores", () => {
+    const many = Array.from({ length: 40 }, (_, i) => topic(`m${i}`));
+
+    const palette = topicPalette(many);
+    const used = new Set(palette.values());
+
+    expect(used.size).toBe(palette.size);
+    expect(palette.size).toBeLessThan(many.length);
+    // Topics arrive sorted by size: the first ones are the ones that get painted.
+    expect(palette.has("m0")).toBe(true);
+    expect(palette.has("m39")).toBe(false);
+  });
+
+  it("gasta los colores en los temas que se dibujan, no en los más grandes del total", () => {
+    // The first is huge but off screen; the second is small and on it.
+    const fuera = topic(...Array.from({ length: 50 }, (_, i) => `fuera${i}`));
+    const dentro = topic("visible1", "visible2");
+
+    const palette = topicPalette([fuera, dentro], new Set(["visible1", "visible2"]));
+
+    expect(palette.get("visible1")).toBe(SCOPE_COLORS_FIRST);
+    expect(palette.has("fuera0")).toBe(false);
+  });
+
+  it("sin temas devuelve una paleta vacía y no revienta", () => {
+    expect(topicPalette([]).size).toBe(0);
   });
 });

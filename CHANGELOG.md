@@ -2,6 +2,21 @@
 
 ## Sin publicar
 
+### El grafo se puede pintar por tema, no sólo por ámbito
+
+- *Ajustes del grafo* cambia **Color por ámbito** por una elección de tres: **ámbito, tema o ninguno**.
+  Por tema, cada nodo toma el color de la isla semántica a la que pertenece, y la leyenda los nombra
+  con la memoria más saliente de cada una.
+- La paleta se reparte entre **los temas que están dibujados**, no entre los más grandes del total.
+  Es la misma regla que ya seguía la de ámbitos: la paleta es corta y gastarla en temas que casi no
+  salen en pantalla deja un dibujo donde no se pinta casi nada. Medido sobre una base real, pasa de
+  74 a 85 nodos pintados de los 600 que se dibujan.
+- Los temas se piden sólo cuando pintan, y con la misma clave de consulta que la pestaña *Temas*:
+  llegando desde ahí, los colores ya están en mano.
+- Un rasgo conserva su color de marca pinte quien pinte: es la capa que organiza a las demás.
+- Las filas del panel (interruptores, deslizadores, secciones y la elección nueva) pasan a
+  `components/graph/PanelRows.tsx`: el panel se había comido el trinquete de 400 líneas.
+
 ### Los marcadores de ruido dejan de ocupar un vector
 
 - Un marcador (`[noise] ...`, `[pareto:l0] ...`) no compite en el recall ni gasta un embedding, pero

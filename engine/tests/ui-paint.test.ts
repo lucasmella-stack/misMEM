@@ -65,18 +65,26 @@ describe("peso de un nodo", () => {
 });
 
 describe("color de un nodo", () => {
-  it("un ámbito sin color en la paleta no deja al nodo sin pintar", () => {
+  it("sin color asignado el nodo se pinta igual, en vez de desaparecer", () => {
     conDocumento();
-    const fuera = colorOfNode({ layer: "memory", scope: "sin-color" } as never, new Map(), true);
+    const fuera = colorOfNode({ layer: "memory", scope: "sin-color" } as never, () => undefined);
     expect(fuera).toBeTruthy();
-    expect(fuera).toBe(colorOfNode({ layer: "memory", scope: "x" } as never, new Map([["x", "#abc"]]), false));
   });
 
-  it("con color por ámbito apagado ignora la paleta", () => {
+  it("un rasgo se pinta con el color de marca, lo diga quien lo diga", () => {
     conDocumento();
-    const paleta = new Map([["x", "#abcdef"]]);
-    expect(colorOfNode({ layer: "memory", scope: "x" } as never, paleta, false)).not.toBe("#abcdef");
-    expect(colorOfNode({ layer: "memory", scope: "x" } as never, paleta, true)).toBe("#abcdef");
+    const rasgo = { layer: "trait", id: "t1", scope: "x" } as never;
+
+    // The layer that organizes the rest keeps its colour whichever grouping is painting.
+    expect(colorOfNode(rasgo, () => "#000000")).not.toBe("#000000");
+    expect(colorOfNode(rasgo, () => undefined)).toBe(colorOfNode(rasgo, () => "#123456"));
+  });
+
+  it("toma el color de quien se lo da, sea por ámbito o por tema", () => {
+    conDocumento();
+    const nodo = { layer: "memory", id: "m1", scope: "x" } as never;
+    expect(colorOfNode(nodo, (n) => ({ x: "#abcdef" })[n.scope])).toBe("#abcdef");
+    expect(colorOfNode(nodo, (n) => ({ m1: "#123456" })[String(n.id)])).toBe("#123456");
   });
 });
 

@@ -67,10 +67,13 @@ export const pointerRadius = (node: Node, size: number, sizing?: Sizing): number
 
 const POINTER_MIN_RADIUS = 7;
 
-export function colorOfNode(node: Node, palette: Map<string, string>, colorByScope: boolean): string {
+/**
+ * The caller decides what the colour means — scope or topic — because a topic is keyed by memory
+ * and a scope by name. A trait keeps the brand colour: it is the layer that organizes the rest.
+ */
+export function colorOfNode(node: Node, color: (node: Node) => string | undefined): string {
   if (node.layer === "trait") return tokensNow().brand;
-  const scopeColor = colorByScope ? palette.get(node.scope) : undefined;
-  return scopeColor ?? tokensNow().inkMuted;
+  return color(node) ?? tokensNow().inkMuted;
 }
 
 interface NodePaint {
