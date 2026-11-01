@@ -65,19 +65,16 @@ flowchart LR
 git clone https://github.com/lucasmella-stack/misMEM.git && bash misMEM/scripts/install.sh
 ```
 
-Instala misMEM desde el repo clonado, pregunta dónde guardar la memoria y con qué proveedor consolidar
-(DeepSeek, OpenRouter, OpenAI, un servidor compatible o ninguno), guarda la clave en
-`~/.config/mismem/env` con permisos 600 y configura los clientes MCP que encuentra en la máquina (en Claude
-Code, también los hooks de inyección y refuerzo; `--help` da la lista). Para la búsqueda por significado
-ofrece montar un servidor de embeddings local con `llama-server` (baja el modelo y deja un servicio de
-systemd si se acepta); otro servidor u otro modelo se eligen
-con `MISMEM_EMBEDDING_URL` y `MISMEM_EMBEDDING_MODEL` ([cómo](docs/recall.md#por-significado-opcional)). Si se quiere, deja la consolidación nocturna como timer de
-systemd. Los clientes llaman a
-`~/.local/bin/mismem-run`, así que ninguna clave queda en su configuración. Volver a ejecutarlo actualiza
-sin duplicar, y no pisa a ciegas una configuración de misMEM hecha a mano: los hooks de Claude Code que
-ya estén configurados de otra forma y un MCP `mismem` de opencode con otro comando se respetan, y este
-último sólo se reemplaza con `REPLACE_EXISTING=yes`. `--from-npm` instala el paquete publicado, que puede ir por detrás del repo; `--help` explica
-el modo sin preguntas (`--yes`, `--clients`, `--timer`, `--embeddings`).
+Pregunta dónde guardar la memoria y con qué proveedor consolidar (DeepSeek, OpenRouter, OpenAI, un
+servidor compatible o ninguno), deja la clave en `~/.config/mismem/env` con permisos 600 y configura
+los clientes MCP que encuentre, con los hooks de inyección y refuerzo en Claude Code. Ofrece además
+montar un servidor de embeddings local para la búsqueda por significado
+([otro servidor u otro modelo](docs/recall.md#por-significado-opcional)) y dejar la consolidación
+nocturna como timer de systemd.
+
+Los clientes llaman a `~/.local/bin/mismem-run`, así que ninguna clave queda en su configuración.
+Volver a ejecutarlo actualiza sin duplicar y respeta lo que esté configurado a mano. `--help` explica
+el resto: `--from-npm`, el modo sin preguntas y qué clientes toca.
 
 ### Docker: un servidor para varias máquinas
 
@@ -89,14 +86,13 @@ docker run -d --name mismem-brain \
 curl http://127.0.0.1:3200/healthz
 ```
 
-Imagen multi-arch (`linux/amd64` y `linux/arm64`), sin clonar nada. El visor queda en `/viewer` y el MCP
-en `/mcp`. Para exponerlo con Traefik y TLS, o para construirla en el servidor, ver
-[DEPLOY.md](DEPLOY.md).
+Imagen multi-arch (`linux/amd64` y `linux/arm64`). El visor queda en `/viewer` y el MCP en `/mcp`;
+para exponerlo con Traefik y TLS, [DEPLOY.md](DEPLOY.md).
 
 ### npm: sin clonar nada
 
-En la configuración MCP del cliente. El fichero, la clave y la forma cambian de uno a otro; éste es el de
-los que usan `mcpServers` en JSON:
+En la configuración MCP del cliente; el fichero y la forma cambian de uno a otro. Éste es el de los que
+usan `mcpServers` en JSON:
 
 ```json
 {
@@ -132,25 +128,24 @@ Y en la configuración MCP del cliente: `"command": "node", "args": ["<ruta-al-r
 | | Qué hace | Más |
 |---|---|---|
 | **Seis invocaciones** | `capture`, `recall`, `reinforce`, `consolidate`, `crystallize`, `forget`, más una capa de compatibilidad con Engram (`mem_save`, `mem_search`, ...) | [Arquitectura](docs/architecture.md#seis-invocaciones) |
-| **Recall híbrido** | Palabras (FTS5) y significado (embeddings, opcional) fusionados por RRF sobre las tres capas a la vez; si el servidor de embeddings cae, sigue por palabras | [Recall](docs/recall.md) |
-| **Medido, no supuesto** | Un corpus dorado público en castellano (doce dominios) y `pnpm eval`, que informa aciertos y MRR por tipo de pregunta y por dominio contra un suelo declarado | [Recall](docs/recall.md) |
+| **Recall híbrido** | Palabras (FTS5) y significado (embeddings, opcional) fusionados por RRF sobre las tres capas a la vez. Si el servidor de embeddings cae, sigue por palabras | [Recall](docs/recall.md) |
+| **Medido, no supuesto** | Un corpus dorado público en castellano y `pnpm eval`: aciertos y MRR por tipo de pregunta, contra un suelo declarado | [Recall](docs/recall.md) |
 | **Saliencia con decay** | Lo que no se usa pierde la mitad cada 90 días; el refuerzo sigue el uso real, no la aparición | [Arquitectura](docs/architecture.md#saliencia-decay-y-olvido) |
 | **Índice hebbiano** | Cuenta qué recuerdos se usaron juntos en el mismo turno | [Arquitectura](docs/architecture.md#el-índice-hebbiano) |
 | **Ámbitos** | Un `scope` por proyecto o cliente dentro de la misma base; una búsqueda con ámbito no mezcla los demás | [Arquitectura](docs/architecture.md#un-territorio-varias-instancias) |
 | **Consolidación nocturna** | Un LLM destila los episodios en memorias, con prefiltro de ruido | [Consolidación](engine/src/consolidation/README.md) |
-| **Visor web** | Memorias por saliencia, rasgos, lo pendiente, el origen de cada recuerdo, el estado del índice semántico y el grafo; con acciones opcionales | [Arquitectura](docs/architecture.md#componentes) |
-| **Temas** | Las islas de significado: qué recuerdos hablan de lo mismo aunque vivan en ámbitos distintos, calculadas sobre los vectores. El grafo se puede pintar por tema | [Arquitectura](docs/architecture.md#componentes) |
-| **Lo que el modelo recibe** | El servidor anuncia cuándo usar cada herramienta y cómo salir de un fallo; cada resultado de `recall` trae su capa, su fecha, los detalles y la polaridad | [Arquitectura](docs/architecture.md#seis-invocaciones) |
+| **Visor web** | Memorias, rasgos, lo pendiente, el origen de cada recuerdo, el estado del índice semántico y el grafo; con acciones opcionales | [Arquitectura](docs/architecture.md#componentes) |
+| **Temas** | Qué recuerdos hablan de lo mismo aunque vivan en ámbitos distintos, calculado sobre los vectores. El grafo se puede pintar por tema | [Arquitectura](docs/architecture.md#componentes) |
+| **Lo que el modelo recibe** | El servidor anuncia cuándo usar cada herramienta; cada resultado de `recall` trae su capa, su fecha, los detalles y la polaridad | [Arquitectura](docs/architecture.md#seis-invocaciones) |
 | **Hooks de cliente** | Adelantan recuerdos antes de responder y refuerzan los que se usaron | [Hooks](docs/hooks.md) |
 | **Ingesta y exportación** | Exports de ChatGPT, transcripts de VS Code, migración desde Engram, bóveda de Obsidian | [Arquitectura](docs/architecture.md#componentes) |
-| **Servidor remoto** | MCP por Streamable HTTP con BasicAuth, guarda de `Host` y límite de cuerpo; el visor entra por su propio formulario, con la sesión firmada | [DEPLOY.md](DEPLOY.md) |
+| **Servidor remoto** | MCP por Streamable HTTP con BasicAuth, guarda de `Host` y límite de cuerpo; el visor entra por su propio formulario | [DEPLOY.md](DEPLOY.md) |
 
 ## El visor
 
 Capturas del visor (`/viewer`): el grafo entero con sus ajustes, y el grafo local alrededor de una
-memoria con su detalle al costado. El tamaño de cada nodo mide sus conexiones visibles, y los colores
-pueden seguir al ámbito o al tema. Las demás pestañas son las memorias por saliencia, los rasgos, lo
-que falta consolidar y los temas.
+memoria con su detalle al costado. Cada nodo mide sus conexiones visibles y se pinta por ámbito o por
+tema.
 
 <p align="center">
   <img alt="Visor: grafo de episodios, memorias y rasgos, con los ajustes del grafo abiertos" src="docs/assets/viewer-grafo.webp" width="48%">

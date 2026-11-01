@@ -2,6 +2,15 @@
 
 ## Sin publicar
 
+### El README dice lo mismo con menos palabras
+
+- El párrafo del instalador eran ciento setenta palabras en un bloque, con detalles que ya están en su
+  `--help` (`REPLACE_EXISTING`, qué respeta de cada cliente). Baja a dos párrafos cortos y el resto se
+  consulta donde vive.
+- Las celdas más largas de la tabla y el pie de las capturas se recortan sin perder qué hace cada cosa.
+- «Qué es y por qué» y «Privacidad» quedan como estaban: una es el argumento y la otra dice qué sale de
+  la máquina. Recortarlas sería quitar sustancia.
+
 ## 0.9.0 — 2026-11-01
 
 ### El README y la arquitectura cuentan lo que el motor hace hoy
