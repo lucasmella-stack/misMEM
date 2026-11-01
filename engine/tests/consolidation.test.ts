@@ -600,6 +600,21 @@ describe("runConsolidation", () => {
     expect(pendingIds()).toEqual([poison]);
   });
 
+  it("la suite no le pide vectores al proveedor de embeddings real tras consolidar", async () => {
+    const ids = [1, 2].map((n) => captureOld("t", `decisión ${n} sobre el stack elegido`, 48));
+    const distillFn = vi.fn().mockResolvedValue([{ gist: "stack", evidence_episode_ids: ids }]);
+    const fetchSpy = vi.fn().mockResolvedValue(new Response("no", { status: 500 }));
+    vi.stubGlobal("fetch", fetchSpy);
+    try {
+      await runConsolidation(db, { minEpisodesPerScope: 1, paretoPrefilter: false, llm: llmCfg, distillFn, log: () => {} });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    // The backfill reads the real config: without vitest's env it reaches the developer's Ollama.
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("respeta el tope de llamadas por corrida y deja el resto para la próxima", async () => {
     const ids: string[] = [];
     for (const scope of ["a", "b", "c"]) {

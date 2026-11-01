@@ -2,6 +2,15 @@
 
 ## Sin publicar
 
+### La suite de tests ya no llama al Ollama de quien la corre
+
+- Tras consolidar, `runConsolidation` rellena los vectores con la configuración real, así que cada corrida de
+  la suite hacía 24 peticiones a `127.0.0.1:11434`: cargaba `nomic-embed-text` en el Ollama de la máquina y,
+  con ese Ollama ocupado, un test de consolidación pasaba de 5 s y fallaba de forma intermitente.
+- Vitest arranca ahora con `MISMEM_EMBEDDINGS=off`; el test que quiere un proveedor sustituye `fetch`. Un
+  test nuevo comprueba que consolidar no llama a `fetch`.
+- Medido en un espacio de red propio con un Ollama falso que anota cada petición: 24 antes, 0 después.
+
 ### La pantalla de entrada perdía su logo al instalar desde npm
 
 - El logo se leía de `"dist/ui"`, una ruta **relativa al directorio de trabajo**. Dentro del repo
