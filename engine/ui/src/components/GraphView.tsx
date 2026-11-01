@@ -8,6 +8,7 @@ import {
   escapeHtml,
   filterGraph,
   neighborsOf,
+  rankTopicsByDrawn,
   scopePalette,
   topicPalette,
   visibleDegrees,
@@ -20,7 +21,7 @@ import {
   colorOfNode,
   nodeWeight,
   paintNode,
-  pointerRadius,
+  paintPointerArea,
   type Link,
   type Node,
   type Sizing,
@@ -102,6 +103,7 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
 
   const scopes = useMemo(() => data?.nodes.map((node) => node.scope) ?? [], [data]);
   const palette = useMemo(() => scopePalette(scopes), [scopes]);
+  const unpainted = useMemo(() => scopes.some((scope) => !palette.has(scope)), [scopes, palette]);
 
   // The halo is normalized against what is drawn, so it is measured over the filtered graph and
   // not over everything the server sent.
@@ -162,21 +164,16 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
     [topicsQuery.data, drawnIds],
   );
 
-  // The painted ones, in the panel's order: the legend names what the canvas shows.
-  const paintedTopics = useMemo(() => {
-    const painted: Array<{ entry: { id: string; gist: string }; color: string; drawn: number }> = [];
-    for (const topic of topicsQuery.data?.topics ?? []) {
-      const color = byTopic.get(topic.entry.id);
-      if (!color) continue;
-      painted.push({
-        entry: topic.entry,
-        color,
-        drawn: topic.members.filter((id) => drawnIds.has(id)).length,
-      });
-    }
-    // Same order the palette ranked them by, so the legend reads top to bottom like the drawing.
-    return painted.sort((a, b) => b.drawn - a.drawn);
-  }, [topicsQuery.data, byTopic, drawnIds]);
+  // The painted ones, in the order the palette ranked them: the legend reads top to bottom like
+  // the drawing, and the ranking itself comes from `rankTopicsByDrawn` so there is only one of it.
+  const paintedTopics = useMemo(
+    () =>
+      rankTopicsByDrawn(topicsQuery.data?.topics ?? [], drawnIds).flatMap(({ topic, weight }) => {
+        const color = byTopic.get(topic.entry.id);
+        return color ? [{ entry: topic.entry, color, drawn: weight }] : [];
+      }),
+    [topicsQuery.data, byTopic, drawnIds],
+  );
 
   const nodeColor = useCallback(
     (node: Node) =>
@@ -316,13 +313,7 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
           nodeColor={nodeColor}
           nodeLabel={(node) => escapeHtml(node.label)}
           nodeCanvasObject={nodeCanvasObject}
-          nodePointerAreaPaint={(node, color, ctx) => {
-            if (node.x == null || node.y == null) return;
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.arc(node.x, node.y, pointerRadius(node, settings.nodeSize, sizing), 0, 2 * Math.PI);
-            ctx.fill();
-          }}
+          nodePointerAreaPaint={(node, color, ctx) => paintPointerArea(node, color, ctx, settings.nodeSize, sizing)}
           linkColor={linkColor}
           linkWidth={linkWidth}
           linkLineDash={(link) => (link.kind === "related" ? [2, 2] : null)}
@@ -338,7 +329,8 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
       <GraphPanel
         settings={settings}
         onChange={changeSettings}
-        scopes={scopes}
+        palette={palette}
+        unpainted={unpainted}
         width={size.width}
         topics={settings.colorBy === "topic" ? paintedTopics : undefined}
         connectome={

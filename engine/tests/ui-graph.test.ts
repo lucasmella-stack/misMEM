@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GraphData, GraphLink, GraphNode } from "../ui/src/api";
 import { escapeHtml, filterGraph, neighborsOf, scopePalette, type GraphFilters } from "../ui/src/lib/graph";
-import { CANVAS_LABEL_CHARS, topicPalette, visibleDegrees } from "../ui/src/lib/graph";
+import { CANVAS_LABEL_CHARS, asDepth, rankTopicsByDrawn, topicPalette, visibleDegrees } from "../ui/src/lib/graph";
 import { pointerRadius, radiusOf, type Node } from "../ui/src/components/graph/paint";
 import { GRAPH_LABEL_CHARS } from "../src/queries/graph.js";
 
@@ -249,5 +249,38 @@ describe("la paleta por tema", () => {
 
   it("sin temas devuelve una paleta vacía y no revienta", () => {
     expect(topicPalette([]).size).toBe(0);
+  });
+});
+
+describe("asDepth", () => {
+  it("lleva cualquier número al 1, 2 o 3 que admite el ajuste", () => {
+    // The middle branch never ran from the panel, because its slider steps by one.
+    expect([asDepth(0), asDepth(1), asDepth(1.5), asDepth(2), asDepth(2.9), asDepth(3), asDepth(9)]).toEqual([
+      1, 1, 2, 2, 2, 3, 3,
+    ]);
+  });
+});
+
+describe("rankTopicsByDrawn", () => {
+  const tema = (members: string[]) => ({ members });
+
+  it("ordena por miembros dibujados, de más a menos", () => {
+    const dibujados = new Set(["a", "b", "c", "d"]);
+    const ranked = rankTopicsByDrawn([tema(["a"]), tema(["b", "c", "d"]), tema(["a", "b"])], dibujados);
+
+    expect(ranked.map((r) => r.weight)).toEqual([3, 2, 1]);
+  });
+
+  it("deja fuera el tema del que no se dibuja nada", () => {
+    const ranked = rankTopicsByDrawn([tema(["a"]), tema(["z"])], new Set(["a"]));
+
+    expect(ranked).toHaveLength(1);
+    expect(ranked[0]?.topic.members).toEqual(["a"]);
+  });
+
+  it("sin conjunto dibujado pesa por tamaño total", () => {
+    const ranked = rankTopicsByDrawn([tema(["a"]), tema(["b", "c"])]);
+
+    expect(ranked.map((r) => r.weight)).toEqual([2, 1]);
   });
 });
