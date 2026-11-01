@@ -422,6 +422,14 @@ mkdir -p "$CONF_DIR" "$BIN_DIR" "$(dirname "$DB")"
         elif [ "$v" = MISMEM_EMBEDDING_URL ] && [ "$PREV_KIND" = custom ]; then
           # Sin URL propia, el motor resolvía una por su cuenta; se deja escrita para no cambiar de servidor.
           printf '%s=%q\n' "$v" "$PREV_RESOLVED_URL"
+        elif [ "$v" = MISMEM_EMBEDDING_MODEL ] && [ "$PREV_KIND" = custom ]; then
+          # Sin modelo, el motor anterior usaba nomic-embed-text; el nuevo pondría EmbeddingGemma 2, que ese
+          # servidor no tiene.
+          printf '%s=%q\n' "$v" nomic-embed-text
+        elif [ "$v" = MISMEM_EMBEDDING_MIN_SCORE ] && [ "$PREV_KIND" = custom ] &&
+          case "${PREV_EMBED:-nomic-embed-text}" in nomic-embed-text*) true ;; *) false ;; esac; then
+          # nomic tenía su corte propio de 0,65 en el código; el nuevo le daría el genérico de 0,5.
+          printf '%s=0.65\n' "$v"
         fi
       done
     elif [ "$EMBED_CHOICE" = gemma ]; then
