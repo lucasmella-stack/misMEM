@@ -24,9 +24,10 @@ describe("palabras que sólo el rescate descarta", () => {
     // Half a paradigm is worse than none: a question like "¿qué puedo hacer?" kept a verb as
     // if it named the topic and still demanded two matches.
     for (const word of [
-      "puedo", "puedes", "podemos", "podéis", "pueden",
-      "hago", "haces", "hacemos", "hacéis", "hacen",
-      "tengo", "tienes", "tenemos", "tenéis", "tienen",
+      "puedo", "puedes", "puede", "podemos", "podéis", "pueden",
+      "podría", "podrías", "podríamos", "podríais", "podrían",
+      "hago", "haces", "hace", "hacemos", "hacéis", "hacen",
+      "tengo", "tienes", "tiene", "tenemos", "tenéis", "tienen",
       "quiero", "quieres", "quiere", "queremos", "queréis", "quieren",
       "sabemos", "sabéis", "saben",
     ]) {

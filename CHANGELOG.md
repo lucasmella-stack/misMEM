@@ -5,8 +5,7 @@
 - Sin servidor de embeddings, el recall léxico pasa de 222/432 a 254/432 en el eval dorado (MRR de 0,49 a 0,54),
   con las preguntas largas de 5/36 a 17/36 y las coloquiales de 24/36 a 26/36; ningún tipo baja y las ajenas
   se quedan en 4/48 (5 recuerdos frente a 6). El rescate ya no exige el 30 % de todas las palabras: mide la
-  puerta sobre las palabras de contenido de la pregunta, contando una vez las que comparten prefijo, y del
-  rastreo y de la puntuación descarta las que no aparecen en ninguna memoria de la base ni en ningún candidato;
+  puerta sobre las palabras de contenido de la pregunta, contando una vez las que comparten prefijo, y de la puntuación y del recuento de presencia (la consulta OR las sigue llevando, sin efecto) descarta las que no aparecen en ninguna memoria de la base ni en ningún candidato;
   ordena por IDF y pide dos coincidencias con al menos una informativa, así que una pregunta llena de contexto
   ("oye", "ayer") puede rescatar su memoria.
   Ignora además un relleno
