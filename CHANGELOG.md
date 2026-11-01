@@ -2,12 +2,16 @@
 
 ## Sin publicar
 
-### Salir del visor puede fallar y decirlo
+### Salir del visor puede fallar y decirlo, y el grafo oculto no se vuelve a pedir
 
 - El botón de salir navegaba al formulario de entrada **pasara lo que pasara**: iba con `.finally()`,
   así que una salida que falló se veía exactamente igual que una que funcionó, con la cookie todavía
   viva. Ahora sólo navega si el servidor confirmó, y si no lo dice. Sus dos rutas pasan a ser
   relativas, como las de `api.ts`, para que misMEM siga funcionando montado en otra ruta.
+- La pestaña del grafo está `forceMount`, así que sus dos consultas seguían activas con la pestaña
+  oculta: editar una memoria desde otra pestaña volvía a pedir `/api/graph` y, con el color por tema,
+  `/api/topics`, que son las dos lecturas más caras del visor (un coseno por par cada una). Quedan
+  condicionadas a que la pestaña esté a la vista; el dibujo sigue en la caché y se refresca al volver.
 
 ### El README dice lo mismo con menos palabras
 
