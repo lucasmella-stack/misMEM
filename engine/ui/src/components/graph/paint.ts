@@ -1,6 +1,6 @@
 import type { LinkObject, NodeObject } from "react-force-graph-2d";
 import type { GraphLink, GraphNode } from "../../api";
-import { CANVAS_LABEL_CHARS, coUseGlow, hubGlow } from "../../lib/graph";
+import { CANVAS_LABEL_CHARS, RELATED_EDGE_WIDTH, coUseGlow, hubGlow } from "../../lib/graph";
 import { tokensNow } from "../../lib/graph-tokens";
 
 export type Node = NodeObject<GraphNode>;
@@ -66,6 +66,21 @@ export const pointerRadius = (node: Node, size: number, sizing?: Sizing): number
   Math.max(POINTER_MIN_RADIUS, radiusOf(node, size, sizing));
 
 const POINTER_MIN_RADIUS = 7;
+
+/** The disc force-graph hit-tests against: the same radius the node is drawn with, never smaller. */
+export function paintPointerArea(
+  node: Node,
+  color: string,
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  sizing?: Sizing,
+): void {
+  if (node.x == null || node.y == null) return;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(node.x, node.y, pointerRadius(node, size, sizing), 0, 2 * Math.PI);
+  ctx.fill();
+}
 
 /**
  * The caller decides what the colour means — scope or topic — because a topic is keyed by memory
@@ -162,7 +177,7 @@ export function widthOfLink(link: Link, active: string | null): number {
   const touching = active !== null && (endId(link.source) === active || endId(link.target) === active);
   if (touching) return 1.6;
   if (link.kind === "co_use") return coUseGlow(link.strength, link.n).width;
-  return link.kind === "related" ? 0.7 : 0.6;
+  return link.kind === "related" ? RELATED_EDGE_WIDTH : 0.6;
 }
 
 /** The token may arrive as #rgb, #rrggbb or a colour function: only the first two can be mixed. */

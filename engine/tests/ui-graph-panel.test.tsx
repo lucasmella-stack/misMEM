@@ -9,6 +9,7 @@ import { ConnectomePanel } from "../ui/src/components/graph/ConnectomePanel";
 import { DEFAULT_SETTINGS, GraphPanel, type GraphSettings } from "../ui/src/components/GraphPanel";
 import { COMMIT_DELAY_MS } from "../ui/src/components/graph/PanelRows";
 import type { ConnectomeSummary } from "../ui/src/api";
+import { scopePalette } from "../ui/src/lib/graph";
 import { installDomStubs } from "./support/dom";
 
 installDomStubs();
@@ -37,7 +38,8 @@ function panel(overrides: Partial<GraphSettings> = {}, width = 375) {
     <GraphPanel
       settings={{ ...DEFAULT_SETTINGS, coUse: true, ...overrides }}
       onChange={onChange}
-      scopes={["s"]}
+      palette={scopePalette(["s"])}
+      unpainted={false}
       width={width}
       topics={TOPICS}
       connectome={

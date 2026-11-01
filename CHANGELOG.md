@@ -2,6 +2,25 @@
 
 ## Sin publicar
 
+### Siete limpiezas del visor: cada decisión en un solo sitio
+
+- **La paleta por ámbito se calculaba dos veces**, en `GraphView` y otra vez en `GraphPanel` sobre la
+  misma entrada. Ahora la deriva quien dibuja y el panel la recibe, como ya pasaba con los temas.
+- **El ranking de temas por miembros dibujados estaba escrito dos veces**, y la copia del componente
+  no la cubría ningún test aunque su comentario declarara el invariante. Sale a `rankTopicsByDrawn`,
+  que consumen el reparto de colores y la leyenda.
+- **El grosor fijo de una arista `related` era un literal** en `paint.ts` mientras la calibración de
+  `lib/graph.ts` citaba la cifra en prosa: ajustar uno dejaba el otro mintiendo en silencio. Pasa a
+  ser `RELATED_EDGE_WIDTH`.
+- **Dos JSDoc estaban desplazados** y documentaban la función de al lado: `neighborsOf` y
+  `scopePalette` se habían quedado sin cabecera y otras dos tenían dos.
+- **El recorte de la profundidad era un ternario anidado dentro de una prop JSX**, con su rama del
+  medio inalcanzable desde el panel. Sale a `asDepth`, con su test.
+- **El único trazo de lienzo que vivía en el componente** pasa a `paint.ts`, que es el dueño del
+  dibujo, y queda probado como el resto.
+- El JSDoc de `accumulateCoUse` citaba el fichero equivocado: el test que lo ata a `hubs()` está en
+  `tests/support.test.ts`.
+
 ### Salir del visor puede fallar y decirlo, y el grafo oculto no se vuelve a pedir
 
 - El botón de salir navegaba al formulario de entrada **pasara lo que pasara**: iba con `.finally()`,

@@ -34,10 +34,13 @@ export const PANEL_MAX_HUBS = 10;
  */
 export const CANVAS_LABEL_CHARS = 48;
 
+/** The fixed width of a `related` edge, read by `widthOfLink` and by the ceiling below. */
+export const RELATED_EDGE_WIDTH = 0.7;
+
 /**
  * The floor is what an unmeasured pair gets: drawn, because the pair exists, but saying nothing.
- * The ceiling is what the strongest measured association earns, and it has to beat the fixed
- * width of a `related` edge (0.7) so a measured path reads over a similar one.
+ * The ceiling is what the strongest measured association earns, and it has to beat
+ * `RELATED_EDGE_WIDTH` so a measured path reads over a similar one.
  */
 const EDGE_MIN_ALPHA = 0.2;
 const EDGE_MIN_WIDTH = 0.7;
@@ -82,7 +85,7 @@ export function hubGlow(strength: number | undefined, max: number, support?: num
 /**
  * What each node contributes to the lateral layer, over the edges given. Mirrors `hubs()` in
  * `engine/src/store/connectome.ts` on purpose, because the canvas draws a filtered subset the
- * server never saw; `tests/ui-connectome.test.ts` fails if the two stop agreeing.
+ * server never saw; `tests/support.test.ts` fails if the two stop agreeing.
  */
 export function accumulateCoUse(
   links: ReadonlyArray<{ source: string; target: string; kind: string; n?: number; strength?: number }>,
@@ -108,7 +111,6 @@ type LinkEnd = string | { id: string };
 
 const idOf = (end: LinkEnd): string => (typeof end === "string" ? end : end.id);
 
-/** Direct neighbours, whether or not the library has already swapped ids for node objects. */
 /**
  * One count per node of the edges actually drawn: the server only counts co-use degree, and only
  * with the connectome on, so the drawing counts what it has in front of it.
@@ -123,6 +125,7 @@ export function visibleDegrees(links: Array<{ source: LinkEnd; target: LinkEnd }
   return degrees;
 }
 
+/** Direct neighbours, whether or not the library has already swapped ids for node objects. */
 export function neighborsOf(links: Array<{ source: LinkEnd; target: LinkEnd }>, id: string): Set<string> {
   const neighbors = new Set<string>();
   for (const link of links) {
@@ -167,7 +170,24 @@ const SCOPE_COLORS = [
   "#b63d8d",
 ];
 
-/** Spreads the twelve colours over the scopes with the most nodes; the rest get none. */
+/**
+ * Ranked by what is on screen: the palette is short, and spending it on the biggest topics
+ * overall leaves a drawing where almost nothing is painted. The legend reads in this order too,
+ * so both callers take it from here instead of each sorting its own copy.
+ */
+export function rankTopicsByDrawn<T extends { members: readonly string[] }>(
+  topics: ReadonlyArray<T>,
+  drawn?: ReadonlySet<string>,
+): Array<{ topic: T; weight: number }> {
+  return topics
+    .map((topic) => ({
+      topic,
+      weight: drawn ? topic.members.filter((id) => drawn.has(id)).length : topic.members.length,
+    }))
+    .filter((t) => t.weight > 0)
+    .sort((a, b) => b.weight - a.weight);
+}
+
 /**
  * The same colours keyed by memory instead of by scope, because a topic crosses scopes. Topics
  * arrive sorted by size; the ones past the palette stay unpainted rather than sharing a colour.
@@ -176,15 +196,7 @@ export function topicPalette(
   topics: ReadonlyArray<{ members: readonly string[] }>,
   drawn?: ReadonlySet<string>,
 ): Map<string, string> {
-  // Ranked by what is on screen, like the scope palette: the palette is short, and spending it
-  // on the biggest topics overall leaves a drawing where almost nothing is painted.
-  const ranked = topics
-    .map((topic) => ({
-      topic,
-      weight: drawn ? topic.members.filter((id) => drawn.has(id)).length : topic.members.length,
-    }))
-    .filter((t) => t.weight > 0)
-    .sort((a, b) => b.weight - a.weight);
+  const ranked = rankTopicsByDrawn(topics, drawn);
   const palette = new Map<string, string>();
   for (const [index, { topic }] of ranked.entries()) {
     const color = SCOPE_COLORS[index];
@@ -192,6 +204,14 @@ export function topicPalette(
     for (const id of topic.members) palette.set(id, color);
   }
   return palette;
+}
+
+/** Spreads the twelve colours over the scopes with the most nodes; the rest get none. */
+/** The slider hands back a number; the setting is a union, and its middle branch needs a home. */
+export function asDepth(value: number): 1 | 2 | 3 {
+  if (value >= 3) return 3;
+  if (value <= 1) return 1;
+  return 2;
 }
 
 export function scopePalette(scopes: string[]): Map<string, string> {

@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { GraphLink } from "../ui/src/api";
 import type { Link } from "../ui/src/components/graph/paint";
-import { colorOfLink, colorOfNode, nodeWeight, paintNode, widthOfLink } from "../ui/src/components/graph/paint";
+import {
+  colorOfLink,
+  colorOfNode,
+  nodeWeight,
+  paintNode,
+  paintPointerArea,
+  pointerRadius,
+  widthOfLink,
+} from "../ui/src/components/graph/paint";
 
 /**
  * `tokensNow` reads the CSS variables off the document, and the project has no renderer. The
@@ -163,5 +171,38 @@ describe("el halo del conectoma", () => {
     paintNode(nodo, ctx, 1, paint);
 
     expect(stops[0]).toBe("#eeeeee");
+  });
+});
+
+describe("paintPointerArea", () => {
+  /** Only what the function touches: force-graph hands it a real 2D context. */
+  function fakeCtx() {
+    const arcs: number[] = [];
+    return {
+      arcs,
+      ctx: {
+        fillStyle: "",
+        beginPath: () => {},
+        fill: () => {},
+        arc: (_x: number, _y: number, r: number) => void arcs.push(r),
+      } as unknown as CanvasRenderingContext2D,
+    };
+  }
+
+  it("marca el disco con el mismo radio con el que se dibuja el nodo", () => {
+    const nodo = { id: "m1", layer: "memory", scope: "s", label: "una", x: 4, y: 7 } as never;
+    const { arcs, ctx } = fakeCtx();
+
+    paintPointerArea(nodo, "#ff0000", ctx, 1);
+
+    expect(arcs).toEqual([pointerRadius(nodo, 1)]);
+  });
+
+  it("un nodo sin coordenadas no dibuja nada", () => {
+    const { arcs, ctx } = fakeCtx();
+
+    paintPointerArea({ id: "m1", layer: "memory", scope: "s", label: "una" } as never, "#ff0000", ctx, 1);
+
+    expect(arcs).toEqual([]);
   });
 });

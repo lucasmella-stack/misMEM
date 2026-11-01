@@ -1,8 +1,8 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { ChevronDownIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { scopePalette } from "@/lib/graph";
+import { asDepth } from "@/lib/graph";
 import { ColorLegend } from "@/components/graph/ColorLegend";
 import { ChoiceRow, Section, SliderRow, ToggleRow } from "@/components/graph/PanelRows";
 
@@ -61,7 +61,10 @@ interface Props {
   settings: GraphSettings;
   onChange: (patch: Partial<GraphSettings>) => void;
   /** One scope per node, in arrival order: the panel counts and colours. */
-  scopes: string[];
+  /** Derived once by the caller: the drawing and the legend have to name the same colours. */
+  palette: Map<string, string>;
+  /** Some drawn scope got no colour, so the legend says "resto". */
+  unpainted: boolean;
   /** Width of the graph container: decides whether the panel starts expanded. */
   width: number;
   /** The connectome's reading, inside this panel's own section: as a second floating panel it
@@ -76,15 +79,13 @@ interface Props {
 
 
 
-export function GraphPanel({ settings, onChange, scopes, width, connectome, topics }: Props) {
+export function GraphPanel({ settings, onChange, palette, unpainted, width, connectome, topics }: Props) {
   // In a narrow container the panel covers half the graph: it starts collapsed and opens when
   // touched. While the parent has not measured (width 0) it stays collapsed and expands as soon
   // as a desktop width arrives; after that the person's choice rules.
   const [open, setOpen] = useState<boolean>();
   const expanded = open ?? width >= 900;
 
-  const palette = useMemo(() => scopePalette(scopes), [scopes]);
-  const unpainted = scopes.some((scope) => !palette.has(scope));
 
   return (
     <Collapsible
@@ -266,7 +267,7 @@ export function GraphPanel({ settings, onChange, scopes, width, connectome, topi
             min={1}
             max={3}
             step={1}
-            onValueChange={(v) => onChange({ depth: v >= 3 ? 3 : v <= 1 ? 1 : 2 })}
+            onValueChange={(v) => onChange({ depth: asDepth(v) })}
           />
         </Section>
       </CollapsibleContent>
