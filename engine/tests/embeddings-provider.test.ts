@@ -8,9 +8,7 @@ import { embedTexts, loadEmbeddingConfig } from "../src/embeddings/provider.js";
 
 const ENV_KEYS = [
   "MISMEM_EMBEDDINGS",
-  "MISMEM_EMBEDDING_PROVIDER",
   "MISMEM_EMBEDDING_URL",
-  "MISMEM_OLLAMA_URL",
   "MISMEM_EMBEDDING_MODEL",
   "MISMEM_EMBEDDING_QUERY_PREFIX",
   "MISMEM_EMBEDDING_DOC_PREFIX",
@@ -40,28 +38,45 @@ function openAiResponse(vectors: number[][]): Response {
 }
 
 const GEMMA_ENV = {
-  MISMEM_EMBEDDING_PROVIDER: "openai",
   MISMEM_EMBEDDING_URL: "http://embed.test",
   MISMEM_EMBEDDING_MODEL: "embeddinggemma-2",
-  MISMEM_EMBEDDING_QUERY_PREFIX: "task: search result | query: ",
-  MISMEM_EMBEDDING_DOC_PREFIX: "title: none | text: ",
 };
 
 describe("loadEmbeddingConfig", () => {
-  it("sin configurar sigue siendo Ollama con nomic, sin prefijos y corte 0,65", () => {
+  it("sin configurar es EmbeddingGemma 2 en llama-server, con sus prefijos y corte 0,65", () => {
     setEnv({});
     const cfg = loadEmbeddingConfig();
-    expect(cfg.provider).toBe("ollama");
-    expect(cfg.url).toBe("http://127.0.0.1:11434");
-    expect(cfg.model).toBe("nomic-embed-text");
-    expect(cfg.queryPrefix).toBe("");
-    expect(cfg.docPrefix).toBe("");
+    expect(cfg.url).toBe("http://127.0.0.1:8080");
+    expect(cfg.model).toBe("embeddinggemma-2");
+    expect(cfg.queryPrefix).toBe("task: search result | query: ");
+    expect(cfg.docPrefix).toBe("title: none | text: ");
     expect(cfg.minScore).toBe(0.65);
   });
 
-  it("MISMEM_OLLAMA_URL sigue valiendo para Ollama", () => {
-    setEnv({ MISMEM_OLLAMA_URL: "http://ollama:11434" });
-    expect(loadEmbeddingConfig().url).toBe("http://ollama:11434");
+  it.each(["google/embeddinggemma-300m", "/models/EmbeddingGemma-2-Q8_0.gguf"])(
+    "reconoce la familia EmbeddingGemma en cualquier id (%s)",
+    (model) => {
+      setEnv({ MISMEM_EMBEDDING_MODEL: model });
+      const cfg = loadEmbeddingConfig();
+      expect(cfg.queryPrefix).toBe("task: search result | query: ");
+      expect(cfg.docPrefix).toBe("title: none | text: ");
+      expect(cfg.minScore).toBe(0.65);
+    },
+  );
+
+  it("otro modelo arranca sin los prefijos de EmbeddingGemma y con el corte genérico 0,5", () => {
+    setEnv({ MISMEM_EMBEDDING_MODEL: "mxbai-embed-large" });
+    const cfg = loadEmbeddingConfig();
+    expect(cfg.queryPrefix).toBe("");
+    expect(cfg.docPrefix).toBe("");
+    expect(cfg.minScore).toBe(0.5);
+  });
+
+  it("un prefijo vacío explícito quita el de EmbeddingGemma", () => {
+    setEnv({ MISMEM_EMBEDDING_QUERY_PREFIX: "", MISMEM_EMBEDDING_DOC_PREFIX: "" });
+    const cfg = loadEmbeddingConfig();
+    expect(cfg.queryPrefix).toBe("");
+    expect(cfg.docPrefix).toBe("");
   });
 
   it("un corte 0 es una elección (traer todo), no un valor ausente", () => {
@@ -74,36 +89,16 @@ describe("loadEmbeddingConfig", () => {
     (value) => {
       setEnv({ MISMEM_EMBEDDING_MIN_SCORE: value });
       expect(loadEmbeddingConfig().minScore).toBe(0.65);
-      setEnv({ MISMEM_EMBEDDING_MIN_SCORE: value, MISMEM_EMBEDDING_MODEL: "embeddinggemma-2" });
+      setEnv({ MISMEM_EMBEDDING_MIN_SCORE: value, MISMEM_EMBEDDING_MODEL: "mxbai-embed-large" });
       expect(loadEmbeddingConfig().minScore).toBe(0.5);
     },
   );
 
-  it.each(["nomic-embed-text", "nomic-embed-text:latest"])(
-    "con %s y sin corte elegido, el default es 0,65",
-    (model) => {
-      setEnv({ MISMEM_EMBEDDING_MODEL: model });
-      expect(loadEmbeddingConfig().minScore).toBe(0.65);
-    },
-  );
-
-  it("un corte explícito gana al default de nomic", () => {
-    setEnv({ MISMEM_EMBEDDING_MODEL: "nomic-embed-text", MISMEM_EMBEDDING_MIN_SCORE: "0.5" });
+  it("un corte explícito gana al default", () => {
+    setEnv({ MISMEM_EMBEDDING_MIN_SCORE: "0.5" });
     expect(loadEmbeddingConfig().minScore).toBe(0.5);
-    setEnv({ MISMEM_EMBEDDING_MODEL: "nomic-embed-text", MISMEM_EMBEDDING_MIN_SCORE: "0" });
+    setEnv({ MISMEM_EMBEDDING_MIN_SCORE: "0" });
     expect(loadEmbeddingConfig().minScore).toBe(0);
-  });
-
-  it("los demás modelos conservan el default de 0,5", () => {
-    setEnv({ MISMEM_EMBEDDING_MODEL: "embeddinggemma-2" });
-    expect(loadEmbeddingConfig().minScore).toBe(0.5);
-    setEnv({ MISMEM_EMBEDDING_MODEL: "mxbai-embed-large" });
-    expect(loadEmbeddingConfig().minScore).toBe(0.5);
-  });
-
-  it("el proveedor openai sin URL no le habla al puerto de Ollama", () => {
-    setEnv({ MISMEM_EMBEDDING_PROVIDER: "openai", MISMEM_OLLAMA_URL: "http://ollama:11434" });
-    expect(loadEmbeddingConfig().url).toBe("http://127.0.0.1:8080");
   });
 
   it("un timeout válido se respeta", () => {
@@ -132,13 +127,19 @@ describe("loadEmbeddingConfig", () => {
     },
   );
 
-  it("lee proveedor, URL, prefijos y corte", () => {
-    setEnv({ ...GEMMA_ENV, MISMEM_EMBEDDING_MIN_SCORE: "0.68" });
+  it("lee URL, modelo, prefijos y corte", () => {
+    setEnv({
+      MISMEM_EMBEDDING_URL: "http://ollama.test:11434",
+      MISMEM_EMBEDDING_MODEL: "otro-modelo",
+      MISMEM_EMBEDDING_QUERY_PREFIX: "q: ",
+      MISMEM_EMBEDDING_DOC_PREFIX: "d: ",
+      MISMEM_EMBEDDING_MIN_SCORE: "0.68",
+    });
     const cfg = loadEmbeddingConfig();
-    expect(cfg.provider).toBe("openai");
-    expect(cfg.url).toBe("http://embed.test");
-    expect(cfg.queryPrefix).toBe("task: search result | query: ");
-    expect(cfg.docPrefix).toBe("title: none | text: ");
+    expect(cfg.url).toBe("http://ollama.test:11434");
+    expect(cfg.model).toBe("otro-modelo");
+    expect(cfg.queryPrefix).toBe("q: ");
+    expect(cfg.docPrefix).toBe("d: ");
     expect(cfg.minScore).toBe(0.68);
   });
 });
@@ -157,7 +158,7 @@ describe("embedTexts con un servidor compatible con OpenAI", () => {
       model: "embeddinggemma-2",
       input: ["task: search result | query: a", "task: search result | query: b"],
     });
-    expect(vecs?.map((v) => Array.from(v))).toEqual([[1, 0], [0, 1]]);
+    expect(vecs?.map((v) => (v ? Array.from(v) : null))).toEqual([[1, 0], [0, 1]]);
   });
 
   it("a los documentos les pone el prefijo de documento", async () => {
@@ -177,20 +178,46 @@ describe("embedTexts con un servidor compatible con OpenAI", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("boom", { status: 500 })));
     expect(await embedTexts(["a"], loadEmbeddingConfig(), "query")).toBeNull();
   });
+
+  it("normaliza lo que devuelve el servidor", async () => {
+    setEnv(GEMMA_ENV);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(openAiResponse([[3, 4]])));
+
+    const vecs = await embedTexts(["a"], loadEmbeddingConfig(), "query");
+
+    expect(vecs?.[0]?.[0]).toBeCloseTo(0.6);
+    expect(vecs?.[0]?.[1]).toBeCloseTo(0.8);
+  });
+
+  it.each([
+    { label: "norma cero", vector: [0, 0] },
+    // 1e39 overflows Float32Array into Infinity: JSON cannot carry NaN itself.
+    { label: "un componente no finito", vector: [1e39, 1] },
+    { label: "un componente null", vector: [1, null, 2] },
+  ])("un vector con $label es null, pero no arrastra al resto del lote", async ({ vector }) => {
+    setEnv(GEMMA_ENV);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(openAiResponse([[1, 0, 0], vector as unknown as number[]])),
+    );
+
+    const vecs = await embedTexts(["a", "b"], loadEmbeddingConfig(), "query");
+
+    expect(vecs?.[0]?.length).toBe(3);
+    expect(vecs?.[1]).toBeNull();
+  });
 });
 
-describe("Ollama no cambia", () => {
-  it("pide /api/embed sin prefijos", async () => {
-    setEnv({ MISMEM_OLLAMA_URL: "http://ollama.test" });
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ embeddings: [[1, 0]] })));
+describe("otro servidor y otro modelo", () => {
+  it("Ollama se usa por el mismo /v1/embeddings, con el modelo elegido y sin prefijos", async () => {
+    setEnv({ MISMEM_EMBEDDING_URL: "http://ollama.test:11434", MISMEM_EMBEDDING_MODEL: "mxbai-embed-large" });
+    const fetchMock = vi.fn().mockResolvedValue(openAiResponse([[1, 0]]));
     vi.stubGlobal("fetch", fetchMock);
 
     await embedTexts(["a"], loadEmbeddingConfig(), "query");
 
-    expect(fetchMock.mock.calls[0]![0]).toBe("http://ollama.test/api/embed");
-    expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string).input).toEqual(["a"]);
+    expect(fetchMock.mock.calls[0]![0]).toBe("http://ollama.test:11434/v1/embeddings");
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string)).toEqual({ model: "mxbai-embed-large", input: ["a"] });
   });
 });
 

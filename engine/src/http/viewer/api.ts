@@ -39,7 +39,7 @@ export function parseDetailPath(pathname: string): DetailPath | "bad" | null {
 export function handleEmbeddings(db: DB, res: ServerResponse): void {
   const cfg = loadEmbeddingConfig();
   const status = getEmbeddingIndexStatus(db, cfg.model);
-  json(res, 200, { enabled: cfg.enabled, provider: cfg.provider, model: cfg.model, ...status });
+  json(res, 200, { enabled: cfg.enabled, model: cfg.model, ...status });
 }
 
 export function handleScopes(db: DB, res: ServerResponse): void {

@@ -611,7 +611,7 @@ describe("runConsolidation", () => {
       vi.unstubAllGlobals();
     }
 
-    // The backfill reads the real config: without vitest's env it reaches the developer's Ollama.
+    // The backfill reads the real config: without vitest's env it reaches the developer's embedding server.
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 

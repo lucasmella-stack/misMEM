@@ -35,7 +35,6 @@ interface MemoryItem {
 /** The semantic index status; it never includes the provider URL. */
 export interface EmbeddingStatus {
   enabled: boolean;
-  provider: "ollama" | "openai";
   model: string;
   /** The width search compares against; null when the base has no vector of the model. */
   active_dims: number | null;
@@ -45,6 +44,8 @@ export interface EmbeddingStatus {
   compatible: number;
   stale_model: number;
   stale_dims: number;
+  /** Active-model vectors with a non-finite component or a zero norm; the next backfill redoes them. */
+  invalid: number;
   models: Array<{ model: string; dims: number; count: number }>;
 }
 

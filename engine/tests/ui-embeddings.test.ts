@@ -13,7 +13,6 @@ const NOW = Date.UTC(2026, 9, 25, 12, 0, 0);
 function status(overrides: Partial<EmbeddingStatus> = {}): EmbeddingStatus {
   return {
     enabled: true,
-    provider: "ollama",
     model: "embeddinggemma-2",
     memories: 10,
     embedded: 10,
@@ -21,6 +20,7 @@ function status(overrides: Partial<EmbeddingStatus> = {}): EmbeddingStatus {
     compatible: 10,
     stale_model: 0,
     stale_dims: 0,
+    invalid: 0,
     active_dims: null,
     models: [],
     ...overrides,
