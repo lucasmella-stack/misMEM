@@ -326,15 +326,22 @@ PREV_URL="$(prev MISMEM_EMBEDDING_URL)"
 PREV_PROVIDER_EMBED="$(prev MISMEM_EMBEDDING_PROVIDER)"
 PREV_OLLAMA_URL="$(prev MISMEM_OLLAMA_URL)"
 PREV_KIND=""
+# nomic sólo es "lo que montaba este instalador" si apuntaba al Ollama local; con otro servidor es del
+# usuario y pasa por la pregunta de conservarlo.
+PREV_LOCAL_OLLAMA=""
+if [ -z "$PREV_URL" ] && [ "$PREV_PROVIDER_EMBED" != openai ] &&
+  [ "${PREV_OLLAMA_URL:-http://127.0.0.1:11434}" = http://127.0.0.1:11434 ]; then PREV_LOCAL_OLLAMA=1; fi
 if [ -n "$PREV_EMBED$PREV_URL$PREV_PROVIDER_EMBED$PREV_OLLAMA_URL" ]; then
   PREV_KIND=custom
   case "$PREV_EMBED" in
     embeddinggemma-2) if [ "${PREV_URL:-$GEMMA_URL}" = "$GEMMA_URL" ]; then PREV_KIND=gemma; fi ;;
-    nomic-embed-text*) PREV_KIND=nomic ;;
+    nomic-embed-text*) if [ -n "$PREV_LOCAL_OLLAMA" ]; then PREV_KIND=nomic; fi ;;
     "")
       # Sin modelo, el motor usaba nomic-embed-text: una instalación de Ollama, o con su URL, es nomic
       # y se migra como las demás; no es una configuración propia que haya que conservar.
-      if [ "$PREV_PROVIDER_EMBED" = ollama ] || [ -n "$PREV_OLLAMA_URL" ]; then PREV_KIND=nomic; fi
+      if [ -n "$PREV_LOCAL_OLLAMA" ] && { [ "$PREV_PROVIDER_EMBED" = ollama ] || [ -n "$PREV_OLLAMA_URL" ]; }; then
+        PREV_KIND=nomic
+      fi
       ;;
   esac
 fi
@@ -357,6 +364,10 @@ if [ -n "$EMBED_FLAG" ]; then
   fi
 elif [ "$PREV_KIND" = custom ] && ! confirm "  Ya tienes embeddings configurados (${PREV_EMBED:-sin modelo}, ${PREV_URL:-$PREV_RESOLVED_URL}). ¿Conservarlos?" y; then
   EMBED_CHOICE=gemma
+fi
+# Una búsqueda apagada a propósito sigue apagada: re-ejecutar sin --embeddings no la enciende.
+if [ -z "$EMBED_FLAG" ] && [ "$EMBED_CHOICE" != custom ] && [ "$(prev MISMEM_EMBEDDINGS)" = off ]; then
+  EMBED_CHOICE=off
 fi
 if [ "$EMBED_CHOICE" = nomic ]; then
   say "  nomic-embed-text ya no se usa: paso a EmbeddingGemma 2, y las memorias se reindexan solas."
