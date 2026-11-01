@@ -12,7 +12,7 @@
   mayor que no pierde aciertos en el golden eval (PR #181, que esto sustituye); otro modelo arranca sin prefijos
   y con 0,5. Quien configuró EmbeddingGemma a mano sin prefijos tiene que reindexar con `mismem-embed --force`.
 - **El instalador** monta sólo EmbeddingGemma 2: `--embeddings gemma|off`. Una instalación con nomic en el Ollama local pasa
-  a EmbeddingGemma 2 al re-ejecutarlo; nomic en otro servidor u otro modelo se conservan, y una búsqueda apagada
+  a EmbeddingGemma 2 al re-ejecutarlo si hay `llama-server` (si no, conserva nomic); nomic en otro servidor u otro modelo se conservan, y una búsqueda apagada
   con `MISMEM_EMBEDDINGS=off` sigue apagada.
 - **Rompe** a quien tenga nomic o el proveedor `ollama` configurado a mano: sin `MISMEM_EMBEDDING_PROVIDER` ni
   `MISMEM_OLLAMA_URL`, la URL pasa a `http://127.0.0.1:8080` y el modelo a EmbeddingGemma 2. Para conservar lo
