@@ -46,8 +46,9 @@ describe("el servidor de embeddings real", () => {
     expect(a!.length).toBeGreaterThan(0);
     expect(b!.length).toBe(a!.length);
     for (const v of vecs!) {
-      expect(v.every(Number.isFinite)).toBe(true);
-      expect(v.some((x) => x !== 0)).toBe(true);
+      expect(v).not.toBeNull();
+      expect(v!.every(Number.isFinite)).toBe(true);
+      expect(v!.some((x) => x !== 0)).toBe(true);
     }
   });
 
