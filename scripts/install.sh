@@ -343,7 +343,12 @@ if [ -z "$PREV_URL" ] && [ "$PREV_PROVIDER_EMBED" != openai ] &&
 if [ -n "$PREV_EMBED$PREV_URL$PREV_PROVIDER_EMBED$PREV_OLLAMA_URL" ]; then
   PREV_KIND=custom
   case "$PREV_EMBED" in
-    embeddinggemma-2) if [ "${PREV_URL:-$GEMMA_URL}" = "$GEMMA_URL" ]; then PREV_KIND=gemma; fi ;;
+    # Sin URL, el motor anterior sólo iba al 8080 con el proveedor openai; si no, hablaba con Ollama.
+    embeddinggemma-2)
+      if [ "$PREV_URL" = "$GEMMA_URL" ] || { [ -z "$PREV_URL" ] && [ "$PREV_PROVIDER_EMBED" = openai ]; }; then
+        PREV_KIND=gemma
+      fi
+      ;;
     nomic-embed-text*) if [ -n "$PREV_LOCAL_OLLAMA" ]; then PREV_KIND=nomic; fi ;;
     "")
       # Sin modelo, el motor usaba nomic-embed-text: una instalación de Ollama, o con su URL, es nomic

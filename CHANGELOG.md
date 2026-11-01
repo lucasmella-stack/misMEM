@@ -14,8 +14,9 @@
 - **El instalador** monta sólo EmbeddingGemma 2: `--embeddings gemma|off`. Una instalación con nomic en el Ollama local pasa
   a EmbeddingGemma 2 al re-ejecutarlo si hay `llama-server` (si no, conserva nomic); nomic en otro servidor u otro modelo se conservan, y una búsqueda apagada
   con `MISMEM_EMBEDDINGS=off` sigue apagada.
-- **Rompe** a quien tenga nomic o el proveedor `ollama` configurado a mano: sin `MISMEM_EMBEDDING_PROVIDER` ni
-  `MISMEM_OLLAMA_URL`, la URL pasa a `http://127.0.0.1:8080` y el modelo a EmbeddingGemma 2. Para conservar lo
+- **Rompe** a quien use nomic o el proveedor `ollama`, a mano o con el instalador anterior, hasta que re-ejecute el
+  instalador: el motor ya no lee `MISMEM_EMBEDDING_PROVIDER` ni `MISMEM_OLLAMA_URL`, así que la URL pasa a
+  `http://127.0.0.1:8080`, el modelo por defecto a EmbeddingGemma 2 y el corte de nomic de 0,65 a 0,5. Para conservar lo
   que tenía, que escriba `MISMEM_EMBEDDING_URL=http://127.0.0.1:11434`,
   `MISMEM_EMBEDDING_MODEL=nomic-embed-text` y `MISMEM_EMBEDDING_MIN_SCORE=0.65`; para pasarse a EmbeddingGemma 2,
   que re-ejecute el instalador.
