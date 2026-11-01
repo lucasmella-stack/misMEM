@@ -14,14 +14,27 @@ const endId = (end: End): string | undefined => {
   return typeof end === "object" ? (end.id === undefined ? undefined : String(end.id)) : String(end);
 };
 
+/** How many drawn edges each node has, and the most any of them has: 0 turns the mode off. */
+export interface Sizing {
+  degrees: Map<string, number>;
+  maxDegree: number;
+}
+
 /**
  * The simulation sizes a node from this and the canvas draws its radius from the same number,
  * so the circle and the force field cannot disagree.
  */
-export const nodeWeight = (node: Node): number =>
-  node.layer === "trait"
+export const nodeWeight = (node: Node, sizing?: Sizing): number => {
+  // By connections every layer measures the same way: a trait fixed at 5 and an episode at a
+  // salience of 0.5 said nothing about which of them organizes the rest.
+  if (sizing && sizing.maxDegree > 0) {
+    const share = Math.min(1, (sizing.degrees.get(String(node.id)) ?? 0) / sizing.maxDegree);
+    return MEMORY_MIN_WEIGHT + DEGREE_WEIGHT_RANGE * share;
+  }
+  return node.layer === "trait"
     ? TRAIT_WEIGHT
     : MEMORY_MIN_WEIGHT + MEMORY_WEIGHT_RANGE * (node.salience ?? UNKNOWN_SALIENCE);
+};
 
 /**
  * A trait outweighs every memory because it is the layer that organizes them, and a memory of
@@ -31,6 +44,9 @@ export const nodeWeight = (node: Node): number =>
 const TRAIT_WEIGHT = 5;
 const MEMORY_MIN_WEIGHT = 1;
 const MEMORY_WEIGHT_RANGE = 2.5;
+// Pixels come out of a square root, so 9x the weight is 3x the radius: the most connected node
+// reads as a centre without swallowing its neighbours.
+const DEGREE_WEIGHT_RANGE = 8;
 const UNKNOWN_SALIENCE = 0.5;
 const WEIGHT_TO_PIXELS = 2.2;
 
@@ -42,7 +58,14 @@ const HALO_MIN_SCALE = 1.8;
 const HALO_GROWTH = 1.4;
 const HALO_MAX_ALPHA = 0.5;
 
-const radiusOf = (node: Node, size: number): number => Math.sqrt(nodeWeight(node) * size) * WEIGHT_TO_PIXELS;
+export const radiusOf = (node: Node, size: number, sizing?: Sizing): number =>
+  Math.sqrt(nodeWeight(node, sizing) * size) * WEIGHT_TO_PIXELS;
+
+/** The area that takes a click: never under the minimum, and it grows with a bigger node. */
+export const pointerRadius = (node: Node, size: number, sizing?: Sizing): number =>
+  Math.max(POINTER_MIN_RADIUS, radiusOf(node, size, sizing));
+
+const POINTER_MIN_RADIUS = 7;
 
 export function colorOfNode(node: Node, palette: Map<string, string>, colorByScope: boolean): string {
   if (node.layer === "trait") return tokensNow().brand;
@@ -60,6 +83,8 @@ interface NodePaint {
   positions: Map<string, { x: number; y: number }>;
   /** Strongest accumulated association in view; 0 turns the halos off. */
   maxHubStrength: number;
+  /** Absent, the radius comes from salience, which is the drawing of before. */
+  sizing?: Sizing;
 }
 
 /** Draws one node; every piece of state it needs arrives in `paint`, never through a closure. */
@@ -70,7 +95,7 @@ export function paintNode(node: Node, ctx: CanvasRenderingContext2D, scale: numb
   const saved = paint.positions.get(id);
   if (saved?.x !== node.x || saved.y !== node.y) paint.positions.set(id, { x: node.x, y: node.y });
   const lit = paint.isLit(id);
-  const radius = radiusOf(node, paint.nodeSize);
+  const radius = radiusOf(node, paint.nodeSize, paint.sizing);
 
   // Outside the active node and its neighbours the graph dims: focus reads at a glance.
   ctx.globalAlpha = lit ? 1 : DIMMED_ALPHA;

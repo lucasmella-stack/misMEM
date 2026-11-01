@@ -4,10 +4,27 @@ import { forceX, forceY, type ForceLink, type ForceManyBody } from "d3-force";
 import ForceGraph2D, { type ForceGraphMethods } from "react-force-graph-2d";
 import { api, type GraphLink, type GraphNode, type Layer } from "../api";
 import { errorMessage } from "../lib/errors";
-import { escapeHtml, filterGraph, neighborsOf, scopePalette, type GraphFilters } from "../lib/graph";
+import {
+  escapeHtml,
+  filterGraph,
+  neighborsOf,
+  scopePalette,
+  visibleDegrees,
+  type GraphFilters,
+} from "../lib/graph";
 import { DEFAULT_SETTINGS, GraphPanel, type GraphSettings } from "./GraphPanel";
 import { ConnectomePanel } from "./graph/ConnectomePanel";
-import { colorOfLink, colorOfNode, nodeWeight, paintNode, type Link, type Node, widthOfLink } from "./graph/paint";
+import {
+  colorOfLink,
+  colorOfNode,
+  nodeWeight,
+  paintNode,
+  pointerRadius,
+  type Link,
+  type Node,
+  type Sizing,
+  widthOfLink,
+} from "./graph/paint";
 
 interface Props {
   scope: string | undefined;
@@ -119,7 +136,17 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
     [],
   );
 
-  const nodeVal = useCallback((node: Node) => nodeWeight(node) * settings.nodeSize, [settings.nodeSize]);
+  // Counted over the links actually drawn, so turning a layer off resizes the nodes with it.
+  const sizing = useMemo<Sizing | undefined>(() => {
+    if (!settings.sizeByConnections) return undefined;
+    const degrees = visibleDegrees(graphData.links);
+    return { degrees, maxDegree: Math.max(0, ...degrees.values()) };
+  }, [settings.sizeByConnections, graphData.links]);
+
+  const nodeVal = useCallback(
+    (node: Node) => nodeWeight(node, sizing) * settings.nodeSize,
+    [settings.nodeSize, sizing],
+  );
 
   const nodeColor = useCallback(
     (node: Node) => colorOfNode(node, palette, settings.colorByScope),
@@ -137,8 +164,9 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
         color: nodeColor,
         positions: positions.current,
         maxHubStrength,
+        sizing,
       }),
-    [active, isLit, maxHubStrength, nodeColor, selectedId, settings.nodeSize, settings.textThreshold],
+    [active, isLit, maxHubStrength, nodeColor, selectedId, settings.nodeSize, settings.textThreshold, sizing],
   );
 
   const linkColor = useCallback((link: Link) => colorOfLink(link, active), [active]);
@@ -255,7 +283,7 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
             if (node.x == null || node.y == null) return;
             ctx.fillStyle = color;
             ctx.beginPath();
-            ctx.arc(node.x, node.y, 7, 0, 2 * Math.PI);
+            ctx.arc(node.x, node.y, pointerRadius(node, settings.nodeSize, sizing), 0, 2 * Math.PI);
             ctx.fill();
           }}
           linkColor={linkColor}
