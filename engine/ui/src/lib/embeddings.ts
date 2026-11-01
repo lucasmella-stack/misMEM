@@ -46,20 +46,11 @@ export function embeddingWarning(status: EmbeddingStatus | undefined): string | 
 }
 
 /**
- * The width the active model produces, read from the index itself: the width most of its
- * vectors use, as the server decides it. A tie breaks towards the smaller width so the answer
- * does not depend on the order the API happens to return.
+ * The width the server recorded as active, which is the one search compares against. A base
+ * indexed before the width was recorded reports null, and then nothing is claimed about a vector.
  */
 export function activeModelDims(status: EmbeddingStatus | undefined): number | undefined {
-  if (!status) return undefined;
-  let best: { dims: number; count: number } | undefined;
-  for (const entry of status.models) {
-    if (entry.model !== status.model) continue;
-    if (!best || entry.count > best.count || (entry.count === best.count && entry.dims < best.dims)) {
-      best = entry;
-    }
-  }
-  return best?.dims;
+  return status?.active_dims ?? undefined;
 }
 
 /**

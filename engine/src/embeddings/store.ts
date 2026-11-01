@@ -2,11 +2,24 @@
 // No native extensions: vectors live as Float32Array BLOBs and the cosine runs in JS, sized for a personal
 // memory (thousands of rows, not millions) without adding install fragility.
 import type { Database as DB } from "better-sqlite3";
+import { readMeta, writeMeta } from "../store/meta.js";
 import { excludeNoiseSql } from "../store/rows.js";
 import { embedTexts, loadEmbeddingConfig, type EmbedFn } from "./provider.js";
 import { cosine } from "./vector.js";
 
 const MAX_CONSECUTIVE_FAILURES = 2;
+
+const activeDimsKey = (model: string): string => `embedding_dims:${model}`;
+
+/**
+ * The width the embedder last produced for this model. Ground truth over the stored majority:
+ * after a provider change of width, the old vectors outnumber the new and are the stale ones.
+ */
+function recordedDims(db: DB, model: string): number | undefined {
+  const raw = readMeta(db, activeDimsKey(model));
+  const value = Number(raw);
+  return raw !== undefined && Number.isInteger(value) && value > 0 ? value : undefined;
+}
 
 export function saveMemoryEmbedding(
   db: DB,
@@ -178,14 +191,18 @@ export async function embedPendingMemories(
       continue;
     }
     consecutiveFailures = 0;
+    let savedDims: number | undefined;
     for (let j = 0; j < batch.length; j++) {
       const vec = vecs[j];
       const mem = batch[j];
       if (!vec || !mem) continue;
       saveMemoryEmbedding(db, mem.id, model, vec);
+      savedDims = vec.length;
       stats.embedded++;
       if (mem.had_embedding) stats.reembedded++;
     }
+    // The status reads this instead of guessing from the majority, which lags a width change.
+    if (savedDims !== undefined) writeMeta(db, activeDimsKey(model), String(savedDims));
   }
   return stats;
 }
@@ -198,6 +215,8 @@ export interface EmbeddingIndexStatus {
   stale_model: number;
   stale_dims: number;
   models: Array<{ model: string; dims: number; count: number }>;
+  /** The width search compares against: nullable because an unindexed base has none. */
+  active_dims: number | null;
 }
 
 export function getEmbeddingIndexStatus(
@@ -222,8 +241,8 @@ export function getEmbeddingIndexStatus(
       .get() as { n: number }
   ).n;
   // A vector is only usable by search when it has both the active model and the width
-  // that model produces. Without a configured width, the most common one is the best
-  // guess; a tie breaks towards the smaller width so the report is deterministic.
+  // that model produces. The recorded width wins; the stored majority only fills in for a
+  // base indexed before the width was recorded. A tie breaks towards the smaller width.
   const dominant = db
     .prepare(
       `SELECT e.dims FROM memory_embeddings e
@@ -232,7 +251,7 @@ export function getEmbeddingIndexStatus(
        GROUP BY e.dims ORDER BY COUNT(*) DESC, e.dims ASC LIMIT 1`,
     )
     .get(activeModel) as { dims: number } | undefined;
-  const dims = expectedDims ?? dominant?.dims;
+  const dims = expectedDims ?? recordedDims(db, activeModel) ?? dominant?.dims;
   const compatible =
     dims === undefined
       ? 0
@@ -276,6 +295,7 @@ export function getEmbeddingIndexStatus(
     compatible,
     stale_model: embedded - compatible - stale_dims,
     stale_dims,
+    active_dims: dims ?? null,
     models,
   };
 }

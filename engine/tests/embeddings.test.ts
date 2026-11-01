@@ -204,7 +204,35 @@ describe("getEmbeddingIndexStatus", () => {
       compatible: 0,
       stale_model: 0,
       stale_dims: 0,
+      active_dims: null,
       models: [],
+    });
+  });
+
+  it("el ancho que produjo el embedder manda sobre la mayoría de vectores viejos", async () => {
+    const a = makeMemory("vida", "uno");
+    const b = makeMemory("vida", "dos");
+    makeMemory("vida", "tres");
+    saveMemoryEmbedding(db, a, "m", Float32Array.from([1, 0, 0]));
+    saveMemoryEmbedding(db, b, "m", Float32Array.from([1, 0, 0]));
+    // The provider now answers with another width: only the new vector is searchable.
+    const fiveDims: EmbedFn = async () => [new Float32Array([1, 0, 0, 0, 0])];
+
+    await embedPendingMemories(db, { embedFn: fiveDims, model: "m" });
+
+    expect(getEmbeddingIndexStatus(db, "m")).toMatchObject({
+      embedded: 3,
+      compatible: 1,
+      stale_model: 0,
+      stale_dims: 2,
+      active_dims: 5,
+    });
+    // An explicit width still wins over the recorded one.
+    expect(getEmbeddingIndexStatus(db, "m", 3)).toMatchObject({
+      compatible: 2,
+      stale_model: 0,
+      stale_dims: 1,
+      active_dims: 3,
     });
   });
 
@@ -216,7 +244,7 @@ describe("getEmbeddingIndexStatus", () => {
     saveMemoryEmbedding(db, b, "m", Float32Array.from([1, 0, 0]));
     saveMemoryEmbedding(db, c, "m", Float32Array.from([1, 0, 0, 0, 0]));
 
-    // Two 3-dimension vectors against one of 5: the dominant width is 3.
+    // Two 3-dimension vectors against one of 5: nothing recorded, so the dominant width is 3.
     expect(getEmbeddingIndexStatus(db, "m")).toMatchObject({
       memories: 3,
       embedded: 3,
@@ -224,6 +252,7 @@ describe("getEmbeddingIndexStatus", () => {
       compatible: 2,
       stale_model: 0,
       stale_dims: 1,
+      active_dims: 3,
     });
   });
 
