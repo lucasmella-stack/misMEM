@@ -122,7 +122,7 @@ pnpm test        # todo verde antes de usar
 pnpm build       # compila a dist/
 ```
 
-Y en `mcp.json`: `"command": "node", "args": ["<ruta-al-repo>/misMEM/engine/dist/server.js"]`.
+Y en la configuración MCP del cliente: `"command": "node", "args": ["<ruta-al-repo>/misMEM/engine/dist/server.js"]`.
 
 </details>
 

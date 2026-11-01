@@ -8,7 +8,7 @@
   consolidación con cualquier LLM de API compatible con OpenAI: el README deja de presentar modelos concretos
   como si fueran parte del sistema.
 - misMEM sirve a cualquier cliente MCP: los ejemplos pasan a ser las herramientas de código (opencode,
-  Claude Code, Codex, Cursor, VS Code), y la lista exacta de lo que configura el instalador queda en su `--help`.
+  Claude Code, Codex, Cursor, VS Code), y la lista de clientes que configura el instalador queda en su `--help`.
 
 ### Un solo proveedor de embeddings, con EmbeddingGemma 2 por defecto y sin nomic (#229)
 
