@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Database as DB } from "better-sqlite3";
 import type { ServerResponse } from "node:http";
-import { openDb } from "../src/db.js";
-import { capture, consolidate, recall, recallHybrid } from "../src/tools.js";
+import { openDb } from "../src/store/db.js";
+import { capture } from "../src/memory/capture.js";
+import { consolidate } from "../src/memory/consolidate.js";
+import { recall, recallHybrid } from "../src/recall/recall.js";
 import { embedPendingMemories } from "../src/embeddings/store.js";
 import type { EmbedFn } from "../src/embeddings/provider.js";
-import { dispatchEngramTool } from "../src/engram-compat.js";
-import { handleSearch } from "../src/viewer.js";
+import { dispatchEngramTool } from "../src/mcp/engram-compat.js";
+import { handleSearch } from "../src/http/viewer/read.js";
 
 let db: DB;
 
@@ -210,7 +212,7 @@ describe("ranking híbrido", () => {
     const noise = makeNoiseMarker("[noise] 4 episodios sin señal consolidable de finanzas");
     makeMemory("la deuda del cashflow quedó saldada");
     await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
-    // Una base de antes del filtro ya tiene vectores de marcadores: hay que atajarlos igual.
+    // A db from before the filter already has marker vectors: they must be stopped all the same.
     db.prepare(
       "INSERT INTO memory_embeddings (memory_id, model, dims, vec, created_at) VALUES (?, ?, ?, ?, ?)",
     ).run(noise, "fake", 2, Buffer.from(fakeVec("finanzas").buffer), Date.now());

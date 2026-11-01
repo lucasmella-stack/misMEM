@@ -1,15 +1,8 @@
 #!/usr/bin/env node
-/**
- * mismem-embed — backfill y reindexado de embeddings para memories.
- *
- * Requiere el servidor de embeddings configurado: Ollama (default:
- * `ollama pull nomic-embed-text`) o uno compatible con OpenAI. Idempotente: procesa vectores
- * ausentes u obsoletos; `--force` reconstruye también los compatibles.
- *
- * Uso:
- *   mismem-embed [--scope <name>] [--batch 32] [--status] [--force]
- */
-import { defaultDbPath, openDefaultDb } from "./db.js";
+// mismem-embed: backfill and reindex of memory embeddings against the configured server
+// (Ollama by default, or OpenAI-compatible). Idempotent: it fills missing or stale vectors;
+// --force rebuilds compatible ones too.
+import { defaultDbPath, openDefaultDb } from "./store/db.js";
 import { embedPendingMemories, getEmbeddingIndexStatus } from "./embeddings/store.js";
 import { loadEmbeddingConfig } from "./embeddings/provider.js";
 import { ArgsError, EXIT_USAGE } from "./cli-args.js";

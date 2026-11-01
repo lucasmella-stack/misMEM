@@ -3,10 +3,11 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
+import { isNoiseGist } from "../src/domain/noise.js";
 import type { EmbedFn } from "../src/embeddings/provider.js";
-import { loadGolden, parseFloor, parseGolden, runGolden } from "../src/golden.js";
-import { isNoiseGist } from "../src/noise.js";
+import { parseFloor, parseGolden } from "../src/recall/golden-corpus.js";
+import { loadGolden, runGolden } from "../src/recall/golden.js";
+import { openDb } from "../src/store/db.js";
 
 const DAY_MS = 86_400_000;
 const AT = Date.UTC(2026, 0, 15);

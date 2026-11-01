@@ -1,13 +1,8 @@
-/**
- * Owns the memory_embeddings SQL: saving vectors, brute-force search over them, backfill and index status.
- *
- * Capa semántica opcional sobre las memorias. Sin extensiones nativas: los vectores
- * viven como BLOB (Float32Array) en `memory_embeddings` y la búsqueda es coseno
- * brute-force en JS, pensada para una memoria personal (miles de filas, no millones)
- * sin agregar fragilidad de instalación al paquete.
- */
+// Owns the memory_embeddings SQL: saving vectors, brute-force search over them, backfill and index status.
+// No native extensions: vectors live as Float32Array BLOBs and the cosine runs in JS, sized for a personal
+// memory (thousands of rows, not millions) without adding install fragility.
 import type { Database as DB } from "better-sqlite3";
-import { excludeNoiseSql } from "../noise.js";
+import { excludeNoiseSql } from "../store/rows.js";
 import { embedTexts, loadEmbeddingConfig, type EmbedFn } from "./provider.js";
 import { cosine } from "./vector.js";
 
@@ -36,7 +31,7 @@ export interface SemanticHit {
   score: number;
 }
 
-/** Coseno brute-force sobre todas las memorias embebidas (scope opcional). */
+/** Brute-force cosine over every embedded memory (optional scope). */
 export function semanticSearchMemories(
   db: DB,
   queryVec: Float32Array,
@@ -105,8 +100,8 @@ export interface BackfillStats {
 }
 
 /**
- * Embebe memories sin vector o con un modelo obsoleto (idempotente).
- * Cubre cualquier write path pendiente y permite reindexado explícito.
+ * Embeds memories without a vector or with a stale model (idempotent).
+ * Covers any pending write path and allows an explicit reindex.
  */
 export async function embedPendingMemories(
   db: DB,
@@ -173,7 +168,7 @@ export async function embedPendingMemories(
     );
     const vecs = await embedFn(texts);
     if (!vecs) {
-      // Una tanda lenta o rara no condena al resto; dos seguidas, sí: el embedder está caído.
+      // A slow or odd batch does not doom the rest; two in a row do: the embedder is down.
       consecutiveFailures++;
       if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
         stats.failed += pendingRows.length - i;

@@ -20,6 +20,39 @@ Con `MISMEM_REINFORCE_ON_RECALL=off`, la saliencia pasa a seguir el uso en vez d
 mirar antes qué reforzaría `mismem-used --dry-run` y, sólo entonces, apagarlo; las cifras y el motivo
 están en DEPLOY.md.
 
+## Cuándo cuenta que un recuerdo se usó
+
+`mismem-used` no refuerza todo lo que el recall devolvió: premiaría a lo que siempre aparece. Cuenta como
+usado el recuerdo cuya respuesta repite **al menos 2 de sus palabras distintivas** y **al menos el 20 % de
+ellas**. Los dos umbrales están en `engine/src/hooks/usage.ts`.
+
+La calibración se midió el 2026-10-31 sobre 898 recuerdos puestos delante en 565 turnos reales, contra un
+**modelo nulo**: la misma respuesta comparada con recuerdos de *otros* turnos, 25 barajadas. Lo que pasa el
+umbral ahí es ruido por construcción, y la distancia entre lo real y lo nulo es la señal.
+
+| Umbral | Pares escritos | Señal sobre el azar |
+|---|---|---|
+| 0,20 / 3 (anterior) | 147 | 3,0× |
+| **0,20 / 2 (actual)** | **187** | **2,9×** |
+| 0,10 / 3 | 245 | 2,1× |
+| 0,05 / 3 | 245 | 2,1× |
+
+Dos cosas que esa tabla deja ver y que conviene no olvidar:
+
+- **Bajar la fracción satura.** Con un piso de 3 palabras y recuerdos de ~17, el piso equivale a una fracción
+  de 0,18: por debajo de 0,12 manda el piso y la fracción deja de hacer nada. El piso de palabras es el que
+  realmente decide.
+- **Aflojar cuesta señal.** De 0,20 a 0,10 la proporción sobre el azar cae de 3,0× a 2,1×: casi la mitad de lo
+  que entraría sería casualidad.
+
+Se comprobaron además dos efectos indeseados y ninguno aparece: no hay sesgo por longitud (la mediana de los
+que pasan es de 17 palabras contra 16 de todos los ofrecidos) y el refuerzo no se concentra en unos pocos
+recuerdos (el más reforzado, 6 veces; los cinco primeros se llevan el 11 % del total).
+
+**Por qué el tope de la inyección es 5 y no 3.** La capa lateral sólo aprende de **pares**, y los pares crecen
+con el cuadrado de lo que hay delante: con 3 recuerdos salen 3 pares como mucho, con 5 salen 10. El
+presupuesto de caracteres (`DEFAULT_MAX_CHARS`) sigue siendo el tope real del costo.
+
 ## Montaje y variables
 
 El montaje paso a paso (configuración de `settings.json`, el envoltorio `scripts/mismem-hook.sh`, la

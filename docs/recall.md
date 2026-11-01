@@ -3,7 +3,7 @@
 `recall` devuelve traits, después memories, después episodes. Dentro de las memories fusiona dos señales
 con RRF: las palabras (FTS5) y, si hay un servidor de embeddings, el significado. La relevancia va antes
 que la saliencia, que sólo desempata. Esta página cuenta el comportamiento; las constantes están en
-`engine/src/search.ts` y las variables, en la tabla de [DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única).
+`engine/src/recall/` y las variables, en la tabla de [DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única).
 
 ## Por palabras (siempre)
 
@@ -16,6 +16,15 @@ y conserva sólo los candidatos que comparten al menos dos términos informativo
 basta una; en consultas largas, el 30 % de sus palabras. Devuelve hasta 3 por capa. El rescate alcanza a
 rasgos, episodios y memorias, y no altera una búsqueda que ya encontró algo.
 
+Con capa semántica el rescate apenas suma aciertos, empuja hacia abajo la respuesta buena y trae
+memorias de preguntas que no vienen al caso; sin ella es lo que hace aparecer la paráfrasis que la
+consulta estricta deja fuera. Por eso sólo entra cuando no hay nada que puntuar.
+
+La rareza de un término que cuenta para el rescate tiene un suelo de 3 documentos y una fracción del 5 % de
+la base, de modo que "pocos" significa lo mismo con 300 memorias que con 3.000. Se calibró con
+`mismem-bench --off-topic`: se sube la fracción mientras las preguntas fuera de tema no devuelvan nada, y se
+elige la mayor que las deje a cero.
+
 ## Por significado (opcional)
 
 Con un servidor de embeddings corriendo, `recall` suma búsqueda por significado: "problemas de plata"
@@ -27,7 +36,7 @@ La semántica cubre deliberadamente sólo `memories`; `episodes` y `traits` cons
 Backfill y reindexado: `mismem-embed` (`--status`, `--force`).
 
 También habla con cualquier servidor compatible con OpenAI (`/v1/embeddings`, por ejemplo
-`llama-server --embedding`). **Si tus memorias no están en inglés, usa EmbeddingGemma 2**: con memorias en
+`llama-server --embedding`). **Si las memorias no están en inglés, conviene EmbeddingGemma 2**: con memorias en
 castellano encontró 34 de 50 paráfrasis frente a 4 de 50 de `nomic-embed-text` (medido en la issue #72), y
 en CPU no gasta VRAM. Va con sus prefijos y un corte de 0,65 (con 0,68 sale casi igual):
 
@@ -57,7 +66,7 @@ variables, con sus defaults, están en
 
 `mismem-bench` informa la posición del acierto (MRR, 1ª, entre las 3), los recuerdos devueltos por
 pregunta y `noiseHits` (marcadores que se escaparon: tiene que ser 0). Se corre antes y después de tocar
-`tools.ts`, `search.ts` o `embeddings/`. El banco de preguntas es privado y sale de la propia memoria.
+`recall/` o `embeddings/`. El banco de preguntas es privado y sale de la propia memoria.
 Cómo usarlo en un servidor: [DEPLOY.md](../DEPLOY.md#medir-el-recall).
 
 El eval dorado (`pnpm eval`) mide lo mismo sobre un corpus sintético y público en castellano: una persona ficticia en doce
@@ -70,8 +79,8 @@ node dist/eval-cli.js --mode semantico
 
 El segundo exige `pnpm build` y las variables `MISMEM_EMBEDDING_*` del servidor de embeddings
 ([DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única)); `--mode auto` usa el semántico si el
-embedder responde. Los datos viven en `engine/eval/golden/`, un `.jsonl` por dominio, y el formato y los
-tipos de pregunta están en la cabecera de [`engine/src/golden.ts`](../engine/src/golden.ts). La puerta de CI
+embedder responde. Los datos viven en `engine/eval/golden/`, un `.jsonl` por dominio; su validación está en
+`engine/src/recall/golden-corpus.ts` y su carga y medición en `engine/src/recall/golden.ts`. La puerta de CI
 (`engine/tests/golden.test.ts`) exige que el modo léxico no baje del suelo por tipo de `floor.json` ni supere
 `lexico_ajenas_max`, y que ningún marcador de ruido llegue al resultado. También comprueba el reparto del
 corpus (doce dominios, 40 preguntas por dominio y los tipos esperados) y que `expect` o `evidence` no nombren
@@ -86,3 +95,20 @@ Línea base del 2026-10-30 (tope 5, aciertos dentro del tope; caduca cuando camb
 | Semántico (`embeddinggemma-2`, corte 0,65) | 368/432 | 0,80 | 64/72 | 0/24 | 0/24 | 11/48 | 4,8 |
 
 Los dos ceros del semántico son el issue #154.
+
+### El corpus dorado
+
+Un objeto JSON por línea, en `engine/eval/golden/<dominio>.jsonl`:
+
+```json
+{"type":"memory","key":"dev-01","scope":"lucia/dev","gist":"…","details":"…","days_ago":12,"salience":0.8}
+{"type":"trait","key":"dev-t1","scope":"lucia/dev","name":"…","evidence":["dev-01"]}
+{"type":"episode","key":"dev-e1","scope":"lucia/dev","body":"…","days_ago":1}
+{"type":"query","id":"dev-q01","kind":"parafrasis","query":"…","expect":["dev-01"],"scope":"…"}
+```
+
+`details`, `salience` y el `scope` de una pregunta son opcionales. Las claves son únicas entre ficheros;
+`expect` nombra cualquiera de ellas y sólo está vacío en `ajena`, una pregunta que no debe traer nada. Un
+`gist` que empieza por `[noise] ` o `[pareto:l0] ` es un marcador de ruido: se carga, nunca se espera y nunca
+se devuelve. Los tipos de pregunta son `literal`, `parafrasis`, `sinonimo`, `coloquial`, `sin_tildes`,
+`errata`, `ingles`, `larga`, `clave`, `ambito`, `episodio`, `rasgo` y `ajena`.

@@ -1,10 +1,8 @@
 #!/usr/bin/env node
-/**
- * stdio MCP server. Default entry para `mismem` CLI bin.
- * Usado por VS Code/Claude Desktop como child process.
- */
+// stdio MCP server, the default entry of the `mismem` bin: VS Code and Claude Desktop run it as
+// a child process.
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { openDefaultDb } from "./db.js";
+import { openDefaultDb } from "./store/db.js";
 import { createServer } from "./server-core.js";
 
 const db = openDefaultDb();

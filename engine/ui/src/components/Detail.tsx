@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { m } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import type { Selection } from "../App";
+import type { Selection } from "@/lib/selection";
 import { EpisodeView } from "./EpisodeView";
 import { MemoryView } from "./MemoryView";
 import { TraitView } from "./TraitView";
@@ -11,14 +11,14 @@ interface DetailProps {
   selected: Selection | undefined;
   onSelect: (selection: Selection) => void;
   onClose: () => void;
-  /** Refresca lo que dependa de la escritura y, si viene, cambia o cierra la selección. */
+  /** Refreshes whatever depends on the write and, when given, changes or closes the selection. */
   onChanged: (next?: Selection | null) => void;
 }
 
 
 /**
- * En escritorio el detalle vive en la tercera columna; en móvil, en un Sheet de Radix,
- * que aporta foco atrapado y lo devuelve al cerrar. Sólo se monta una de las dos.
+ * On desktop the detail lives in the third column; on mobile, in a Radix Sheet, which brings
+ * focus trapping and returns it on close. Only one of the two mounts.
  */
 export function DetailPanel(props: DetailProps) {
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -27,14 +27,14 @@ export function DetailPanel(props: DetailProps) {
   const openerRef = useRef<HTMLElement | null>(null);
   const lastSelection = useRef<string | undefined>(undefined);
 
-  // En escritorio el detalle no es modal: al abrirlo el foco va al título y al cerrarlo
-  // vuelve a la fila que lo abrió si sigue montada. En móvil lo hace el Sheet de Radix.
+  // On desktop the detail is not modal: opening it moves focus to the title and closing it
+  // returns focus to the row that opened it if still mounted. On mobile the Radix Sheet does it.
   useEffect(() => {
     if (!isDesktop) return;
     const key = props.selected ? `${props.selected.layer}:${props.selected.id}` : undefined;
     if (key === lastSelection.current) return;
-    // Sólo la primera apertura guarda el origen: encadenar selecciones dentro del propio
-    // detalle no puede sustituirlo por un botón que va a desmontarse.
+    // Only the first opening records the origin: chaining selections inside the detail itself
+    // cannot replace it with a button that is about to unmount.
     const opening = lastSelection.current === undefined;
     lastSelection.current = key;
     if (key) {
@@ -50,8 +50,8 @@ export function DetailPanel(props: DetailProps) {
     if (opener?.isConnected) opener.focus();
   }, [props.selected, isDesktop]);
 
-  // D14: la región viva se monta una vez y sólo cambia su texto; una región que nace
-  // poblada no se anuncia. Vive aquí para sobrevivir a cada selección.
+  // D14: the live region mounts once and only its text changes; a region born populated is not
+  // announced. It lives here so it survives every selection.
   useEffect(() => {
     if (!props.selected) setAnnouncement("");
   }, [props.selected]);

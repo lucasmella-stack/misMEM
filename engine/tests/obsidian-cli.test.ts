@@ -5,8 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
-import { openDb } from "../src/db.js";
-import { capture, consolidate } from "../src/tools.js";
+import { openDb } from "../src/store/db.js";
+import { capture } from "../src/memory/capture.js";
+import { consolidate } from "../src/memory/consolidate.js";
 
 const CLI = fileURLToPath(new URL("../src/obsidian-cli.ts", import.meta.url));
 let dir: string;

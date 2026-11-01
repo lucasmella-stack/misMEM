@@ -1,28 +1,17 @@
 #!/usr/bin/env node
 /**
- * Golden eval — measures recall by kind, domain and globally.
- *
- * The corpus ships with the repository, not in the npm package, so this runs from a
- * checkout (`pnpm eval`) instead of a published binary. The DB lives in memory: the
- * eval never touches `~/.mismem`. Lexical mode forces a null embedder; semantic mode
- * embeds the corpus with the environment config and lets `recallHybrid` decide. `auto`
- * uses semantic only when the embedder answered.
+ * Golden eval CLI: measures recall by kind, domain and globally. See docs/recall.md.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ArgsError, EXIT_USAGE } from "./cli-args.js";
-import { openDb } from "./db.js";
-import type { EmbedFn } from "./embeddings/provider.js";
-import { embedPendingMemories } from "./embeddings/store.js";
+import { loadEmbeddingConfig, type EmbedFn } from "./embeddings/provider.js";
+import { embedPendingMemories, getEmbeddingIndexStatus } from "./embeddings/store.js";
 import { EVAL_DEFAULT_LIMIT, parseEvalArgs, type EvalMode } from "./eval-args.js";
-import {
-  loadGolden,
-  parseGolden,
-  runGolden,
-  type GoldenReport,
-  type GoldenScore,
-} from "./golden.js";
+import { parseGolden } from "./recall/golden-corpus.js";
+import { loadGolden, runGolden, type GoldenReport, type GoldenScore } from "./recall/golden.js";
+import { openDb } from "./store/db.js";
 
 /** `dist/eval-cli.js` and `src/eval-cli.ts` hang from the same package: `../eval/golden`. */
 const DEFAULT_DIR = fileURLToPath(new URL("../eval/golden/", import.meta.url));
@@ -56,9 +45,7 @@ async function chooseMode(db: ReturnType<typeof openDb>, requested: EvalMode): P
   if (requested === "lexico") return { mode: "lexico", embedded: 0, failed: 0 };
 
   const stats = await embedPendingMemories(db);
-  const embedded = (
-    db.prepare("SELECT COUNT(*) AS n FROM memory_embeddings").get() as { n: number }
-  ).n;
+  const embedded = getEmbeddingIndexStatus(db, loadEmbeddingConfig().model).embedded;
   const usable = stats.failed === 0 && embedded > 0;
   if (requested === "semantico" || usable) {
     return { mode: "semantico", embedded, failed: stats.failed };

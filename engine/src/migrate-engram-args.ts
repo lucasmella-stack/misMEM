@@ -1,7 +1,5 @@
-/**
- * Arguments for mismem-migrate-engram, kept apart from the CLI because the CLI runs on import.
- * A typo like `--dryrun` used to migrate for real instead of only counting.
- */
+// Arguments for mismem-migrate-engram, kept apart from the CLI because the CLI runs on import.
+// Strict: a mistyped `--dryrun` must count nothing instead of migrating for real.
 import { ArgsError, flagValue } from "./cli-args.js";
 
 export interface MigrateEngramArgs {
