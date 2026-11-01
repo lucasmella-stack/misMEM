@@ -25,11 +25,10 @@ export function SearchHeader({
         {scope ? ` en ${scope}` : ""}
         {fetching ? " · buscando…" : ""}
       </p>
-      {truncated && (
-        <p role="status" className="text-ink-soft">
-          {`${count} resultados, puede haber más: ${advice}`}
-        </p>
-      )}
+      {/* Always mounted: a live region has to exist before its content changes to be announced. */}
+      <p role="status" aria-live="polite" className={truncated ? "text-ink-soft" : undefined}>
+        {truncated ? `${count} resultados, puede haber más: ${advice}` : null}
+      </p>
     </div>
   );
 }

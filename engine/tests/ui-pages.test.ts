@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergePages, nextPageOffset } from "../ui/src/lib/pages";
+import { mergePages, nextPageOffset, pagesLostRows } from "../ui/src/lib/pages";
 
 const row = (id: string): { id: string; text: string } => ({ id, text: `texto de ${id}` });
 
@@ -24,6 +24,30 @@ describe("mergePages", () => {
 
   it("sin páginas devuelve una lista vacía", () => {
     expect(mergePages([])).toEqual([]);
+  });
+});
+
+describe("pagesLostRows", () => {
+  it("no avisa de pérdida cuando las páginas no repiten filas", () => {
+    expect(
+      pagesLostRows([
+        [row("a"), row("b"), row("c")],
+        [row("d"), row("e")],
+      ]),
+    ).toBe(false);
+  });
+
+  it("avisa de pérdida cuando una fila repetida desplaza el resto", () => {
+    expect(
+      pagesLostRows([
+        [row("a"), row("b"), row("c")],
+        [row("c"), row("d")],
+      ]),
+    ).toBe(true);
+  });
+
+  it("con una sola página nunca hay pérdida", () => {
+    expect(pagesLostRows([[row("a"), row("b")]])).toBe(false);
   });
 });
 

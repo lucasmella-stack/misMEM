@@ -27,6 +27,19 @@ describe("SearchHeader", () => {
     expect(html).not.toContain("elige un ámbito");
   });
 
+  it("monta la región de estado con y sin aviso, para que se anuncie al aparecer", () => {
+    const idle = renderToStaticMarkup(
+      createElement(SearchHeader, { term: "alpha", count: 3, truncated: false, fetching: false }),
+    );
+    const cut = renderToStaticMarkup(
+      createElement(SearchHeader, { term: "alpha", count: 50, truncated: true, fetching: false }),
+    );
+
+    expect(idle).toContain('role="status"');
+    expect(cut).toContain('role="status"');
+    expect(cut).toContain("50 resultados");
+  });
+
   it("no avisa del corte cuando la lista está completa", () => {
     const html = renderToStaticMarkup(
       createElement(SearchHeader, { term: "alpha", count: 3, truncated: false, fetching: false }),

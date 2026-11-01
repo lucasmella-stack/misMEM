@@ -1,10 +1,12 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { api } from "@/api";
 import { ago } from "@/format";
-import { mergePages, nextPageOffset } from "@/lib/pages";
+import { mergePages, nextPageOffset, pagesLostRows } from "@/lib/pages";
 import { Chip, Count, Empty, Failure, Loading, type ListProps, PagedList, Row } from "./primitives";
 
 export function TraitList({ scope, selected, onSelect }: ListProps) {
+  const queryClient = useQueryClient();
   const query = useInfiniteQuery({
     queryKey: ["traits", scope ?? ""],
     queryFn: ({ pageParam, signal }) => api.traits(scope, pageParam, signal),
@@ -12,9 +14,17 @@ export function TraitList({ scope, selected, onSelect }: ListProps) {
     getNextPageParam: (last, _pages, lastOffset) =>
       nextPageOffset(lastOffset, last.rows.length, last.total),
   });
+  const pages = query.data?.pages.map((page) => page.rows) ?? [];
+  const lostRows = pagesLostRows(pages);
+  // Refetching keeps the stale offsets, so the gap survives; resetting restarts at the first page
+  // and lines the offsets up with the rows again.
+  useEffect(() => {
+    if (!lostRows) return;
+    void queryClient.resetQueries({ queryKey: ["traits", scope ?? ""], exact: true });
+  }, [lostRows, queryClient, scope]);
 
   if (query.isPending) return <Loading label="Cargando los rasgos…" />;
-  const rows = mergePages(query.data?.pages.map((page) => page.rows) ?? []);
+  const rows = mergePages(pages);
   // The total comes from the last page so the header and "load more" agree on what is left.
   const total = query.data?.pages.at(-1)?.total ?? 0;
   const remaining = Math.max(0, total - rows.length);
