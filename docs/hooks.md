@@ -12,10 +12,12 @@ Dos matices sobre esa aproximación:
 
 - Con `MISMEM_HOOK_URL`, la inyección recibe de `recall` el `text` ya recortado a 2.000 caracteres
   (`MAX_TEXT_CHARS`). Sin servidor remoto lee la base y recibe el texto entero. Con el presupuesto por defecto
-  (`MISMEM_HOOK_MAX_CHARS`, 1.200) un recuerdo de ese tamaño no se inyecta por ninguno de los dos caminos; sólo
-  con un presupuesto por encima de 2.000 lo inyectado deja de ser lo mismo.
-- `mismem-used` mide el solapamiento sobre el texto que llegó al contexto, recortado cuando vino de un
-  `recall` por MCP. El recorte puede quitar palabras que la respuesta no repetía, así que para un gist por
+  (`MISMEM_HOOK_MAX_CHARS`, 1.200) un recuerdo de ese tamaño no se inyecta por ninguno de los dos caminos; con un
+  presupuesto de 2.000 o más, el recorte remoto cabe y el texto entero local no, y lo inyectado deja de ser
+  lo mismo.
+- `mismem-used` mide el solapamiento sólo sobre el `text` del hit, recortado cuando vino de un `recall` por
+  MCP: no cuenta los `details`, aunque el modelo también los recibe, así que una respuesta construida sólo
+  desde el detalle no refuerza la memoria. El recorte puede quitar palabras que la respuesta no repetía, así que para un gist por
   encima del tope el error ya no cae siempre del lado de no reforzar.
 
 ## Qué sale de la máquina
