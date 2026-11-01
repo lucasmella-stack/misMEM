@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { existsSync, mkdtempSync, rmSync, statSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openDb, openDefaultDb } from "../src/db.js";
+import { openDb, openDefaultDb } from "../src/store/db.js";
 
 const mode = (p: string): number => statSync(p).mode & 0o777;
 const posix = process.platform !== "win32";

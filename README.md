@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.webp">
+    <img alt="misMEM" src="docs/assets/logo.webp" width="200">
+  </picture>
+</p>
+
 <h1 align="center">misMEM</h1>
 
 <p align="center">
@@ -80,7 +87,7 @@ curl http://127.0.0.1:3200/healthz
 ```
 
 Imagen multi-arch (`linux/amd64` y `linux/arm64`), sin clonar nada. El visor queda en `/viewer` y el MCP
-en `/mcp`. Para exponerlo con Traefik y TLS, o para construirla vos en el servidor, ver
+en `/mcp`. Para exponerlo con Traefik y TLS, o para construirla en el servidor, ver
 [DEPLOY.md](DEPLOY.md).
 
 ### npm: sin clonar nada
@@ -133,11 +140,12 @@ Y en `mcp.json`: `"command": "node", "args": ["<ruta-al-repo>/misMEM/engine/dist
 
 ## El visor
 
-Capturas del visor (`/viewer`): memorias por saliencia efectiva y grafo episodio, memoria y rasgo.
+Capturas del visor (`/viewer`): el grafo entero con sus ajustes, y el grafo local alrededor de una
+memoria con su detalle al costado.
 
 <p align="center">
-  <img alt="Visor: lista de memorias ordenadas por saliencia" src="docs/assets/viewer-memorias.png" width="48%">
-  <img alt="Visor: grafo de episodios, memorias y rasgos" src="docs/assets/viewer-grafo.png" width="48%">
+  <img alt="Visor: grafo de episodios, memorias y rasgos, con los ajustes del grafo abiertos" src="docs/assets/viewer-grafo.webp" width="48%">
+  <img alt="Visor: grafo local alrededor de una memoria, con su detalle al costado" src="docs/assets/viewer-grafo-detalle.webp" width="48%">
 </p>
 
 ## Documentación

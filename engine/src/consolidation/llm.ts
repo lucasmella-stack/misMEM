@@ -20,29 +20,29 @@ export interface LlmConfig {
   appUrl?: string;
   appTitle?: string;
   maxTokens?: number;
-  /** Tope por llamada: sin él, un proveedor que acepta y no contesta colgaba la corrida. */
+  /** Per-call cap: without it, a provider that accepts and never answers hung the run. */
   timeoutMs?: number;
 }
 
-// El máximo de salida de deepseek-chat: menos corta respuestas de tandas grandes.
+// deepseek-chat's output maximum: anything lower truncates answers for large batches.
 const DEFAULT_MAX_TOKENS = 8192;
 
-/** Credenciales o saldo: reintentar con otro ámbito daría el mismo error. */
+/** Credentials or balance: retrying with another scope would give the same error. */
 export class LlmFatalError extends Error {
   override name = "LlmFatalError";
 }
 
-/** La respuesta llegó al tope de tokens: con menos episodios entra. */
+/** The answer hit the token cap: fewer episodes make it fit. */
 export class LlmTruncatedError extends Error {
   override name = "LlmTruncatedError";
 }
 
-/** La respuesta no es JSON válido: con una tanda más chica suele salir bien. */
+/** The answer is not valid JSON: a smaller batch usually goes through. */
 export class LlmInvalidJsonError extends Error {
   override name = "LlmInvalidJsonError";
 }
 
-// De sobra para generar 8192 tokens; lo que tarde más es un proveedor colgado.
+// Plenty for 8192 tokens; anything slower is a hung provider.
 const DEFAULT_TIMEOUT_MS = 120_000;
 
 function loadTimeoutMs(): number {
@@ -57,7 +57,7 @@ type LlmProvider = "deepseek" | "openrouter" | "openai" | "compatible";
 
 const PROVIDERS: readonly LlmProvider[] = ["deepseek", "openrouter", "openai", "compatible"];
 
-/** Sin MISMEM_LLM_PROVIDER, el primero que tenga su variable, en el orden de siempre. */
+/** Without MISMEM_LLM_PROVIDER, the first one with its variable set, in the usual order. */
 function pickProvider(): LlmProvider | undefined {
   const explicit = process.env.MISMEM_LLM_PROVIDER?.trim().toLowerCase();
   if (explicit) {
@@ -80,8 +80,8 @@ function required(name: string, provider: LlmProvider): string {
 }
 
 /**
- * Con OpenAI o un servidor compatible no hay un modelo por defecto que valga: elegirlo es
- * una decisión de coste de quien paga, y un nombre fijado acá caducaría.
+ * With OpenAI or a compatible server no default model is valid: choosing it is the cost
+ * decision of whoever pays, and a name fixed here would go stale.
  */
 function requiredModel(provider: LlmProvider): string {
   const model = process.env.MISMEM_CONSOLIDATION_MODEL;
@@ -97,7 +97,7 @@ export function loadLlmConfig(): LlmConfig {
     case "deepseek":
       return {
         apiKey: required("DEEPSEEK_API_KEY", provider),
-        // "deepseek/deepseek-chat" es el nombre en OpenRouter; DeepSeek no lo acepta.
+        // "deepseek/deepseek-chat" is the OpenRouter name; DeepSeek does not accept it.
         model: configured && !configured.includes("/") ? configured : "deepseek-chat",
         baseUrl: process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com/v1",
         ...limits,
@@ -120,7 +120,7 @@ export function loadLlmConfig(): LlmConfig {
       };
     case "compatible":
       return {
-        // Un servidor local (Ollama, LM Studio, vLLM) puede no pedir clave.
+        // A local server (Ollama, LM Studio, vLLM) may not ask for a key.
         apiKey: process.env.MISMEM_LLM_API_KEY ?? "",
         model: requiredModel(provider),
         baseUrl: required("MISMEM_LLM_BASE_URL", provider).replace(/\/+$/, ""),
@@ -140,7 +140,7 @@ export async function distill(
   userPrompt: string,
 ): Promise<DistilledMemory[]> {
   const timeoutMs = cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  // La misma señal corta también la lectura del cuerpo, que es donde se cuelga un stream a medias.
+  // The same signal also cuts the body read, which is where a half-done stream hangs.
   const signal = AbortSignal.timeout(timeoutMs);
   try {
     return await request(cfg, systemPrompt, userPrompt, signal);
@@ -205,7 +205,7 @@ async function request(
   try {
     parsed = JSON.parse(cleaned);
   } catch (err) {
-    // Sin el texto de la respuesta: son recuerdos de la persona y este error termina en un log.
+    // Without the response text: these are the person's memories and this error ends up in a log.
     throw new LlmInvalidJsonError(
       `LLM devolvi\u00f3 JSON inv\u00e1lido (${cleaned.length} caracteres): ${(err as Error).name}`,
     );
@@ -217,7 +217,7 @@ async function request(
   const memories = root.data.memories.map((raw) => MemorySchema.safeParse(raw));
   const invalid = memories.filter((m) => !m.success).length;
   if (invalid > 0) {
-    // Quedarse con las válidas dejaría sin citar, y por lo tanto como ruido, a los episodios de las otras.
+    // Keeping only the valid ones would leave the other episodes uncited, and therefore as noise.
     throw new LlmInvalidJsonError(`${invalid} de ${memories.length} memorias del LLM mal formadas`);
   }
   return memories.flatMap((m) => (m.success ? [fitGist(m.data)] : []));

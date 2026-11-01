@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hostAllowed, hostName, parseHostList } from "../src/http-host.js";
+import { hostAllowed, hostName, parseHostList } from "../src/http/host.js";
 
 describe("http-host: hostName", () => {
   it("saca el puerto, los corchetes de IPv6 y las mayúsculas", () => {

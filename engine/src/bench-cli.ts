@@ -1,14 +1,10 @@
 #!/usr/bin/env node
-/**
- * mismem-bench — mide cuántas veces el recall devuelve la memoria esperada.
- *
- * Usa el mismo recall y el mismo servidor de embeddings que producción (las
- * variables MISMEM_EMBEDDING_*), sin reforzar nada. El banco de preguntas es
- * privado: se arma desde la memoria de cada uno y no va al repo.
- */
+// mismem-bench: measures how often recall returns the expected memory.
+// Same recall and embedding server as production, reinforcing nothing; the question bank is
+// private (built from one's own memory) and never reaches the repo.
 import { readFileSync } from "node:fs";
-import { defaultDbPath, openDb } from "./db.js";
-import { meanRank, mrr, parseBank, recallAt, runBench, type Score } from "./bench.js";
+import { defaultDbPath, openDb } from "./store/db.js";
+import { meanRank, mrr, parseBank, recallAt, runBench, type Score } from "./recall/bench.js";
 import { ArgsError, EXIT_USAGE } from "./cli-args.js";
 import { BENCH_DEFAULT_LIMIT, parseBenchArgs } from "./bench-args.js";
 
@@ -36,7 +32,7 @@ const percent = (score: Score): string =>
 const dec = (value: number, places = 2): string =>
   Number.isNaN(value) ? "—" : value.toFixed(places).replace(".", ",");
 
-/** Sólo las posiciones que tuvieron algún acierto: con un tope grande el resto es ruido visual. */
+/** Only positions that had a hit: with a large cap the rest is visual noise. */
 const positions = (score: Score): string =>
   score.ranks
     .map((n, i) => (n > 0 ? `${i + 1}:${n}` : null))

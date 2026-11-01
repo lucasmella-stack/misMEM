@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
-import { capture, consolidate, recallHybrid } from "../src/tools.js";
+import { openDb } from "../src/store/db.js";
+import { capture } from "../src/memory/capture.js";
+import { consolidate } from "../src/memory/consolidate.js";
+import { recallHybrid } from "../src/recall/recall.js";
 import {
   saveMemoryEmbedding,
   semanticSearchMemories,
@@ -12,12 +14,12 @@ import type { EmbedFn } from "../src/embeddings/provider.js";
 
 let db: DB;
 
-/** Embedder fake determinístico: proyecta keywords a ejes fijos. */
+/** Deterministic fake embedder: projects keywords onto fixed axes. */
 const AXES = ["dinero", "musica", "deploy"];
 function fakeVec(text: string): Float32Array {
   const v = new Float32Array(AXES.length);
   const t = text.toLowerCase();
-  // Sinónimos: el eje se activa por familia de palabras, como un embedding real.
+  // Synonyms: an axis fires by word family, like a real embedding.
   if (/dinero|plata|deuda|cashflow|finanzas/.test(t)) v[0] = 1;
   if (/musica|banda|cancion|mezcla/.test(t)) v[1] = 1;
   if (/deploy|docker|servidor|produccion/.test(t)) v[2] = 1;
@@ -214,7 +216,7 @@ describe("getEmbeddingIndexStatus", () => {
     saveMemoryEmbedding(db, b, "m", Float32Array.from([1, 0, 0]));
     saveMemoryEmbedding(db, c, "m", Float32Array.from([1, 0, 0, 0, 0]));
 
-    // Dos vectores de 3 dimensiones frente a uno de 5: las dominantes son 3.
+    // Two 3-dimension vectors against one of 5: the dominant width is 3.
     expect(getEmbeddingIndexStatus(db, "m")).toMatchObject({
       memories: 3,
       embedded: 3,
@@ -231,13 +233,13 @@ describe("getEmbeddingIndexStatus", () => {
     saveMemoryEmbedding(db, a, "m", Float32Array.from([1, 0, 0]));
     saveMemoryEmbedding(db, b, "m", Float32Array.from([1, 0, 0, 0, 0]));
 
-    // Sin dimensiones conocidas hay empate y se elige la menor de forma determinista.
+    // With no known width it is a tie, settled deterministically by the smaller one.
     expect(getEmbeddingIndexStatus(db, "m")).toMatchObject({
       compatible: 1,
       stale_model: 0,
       stale_dims: 1,
     });
-    // Con las dimensiones del modelo activo, el vector de 5 no sirve para buscar.
+    // With the active model's width, the 5-dimension vector cannot be searched.
     expect(getEmbeddingIndexStatus(db, "m", 5)).toMatchObject({
       compatible: 1,
       stale_model: 0,
@@ -299,12 +301,12 @@ describe("recallHybrid", () => {
     const m1 = makeMemory("vida", "deudas y cashflow apretado este mes");
     await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
 
-    // "finanzas" no aparece literal en el gist → FTS5 no lo encuentra...
-    const { recall } = await import("../src/tools.js");
+    // "finanzas" does not appear literally in the gist → FTS5 does not find it...
+    const { recall } = await import("../src/recall/recall.js");
     const lexical = recall(db, { query: "finanzas" });
     expect(lexical.hits).toHaveLength(0);
 
-    // ...pero el híbrido sí, vía embedding.
+    // ...but the hybrid does, through the embedding.
     const hybrid = await recallHybrid(db, { query: "finanzas" }, fakeEmbed);
     expect(hybrid.hits).toHaveLength(1);
     expect(hybrid.hits[0]?.id).toBe(m1);

@@ -1,7 +1,5 @@
-/**
- * Arguments for mismem-bench, kept apart from the CLI because the CLI runs on import.
- * A typo like `--jsn` used to print text instead of JSON without warning.
- */
+// Arguments for mismem-bench, kept apart from the CLI because the CLI runs on import.
+// Strict: a mistyped flag must fail instead of silently changing what the bench prints.
 import { ArgsError, flagNumber, flagValue } from "./cli-args.js";
 
 export const BENCH_DEFAULT_LIMIT = 5;

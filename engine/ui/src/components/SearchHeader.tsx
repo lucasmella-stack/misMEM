@@ -1,7 +1,5 @@
 /**
- * The results header warns when the list is cut at the cap: without it, "not there" and
- * "further down" look the same. It is a separate view so the warning can be tested
- * without the query hooks.
+ * The results header says the list was cut at the cap: "not there" and "further down" look alike.
  */
 export function SearchHeader({
   term,

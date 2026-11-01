@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
-import { capture, consolidate, crystallize } from "../src/tools.js";
+import { openDb } from "../src/store/db.js";
+import { capture } from "../src/memory/capture.js";
+import { consolidate } from "../src/memory/consolidate.js";
+import { crystallize } from "../src/memory/crystallize.js";
 import {
   handleStats,
   handleRecent,
   handleSearch,
-} from "../src/viewer.js";
+} from "../src/http/viewer/read.js";
 
 let db: DB;
 
@@ -117,7 +119,7 @@ describe("viewer: /api/recent", () => {
       return JSON.parse(res.body);
     };
 
-    // El total es el de pendientes del ámbito, no el de filas de la página.
+    // The total is the scope's pending count, not the page's row count.
     const page1 = read("layer=episode&scope=a&pending=1&limit=2&offset=0");
     expect(page1.rows.map((r: { text: string }) => r.text)).toEqual(["pendiente nuevo", "pendiente medio"]);
     expect(page1.total).toBe(3);
@@ -127,11 +129,11 @@ describe("viewer: /api/recent", () => {
     expect(page2.rows.map((r: { text: string }) => r.text)).toEqual(["pendiente viejo"]);
     expect(page2.total).toBe(3);
 
-    // Un offset inválido no rompe la página: cuenta como 0.
+    // An invalid offset does not break the page: it counts as 0.
     const badOffset = read("layer=episode&scope=a&pending=1&limit=2&offset=-4");
     expect(badOffset.rows.map((r: { text: string }) => r.text)).toEqual(["pendiente nuevo", "pendiente medio"]);
 
-    // Sin pending=1 la respuesta sigue siendo la de antes, sin total.
+    // Without pending=1 the response stays as before, with no total.
     const plain = read("layer=episode&scope=a&limit=2");
     expect("total" in plain).toBe(false);
     expect(plain.rows).toHaveLength(2);

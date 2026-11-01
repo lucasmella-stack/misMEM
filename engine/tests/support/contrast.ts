@@ -1,8 +1,8 @@
-/** Contraste relativo según WCAG 2.x para colores #rrggbb. */
+/** WCAG 2.x relative contrast for #rrggbb colours. */
 
 function channel(hex: string, offset: number): number {
   const srgb = Number.parseInt(hex.slice(offset, offset + 2), 16) / 255;
-  // Corrección gamma de sRGB: por debajo del umbral la respuesta del ojo es lineal.
+  // sRGB gamma correction: below the threshold the eye's response is linear.
   return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
 }
 
