@@ -30,11 +30,19 @@ export function consolidate(
     );
 
     const placeholders = input.source_episode_ids.map(() => "?").join(",");
+    // Pending and in scope, like the nightly run: without this an episode another memory already
+    // owns would move to the new one and leave the old memory with no episodes behind it.
     const upd = db.prepare(
       `UPDATE episodes SET consolidated_into = ?
-       WHERE id IN (${placeholders}) AND scope = ?`,
+       WHERE id IN (${placeholders}) AND scope = ? AND consolidated_into IS NULL`,
     );
     const result = upd.run(id, ...input.source_episode_ids, input.scope);
+    // Throwing rolls the INSERT back: a memory with no episodes has nothing it could have come from.
+    if (result.changes === 0) {
+      throw new Error(
+        `ninguno de los ${input.source_episode_ids.length} episodios indicados está pendiente en el ámbito «${input.scope}»: puede que ya estén consolidados, que sean de otro ámbito o que no existan`,
+      );
+    }
     return result.changes;
   });
 

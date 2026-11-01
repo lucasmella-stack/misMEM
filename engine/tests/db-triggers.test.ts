@@ -53,3 +53,40 @@ describe("memories_au and traits_au", () => {
     }
   });
 });
+
+describe("los vectores de los marcadores de ruido", () => {
+  it("se borran al abrir una base que los traía, y el de una memoria de verdad se queda", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mismem-vec-"));
+    try {
+      const path = join(dir, "m.db");
+      openDb(path).close();
+      const raw = new Database(path);
+      const vector = Buffer.from(new Float32Array([1, 0, 0]).buffer);
+      const mem = raw.prepare(
+        "INSERT INTO memories (id, scope, gist, source_episode_ids, created_at) VALUES (?,?,?,'[]',0)",
+      );
+      const vec = raw.prepare(
+        "INSERT INTO memory_embeddings (memory_id, model, dims, vec, created_at) VALUES (?,'m',3,?,0)",
+      );
+      for (const [id, gist] of [
+        ["util", "Una memoria de verdad"],
+        ["ruido", "[noise] 4 episodios sin señal consolidable"],
+        ["pareto", "[pareto:l0] 23 episodios filtrados por baja importancia"],
+      ]) {
+        mem.run(id, "s", gist);
+        vec.run(id, vector);
+      }
+      expect(raw.prepare("SELECT count(*) n FROM memory_embeddings").get()).toEqual({ n: 3 });
+      raw.close();
+
+      const db = openDb(path);
+      const left = db
+        .prepare("SELECT memory_id FROM memory_embeddings ORDER BY memory_id")
+        .all() as Array<{ memory_id: string }>;
+      expect(left.map((r) => r.memory_id)).toEqual(["util"]);
+      db.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

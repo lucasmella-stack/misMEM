@@ -29,7 +29,8 @@ elige la mayor que las deje a cero.
 
 Con un servidor de embeddings corriendo, `recall` suma búsqueda por significado: "problemas de plata"
 encuentra memorias que dicen "deudas". El modelo por defecto es EmbeddingGemma 2, multilingüe, servido por
-`llama-server` en `http://127.0.0.1:8080`.
+`llama-server` en `http://127.0.0.1:8080`. Si ese puerto ya lo ocupa otra cosa, el instalador monta el
+servidor en el primero libre y escribe `MISMEM_EMBEDDING_URL`.
 Los vectores se guardan como BLOB en la misma SQLite y la búsqueda es coseno en JS, sin extensiones
 nativas. Si el servidor no responde, todo degrada silenciosamente a FTS5 puro.
 
