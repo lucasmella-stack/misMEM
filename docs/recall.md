@@ -108,8 +108,8 @@ Línea base del 2026-11-01 (tope 5, aciertos dentro del tope; caduca cuando camb
 
 | Modo | Global | MRR | Paráfrasis | Episodio | Rasgo | Ajenas con algo | Recuerdos por pregunta |
 |---|---|---|---|---|---|---|---|
-| Léxico | 222/432 | 0,48 | 1/72 | 20/24 | 9/24 | 4/48 | 0,9 |
-| Semántico (`embeddinggemma-2`, corte 0,65) | 411/432 | 0,87 | 64/72 | 23/24 | 19/24 | 11/48 | 4,87 |
+| Léxico | 222/432 | 0,49 | 1/72 | 20/24 | 9/24 | 4/48 | 0,9 |
+| Semántico (`embeddinggemma-2`, corte 0,65) | 411/432 | 0,87 | 64/72 | 23/24 | 19/24 | 12/48 | 4,9 |
 
 En el semántico, las tres capas compiten en el mismo ranking: rasgos y episodios pendientes pasan de 0/24 a
 19/24 y 23/24. El acierto en primera posición es 355/432 y el de las preguntas que esperan una memoria,
