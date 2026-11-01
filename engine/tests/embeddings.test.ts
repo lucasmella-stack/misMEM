@@ -264,12 +264,14 @@ describe("getEmbeddingIndexStatus", () => {
 
     // With no known width it is a tie, settled deterministically by the smaller one.
     expect(getEmbeddingIndexStatus(db, "m")).toMatchObject({
+      active_dims: 3,
       compatible: 1,
       stale_model: 0,
       stale_dims: 1,
     });
-    // With the active model's width, the 5-dimension vector cannot be searched.
+    // With an expected width of 5 the 3-dimension vector is the one search cannot read.
     expect(getEmbeddingIndexStatus(db, "m", 5)).toMatchObject({
+      active_dims: 5,
       compatible: 1,
       stale_model: 0,
       stale_dims: 1,
