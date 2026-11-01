@@ -15,6 +15,7 @@ export interface MemoryRow extends SalienceRow {
   gist: string;
   details: string | null;
   source_episode_ids: string;
+  use_count: number;
 }
 
 export interface TraitRow {
@@ -40,7 +41,7 @@ export interface EpisodeRow {
 export type ConsolidatedEpisodeRow = EpisodeRow & { consolidated_into: string };
 
 export const MEMORY_COLUMNS =
-  "id, scope, gist, details, source_episode_ids, salience, created_at, last_accessed_at, salience_updated_at";
+  "id, scope, gist, details, source_episode_ids, salience, use_count, created_at, last_accessed_at, salience_updated_at";
 
 /** What a row needs to be ranked by effective salience and drawn as a node, and nothing else. */
 export type MemoryNodeRow = SalienceRow & { id: string; scope: string; gist: string };

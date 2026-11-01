@@ -49,6 +49,15 @@ describe("contraste de los tokens de texto", () => {
     ["claro", /\[data-theme="light"\]\s*\{([^}]*)\}/],
   ] as const;
 
+  // The connectome halo used the brand token: the same pink that glows over a dark surface reads
+  // as a dirty ring over a light one, so each theme sets its own and neither may fall back.
+  it("el halo del grafo tiene su propio token en los dos temas", () => {
+    for (const [theme, selector] of themes) {
+      const tokens = themeTokens(selector);
+      expect(hex(tokens, "graph-halo"), `${theme}: --color-graph-halo`).toMatch(/^#[0-9a-f]{6}$/i);
+    }
+  });
+
   it("ink, ink-soft, ink-muted y brand-text pasan AA sobre las dos superficies", () => {
     for (const [theme, selector] of themes) {
       const tokens = themeTokens(selector);

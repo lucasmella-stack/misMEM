@@ -109,6 +109,20 @@ type LinkEnd = string | { id: string };
 const idOf = (end: LinkEnd): string => (typeof end === "string" ? end : end.id);
 
 /** Direct neighbours, whether or not the library has already swapped ids for node objects. */
+/**
+ * One count per node of the edges actually drawn: the server only counts co-use degree, and only
+ * with the connectome on, so the drawing counts what it has in front of it.
+ */
+export function visibleDegrees(links: Array<{ source: LinkEnd; target: LinkEnd }>): Map<string, number> {
+  const degrees = new Map<string, number>();
+  const bump = (id: string) => degrees.set(id, (degrees.get(id) ?? 0) + 1);
+  for (const link of links) {
+    bump(idOf(link.source));
+    bump(idOf(link.target));
+  }
+  return degrees;
+}
+
 export function neighborsOf(links: Array<{ source: LinkEnd; target: LinkEnd }>, id: string): Set<string> {
   const neighbors = new Set<string>();
   for (const link of links) {
@@ -154,6 +168,32 @@ const SCOPE_COLORS = [
 ];
 
 /** Spreads the twelve colours over the scopes with the most nodes; the rest get none. */
+/**
+ * The same colours keyed by memory instead of by scope, because a topic crosses scopes. Topics
+ * arrive sorted by size; the ones past the palette stay unpainted rather than sharing a colour.
+ */
+export function topicPalette(
+  topics: ReadonlyArray<{ members: readonly string[] }>,
+  drawn?: ReadonlySet<string>,
+): Map<string, string> {
+  // Ranked by what is on screen, like the scope palette: the palette is short, and spending it
+  // on the biggest topics overall leaves a drawing where almost nothing is painted.
+  const ranked = topics
+    .map((topic) => ({
+      topic,
+      weight: drawn ? topic.members.filter((id) => drawn.has(id)).length : topic.members.length,
+    }))
+    .filter((t) => t.weight > 0)
+    .sort((a, b) => b.weight - a.weight);
+  const palette = new Map<string, string>();
+  for (const [index, { topic }] of ranked.entries()) {
+    const color = SCOPE_COLORS[index];
+    if (!color) break;
+    for (const id of topic.members) palette.set(id, color);
+  }
+  return palette;
+}
+
 export function scopePalette(scopes: string[]): Map<string, string> {
   const counts = new Map<string, number>();
   for (const scope of scopes) counts.set(scope, (counts.get(scope) ?? 0) + 1);

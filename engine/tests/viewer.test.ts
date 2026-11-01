@@ -3,6 +3,7 @@ import type { Database as DB } from "better-sqlite3";
 import { openDb } from "../src/store/db.js";
 import { capture } from "../src/memory/capture.js";
 import { consolidate } from "../src/memory/consolidate.js";
+import { crystallize } from "../src/memory/crystallize.js";
 import {
   handleStats,
   handleRecent,
@@ -138,6 +139,60 @@ describe("viewer: /api/recent", () => {
     expect(plain.rows).toHaveLength(2);
   });
 
+  it("recent con layer=trait pagina y devuelve el total del ámbito", () => {
+    crystallize(db, { scope: "a", name: "uno", evidence_memory_ids: ["mem_uno"] });
+    crystallize(db, { scope: "a", name: "dos", evidence_memory_ids: ["mem_dos"] });
+    crystallize(db, { scope: "a", name: "tres", evidence_memory_ids: ["mem_tres"] });
+    crystallize(db, { scope: "b", name: "ajeno", evidence_memory_ids: ["mem_ajeno"] });
+
+    const read = (query: string) => {
+      const res = mockRes();
+      handleRecent(db, res as unknown as import("node:http").ServerResponse, urlFor(`/api/recent?${query}`));
+      return JSON.parse(res.body);
+    };
+
+    const page1 = read("layer=trait&scope=a&limit=2&offset=0");
+    expect(page1.rows).toHaveLength(2);
+    expect(page1.total).toBe(3);
+
+    const page2 = read("layer=trait&scope=a&limit=2&offset=2");
+    expect(page2.rows).toHaveLength(1);
+    expect(page2.total).toBe(3);
+
+    // Both pages together bring the three traits of the scope, without the foreign one.
+    const names = [...page1.rows, ...page2.rows].map((row: { text: string }) => row.text);
+    expect(new Set(names).size).toBe(3);
+    expect(names).not.toContain("ajeno");
+
+    // Without a scope the default view counts every trait and still paginates.
+    const all = read("layer=trait&limit=2&offset=0");
+    expect(all.rows).toHaveLength(2);
+    expect(all.total).toBe(4);
+  });
+
+  it("con fuerza y fecha empatadas desempata por id para que las páginas no se pisen", () => {
+    // Fixed ids inserted out of order: without the id tie-break SQLite would return insertion order,
+    // so the test fails every time instead of one run in six with random ulids.
+    const ids = ["t3", "t1", "t5", "t2", "t6", "t4"];
+    const insert = db.prepare(
+      "INSERT INTO traits (id, scope, name, evidence_memory_ids, created_at, updated_at) VALUES (?, 'a', ?, '[]', 1, 1)",
+    );
+    for (const id of ids) insert.run(id, `rasgo ${id}`);
+
+    const read = (query: string) => {
+      const res = mockRes();
+      handleRecent(db, res as unknown as import("node:http").ServerResponse, urlFor(`/api/recent?${query}`));
+      return JSON.parse(res.body);
+    };
+
+    const rows = [
+      ...read("layer=trait&scope=a&limit=2&offset=0").rows,
+      ...read("layer=trait&scope=a&limit=2&offset=2").rows,
+      ...read("layer=trait&scope=a&limit=2&offset=4").rows,
+    ];
+    expect(rows.map((row: { id: string }) => row.id)).toEqual([...ids].sort().reverse());
+  });
+
   it("rejects invalid layer", () => {
     const res = mockRes();
     handleRecent(
@@ -160,6 +215,38 @@ describe("viewer: /api/search", () => {
     );
     const j = JSON.parse(res.body);
     expect(j.hits.length).toBe(1);
+  });
+
+  it("marca el corte cuando hay más coincidencias que el tope y no cuando no lo hay", async () => {
+    capture(db, { scope: "x", body: "alpha uno" });
+    capture(db, { scope: "x", body: "alpha dos" });
+    capture(db, { scope: "x", body: "alpha tres" });
+
+    const read = async (query: string) => {
+      const res = mockRes();
+      await handleSearch(
+        db,
+        res as unknown as import("node:http").ServerResponse,
+        urlFor(`/api/search?${query}`),
+      );
+      return JSON.parse(res.body);
+    };
+
+    // Exactly the cap also reads as cut: the flag says the page filled, not that more exist
+    // (deciding that would mean recounting the fused recall on every search).
+    const full = await read("q=alpha&limit=3");
+    expect(full.hits).toHaveLength(3);
+    expect(full.truncated).toBe(true);
+
+    const cut = await read("q=alpha&limit=2");
+    expect(cut.hits).toHaveLength(2);
+    expect(cut.limit).toBe(2);
+    expect(cut.truncated).toBe(true);
+
+    const whole = await read("q=alpha&limit=10");
+    expect(whole.hits).toHaveLength(3);
+    expect(whole.limit).toBe(10);
+    expect(whole.truncated).toBe(false);
   });
 
   it("rejects empty query", async () => {
