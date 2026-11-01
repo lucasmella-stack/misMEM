@@ -11,6 +11,7 @@ import { SESSION_COOKIE, readCookie, verifySession } from "./session.js";
 import { hostAllowed } from "./host.js";
 import { json, jsonBare, jsonPlain, methodNotAllowed, notFound, payloadTooLarge, unauthorized } from "./respond.js";
 import {
+  handleEmbeddings,
   handleGraph,
   handleMemories,
   handleMemory,
@@ -178,6 +179,7 @@ export function createRequestHandler(deps: HttpRoutesDeps): RequestHandler {
           return;
         }
         if (url.pathname === "/api/scopes") return handleScopes(db, res);
+        if (url.pathname === "/api/embeddings") return handleEmbeddings(db, res);
         if (url.pathname === "/api/consolidate") {
           json(res, 200, job.state());
           return;

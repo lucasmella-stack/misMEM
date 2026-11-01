@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Toaster } from "@/components/ui/sonner";
@@ -7,6 +7,7 @@ import { AppHeader } from "./components/AppHeader";
 import { Consolidate } from "./components/Consolidate";
 import { CrystallizeDialog } from "./components/CrystallizeDialog";
 import { DetailPanel } from "./components/Detail";
+import { EmbeddingNotice } from "./components/EmbeddingNotice";
 import { MemoryList } from "./components/list/MemoryList";
 import { PendingList } from "./components/list/PendingList";
 import { SearchResults } from "./components/list/SearchResults";
@@ -110,12 +111,6 @@ export function App() {
   const pickedScopes = new Set(picked?.values() ?? []);
   const pickedScope = pickedScopes.size === 1 ? [...pickedScopes][0] : undefined;
 
-  const totalTraits = useMemo(() => {
-    if (!scopeList) return undefined;
-    if (scope) return scopeList.find((entry) => entry.scope === scope)?.traits ?? 0;
-    return scopeList.reduce((total, entry) => total + entry.traits, 0);
-  }, [scopeList, scope]);
-
   const changed = (next?: Selection | null) => {
     refresh();
     if (next !== undefined) setSelected(next ?? undefined);
@@ -147,6 +142,8 @@ export function App() {
         onConsolidate={() => setConsolidating(true)}
         canSignOut={sessionQuery.data?.active === true}
       />
+
+      <EmbeddingNotice />
 
       <div
         className={`flex min-h-0 flex-1 flex-col md:grid md:overflow-hidden ${
@@ -204,7 +201,7 @@ export function App() {
                 />
               </TabsContent>
               <TabsContent value="traits" className="m-0">
-                <TraitList scope={scope} selected={selected} onSelect={setSelected} totalTraits={totalTraits} />
+                <TraitList scope={scope} selected={selected} onSelect={setSelected} />
               </TabsContent>
               <TabsContent value="topics" className="m-0">
                 <TopicList scope={scope} selected={selected} onSelect={setSelected} />

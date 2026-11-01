@@ -1,50 +1,70 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { api } from "@/api";
 import { ago } from "@/format";
-import { Chip, Count, Empty, Failure, Loading, type ListProps, Row } from "./primitives";
+import { mergePages, nextPageOffset, pagesLostRows } from "@/lib/pages";
+import { Chip, Count, Empty, Failure, Loading, type ListProps, PagedList, Row } from "./primitives";
 
-export function TraitList({ scope, selected, onSelect, totalTraits }: ListProps & { totalTraits: number | undefined }) {
-  const query = useQuery({
+export function TraitList({ scope, selected, onSelect }: ListProps) {
+  const queryClient = useQueryClient();
+  const query = useInfiniteQuery({
     queryKey: ["traits", scope ?? ""],
-    queryFn: ({ signal }) => api.traits(scope, signal),
+    queryFn: ({ pageParam, signal }) => api.traits(scope, pageParam, signal),
+    initialPageParam: 0,
+    getNextPageParam: (last, _pages, lastOffset) =>
+      nextPageOffset(lastOffset, last.rows.length, last.total),
   });
+  const pages = query.data?.pages.map((page) => page.rows) ?? [];
+  const lostRows = pagesLostRows(pages);
+  // Refetching keeps the stale offsets, so the gap survives; resetting restarts at the first page
+  // and lines the offsets up with the rows again. Offset paging cannot see a delete ahead of the
+  // loaded pages: one row slides into a page already read until the list is reloaded.
+  useEffect(() => {
+    if (!lostRows) return;
+    void queryClient.resetQueries({ queryKey: ["traits", scope ?? ""], exact: true });
+  }, [lostRows, queryClient, scope]);
 
   if (query.isPending) return <Loading label="Cargando los rasgos…" />;
-  const rows = query.data?.rows ?? [];
-  const total = totalTraits ?? rows.length;
-  const truncated = rows.length < total;
+  const rows = mergePages(pages);
+  // The total comes from the last page so the header and "load more" agree on what is left.
+  const total = query.data?.pages.at(-1)?.total ?? 0;
+  const remaining = Math.max(0, total - rows.length);
 
   return (
     <div className="flex flex-col gap-2">
       {query.isError && <Failure what="los rasgos" error={query.error} stale={rows.length > 0} />}
       {rows.length > 0 && (
         <Count>
-          {truncated ? `${rows.length} de ${total} rasgos · se muestran los más fuertes` : `${rows.length} ${rows.length === 1 ? "rasgo" : "rasgos"}`}
+          {remaining > 0
+            ? `${rows.length} de ${total} rasgos · se muestran los más fuertes`
+            : `${rows.length} ${rows.length === 1 ? "rasgo" : "rasgos"}`}
         </Count>
       )}
-      {rows.length === 0 ? (
-        query.isError ? null : <Empty>Ningún patrón se ha cristalizado como rasgo todavía.</Empty>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {rows.map((trait) => (
-            <Row
-              key={trait.id}
-              layer="trait"
-              active={selected?.layer === "trait" && selected.id === trait.id}
-              onClick={() => onSelect({ layer: "trait", id: trait.id })}
-              text={trait.text}
-              meta={
-                <>
-                  <Chip>{trait.scope}</Chip>
-                  <Chip brand>fuerza {trait.strength}</Chip>
-                  {trait.polarity !== "neutral" && <Chip>{trait.polarity}</Chip>}
-                  <Chip>{ago(trait.updated_at)}</Chip>
-                </>
-              }
-            />
-          ))}
-        </ul>
-      )}
+      <PagedList
+        rows={rows}
+        empty={query.isError ? null : <Empty>Ningún patrón se ha cristalizado como rasgo todavía.</Empty>}
+        hasNextPage={query.hasNextPage}
+        fetchingNextPage={query.isFetchingNextPage}
+        remaining={remaining}
+        onLoadMore={() => void query.fetchNextPage()}
+        renderRow={(trait) => (
+          <Row
+            key={trait.id}
+            layer="trait"
+            active={selected?.layer === "trait" && selected.id === trait.id}
+            onClick={() => onSelect({ layer: "trait", id: trait.id })}
+            text={trait.text}
+            meta={
+              <>
+                <Chip>{trait.scope}</Chip>
+                <Chip brand>fuerza {trait.strength}</Chip>
+                {trait.polarity !== "neutral" && <Chip>{trait.polarity}</Chip>}
+                <Chip>{ago(trait.updated_at)}</Chip>
+              </>
+            }
+          />
+        )}
+      />
     </div>
   );
 }

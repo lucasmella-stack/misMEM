@@ -213,6 +213,18 @@ describe("server-http without auth", () => {
     expect(r.body).toContain("mismem");
   });
 
+  it("answers GET /api/embeddings with the semantic index status", async () => {
+    const r = await send(open.port, "/api/embeddings");
+
+    expect(r.status).toBe(200);
+    expect(JSON.parse(r.body)).toMatchObject({
+      enabled: false,
+      memories: 0,
+      stale_model: 0,
+      stale_dims: 0,
+    });
+  });
+
   it("returns 415 for a non-JSON POST /mcp and 404 for an unknown path", async () => {
     const bad = await send(open.port, "/mcp", { method: "POST", headers: { "content-type": "text/plain" }, body: "x" });
     expect(bad.status).toBe(415);
