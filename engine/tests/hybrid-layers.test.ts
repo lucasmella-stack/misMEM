@@ -16,6 +16,7 @@ import {
 import {
   embedPendingMemories,
   getEmbeddingIndexStatus,
+  saveMemoryEmbedding,
 } from "../src/embeddings/store.js";
 import { runConsolidation } from "../src/consolidation/run.js";
 import type { EmbedFn } from "../src/embeddings/provider.js";
@@ -289,6 +290,77 @@ describe("capas semánticas en el recall", () => {
     expect(episodes).toEqual([first, second]);
     expect(episodes).not.toContain(third);
     expect(hits.map((hit) => hit.id)).toContain(memory);
+  });
+
+  it("sin vector en la capa, el tope se queda con los primeros candidatos léxicos", async () => {
+    // Memories are indexed, so the semantic layer is on, but the trait and the episodes were
+    // never embedded. The quota then has no cosine order to keep and falls back to the
+    // lexical one: the first trait and the two newest episodes.
+    const source = capture(db, { scope: "dev", body: "origen de la memoria" });
+    const memory = consolidate(db, {
+      scope: "dev",
+      gist: "nota de cocina",
+      source_episode_ids: [source.id],
+    }).memory_id;
+    saveMemoryEmbedding(db, memory, "fake", axis(0.8));
+    const firstTrait = crystallize(db, {
+      scope: "dev",
+      name: "despliegue",
+      evidence_memory_ids: [memory],
+    }).trait_id;
+    crystallize(db, {
+      scope: "dev",
+      name: "despliegue del servidor de producción",
+      evidence_memory_ids: [memory],
+    });
+    const older = capture(db, { scope: "dev", body: "despliegue uno" }).id;
+    const middle = capture(db, { scope: "dev", body: "despliegue dos" }).id;
+    const newer = capture(db, { scope: "dev", body: "despliegue tres" }).id;
+    // Pending episodes are listed newest first, so the lexical order is fixed.
+    db.prepare("UPDATE episodes SET created_at = ? WHERE id = ?").run(1, older);
+    db.prepare("UPDATE episodes SET created_at = ? WHERE id = ?").run(2, middle);
+    db.prepare("UPDATE episodes SET created_at = ? WHERE id = ?").run(3, newer);
+
+    const { hits } = await recallHybrid(
+      db,
+      { query: "despliegue", limit: 10 },
+      async (texts) => texts.map(() => axis(1)),
+      { reinforce: false, embeddingModel: "fake" },
+    );
+
+    expect(hits.filter((hit) => hit.layer === "trait").map((hit) => hit.id)).toEqual([firstTrait]);
+    expect(hits.filter((hit) => hit.layer === "episode").map((hit) => hit.id)).toEqual([
+      newer,
+      middle,
+    ]);
+    expect(hits.map((hit) => hit.id)).not.toContain(older);
+  });
+
+  it("con cosenos casi iguales, la memoria consolidada va antes que el episodio", async () => {
+    const source = capture(db, { scope: "dev", body: "origen de la memoria" });
+    const memory = consolidate(db, {
+      scope: "dev",
+      gist: "memoria concreta",
+      source_episode_ids: [source.id],
+    }).memory_id;
+    const episode = capture(db, { scope: "dev", body: "episodio crudo" }).id;
+    // The episode is closer by meaning, but inside the prior: the consolidated memory wins
+    // the tie-break. Without the 0.05 the episode jumps ahead.
+    const embed = tableEmbed({
+      consulta: axis(1),
+      "memoria concreta": axis(0.8),
+      "episodio crudo": axis(0.83),
+    });
+    await embedPendingMemories(db, { embedFn: embed, model: "fake" });
+
+    const { hits } = await recallHybrid(
+      db,
+      { query: "consulta", limit: 5 },
+      embed,
+      { reinforce: false, embeddingModel: "fake" },
+    );
+
+    expect(hits.map((hit) => hit.id)).toEqual([memory, episode]);
   });
 
   it("una ajena con cosenos justo por debajo de cada puerta no entra", async () => {

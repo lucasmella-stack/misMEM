@@ -65,7 +65,7 @@ function finalizeHits(
 
 /**
  * Pure lexical recall: the path with no semantic layer, so it can always rescue.
- * `recallHybrid` is what turns rescue off when there are comparable vectors to score.
+ * `recallHybrid` is what turns rescue off when the memories have comparable vectors to score.
  */
 export function recall(
   db: DB,
@@ -131,22 +131,29 @@ export async function recallHybrid(
         model: semanticModel,
       })
     : [];
-  // Lexical rescue only comes in with no semantic layer: embeddings off, the embedder not
-  // answering, or no vector of the active model. The measurement behind that cut is in
-  // docs/recall.md#el-rescate.
-  const semanticLayer =
+  // The rescue fills what the strict search missed, so it stays on until the memories
+  // themselves have vectors to compete with. A layer vector alone (an episode embedded at
+  // capture on a base whose memories were never indexed) scores no memory, and switching the
+  // rescue off there loses every memory the strict query does not match.
+  const hasMemoryVectors =
     queryVec !== undefined &&
-    (hasComparableVectors(db, {
+    hasComparableVectors(db, {
       model: semanticModel,
       dims: queryVec.length,
       scope: input.scope,
-    }) ||
+    });
+  // The semantic layer is on with any comparable vector: traits and episodes compete on
+  // cosine even when no memory vector exists yet. The measurement behind the rescue cut is in
+  // docs/recall.md#el-rescate.
+  const semanticLayer =
+    hasMemoryVectors ||
+    (queryVec !== undefined &&
       hasComparableLayerVectors(db, {
         model: semanticModel,
         dims: queryVec.length,
         scope: input.scope,
       }));
-  const lexical = lexicalCandidates(db, input, at, { rescue: !semanticLayer });
+  const lexical = lexicalCandidates(db, input, at, { rescue: !hasMemoryVectors });
 
   // One semantic ranking for the three layers: a trait or pending episode must beat a
   // memory on cosine to pass it, instead of inheriting a full rank-1 share from its own
