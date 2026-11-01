@@ -374,6 +374,29 @@ describe("embedPendingMemories", () => {
     expect(r.embedded + r.layers.embedded).toBe(64);
   });
 
+  it("con rasgos y episodios pendientes, el reparto reservado no deja a ninguna capa sin filas", async () => {
+    const source = makeMemory("vida", "cashflow fuente");
+    for (let i = 0; i < 100; i++) makeMemory("vida", `cashflow pendiente ${i}`);
+    for (let i = 0; i < 100; i++) {
+      crystallize(db, { scope: "vida", name: `rasgo de dinero ${i}`, evidence_memory_ids: [source] });
+    }
+    for (let i = 0; i < 30; i++) capture(db, { scope: "vida", body: `episodio pendiente ${i} con dinero` });
+
+    const r = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake", maxRows: 64 });
+
+    // The 16 rows of the reservation split 8 and 8: traits used to take all 16 first and a
+    // pending episode never saw a row while there were traits left.
+    expect(r.layers).toEqual({ pending: 130, embedded: 16, failed: 0, discarded: 0 });
+    const byLayer = db
+      .prepare("SELECT layer, COUNT(*) AS n FROM layer_embeddings GROUP BY layer ORDER BY layer")
+      .all();
+    expect(byLayer).toEqual([
+      { layer: "episode", n: 8 },
+      { layer: "trait", n: 8 },
+    ]);
+    expect(r.embedded + r.layers.embedded).toBe(64);
+  });
+
   it("sin rasgos ni episodios pendientes, las memorias gastan el tope entero", async () => {
     for (let i = 0; i < 100; i++) makeMemory("vida", `cashflow pendiente ${i}`);
 

@@ -330,8 +330,9 @@ export function pendingLayerRows(db: DB, opts: ResolvedEmbedOptions): PendingLay
 }
 
 /**
- * Embeds the traits and pending episodes already read, up to `maxRows` (traits first).
- * Idempotent: the next pass picks up whatever did not fit.
+ * Embeds the traits and pending episodes already read, up to `maxRows`, split between the
+ * two layers. Whatever one of them leaves unused goes to the other, so neither starves
+ * while the other has a backlog. Idempotent: the next pass picks up what did not fit.
  */
 export async function embedLayerRowsResolved(
   db: DB,
@@ -339,8 +340,14 @@ export async function embedLayerRowsResolved(
   pending: PendingLayerRows,
   maxRows: number,
 ): Promise<{ pending: number; embedded: number; failed: number; discarded: number }> {
-  const traitRows = pending.traits.slice(0, maxRows);
-  const episodeRows = pending.episodes.slice(0, Math.max(0, maxRows - traitRows.length));
+  // Traits used to take the whole share first, so with more than half the budget in traits
+  // a pending episode never saw a row. Half each, and the unused half returns to the other.
+  const cap = Math.max(0, Math.floor(maxRows));
+  const half = Math.ceil(cap / 2);
+  const traitShare = Math.min(pending.traits.length, half);
+  const episodeShare = Math.min(pending.episodes.length, cap - traitShare);
+  const traitRows = pending.traits.slice(0, Math.min(pending.traits.length, cap - episodeShare));
+  const episodeRows = pending.episodes.slice(0, episodeShare);
   const stats: { pending: number; embedded: number; failed: number; discarded: number } = {
     pending: pending.traits.length + pending.episodes.length,
     embedded: 0,

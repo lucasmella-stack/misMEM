@@ -59,6 +59,11 @@ interface ScopeOutcome {
   episodes: number;
   dropped_l0: number;
   skipped?: boolean;
+  /**
+   * Memories distilled in this batch, so the run can ask the backfill for their vectors
+   * first. Noise stubs are left out: the backfill never embeds them.
+   */
+  memory_ids?: string[];
 }
 
 /** Only the columns the batch query selects. */
@@ -185,6 +190,7 @@ export async function processScope(
   const cited = new Set<string>();
   let totalEpisodes = dropped_l0;
   let totalMemories = dropped_l0 > 0 ? 1 : 0;
+  const createdIds: string[] = [];
 
   for (const m of distilled) {
     const evidence = m.evidence_episode_ids.filter((id) => validIds.has(id));
@@ -203,6 +209,7 @@ export async function processScope(
     for (const id of evidence) cited.add(id);
     totalMemories++;
     totalEpisodes += result.consolidated;
+    createdIds.push(result.memory_id);
   }
 
   // What the LLM read and did not cite may carry no signal, or it may have missed it. Each
@@ -246,5 +253,5 @@ export async function processScope(
     }
   }
 
-  return { memories: totalMemories, episodes: totalEpisodes, dropped_l0 };
+  return { memories: totalMemories, episodes: totalEpisodes, dropped_l0, memory_ids: createdIds };
 }
