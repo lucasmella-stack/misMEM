@@ -129,10 +129,13 @@ export function recallMissForModel(db: DB, scope?: string): RecallMissView {
     .map(({ scope: name }) => name);
 
   if (scope === undefined) return { scopes };
-  return {
-    scopes,
-    hint: `El ámbito "${scope}" no tiene nada que coincida. Repite la búsqueda sin scope o usa uno de los que aparecen en scopes.`,
-  };
+  // An empty `scopes` leaves nothing to choose from, so pointing at it sends the model after a
+  // field it cannot use; the empty case names the one exit left, a different search.
+  const hint =
+    scopes.length === 0
+      ? `El ámbito "${scope}" no tiene nada que coincida y la memoria todavía no guarda contenido. Prueba con otra búsqueda, con otro ámbito o sin scope.`
+      : `El ámbito "${scope}" no tiene nada que coincida. Repite la búsqueda sin scope o usa uno de los que aparecen en scopes.`;
+  return { scopes, hint };
 }
 
 /**

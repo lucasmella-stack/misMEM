@@ -268,6 +268,18 @@ describe("MCP guidance", () => {
     expect(r.hint).toMatch(/no tiene/);
   });
 
+  it("recall con la memoria vacía nombra la única salida, no una lista de ámbitos sin nada", async () => {
+    const r = await ok<{ scopes: string[]; hint?: string }>("recall", {
+      query: "alcachofa",
+      scope: "p/typo",
+    });
+
+    expect(r.scopes).toEqual([]);
+    expect(r.hint).toContain("p/typo");
+    expect(r.hint).toMatch(/no guarda contenido/);
+    expect(r.hint).not.toContain("scopes");
+  });
+
   it("recall with hits answers exactly as before, without scopes or hint", async () => {
     await ok("capture", { scope: "p/a", body: "zanahoria growth schedule" });
 

@@ -180,7 +180,16 @@ describe("recallMissForModel", () => {
     insertMemory(db, { id: "m1", gist: "one", scope: "p/a" });
     insertMemory(db, { id: "m2", gist: "two", scope: "p/a" });
     insertMemory(db, { id: "m3", gist: "three", scope: "p/a" });
+    // What consolidation leaves behind: the noise memory plus the episodes tied to it. The
+    // scope still shows up in the counts with nothing but consolidated episodes, so only the
+    // `total > 0` filter keeps it out of the list.
     insertMemory(db, { id: "n1", gist: "[noise] dropped", scope: "p/noise" });
+    insertEpisode(db, {
+      id: "e4",
+      scope: "p/noise",
+      body: "chatter nobody cited",
+      consolidatedInto: "n1",
+    });
     insertTrait(db, "t1", "prefers small PRs", "neutral", "p/b");
     insertEpisode(db, { id: "e1", scope: "p/b", body: "pending note" });
     insertEpisode(db, {
@@ -220,6 +229,20 @@ describe("recallMissForModel", () => {
     expect(view.scopes).toEqual(["p/a"]);
     expect(view.hint).toContain("p/typo");
     expect(view.hint).toMatch(/no tiene/);
+    expect(view.hint).toContain("usa uno de los que aparecen en scopes");
+    db.close();
+  });
+
+  it("no remite a una lista de ámbitos vacía cuando la memoria todavía no guarda nada", () => {
+    const db = openDb(":memory:");
+
+    const view = recallMissForModel(db, "p/typo");
+
+    expect(view.scopes).toEqual([]);
+    expect(view.hint).toContain("p/typo");
+    expect(view.hint).toMatch(/no tiene/);
+    expect(view.hint).toMatch(/no guarda contenido/);
+    expect(view.hint).not.toContain("scopes");
     db.close();
   });
 
