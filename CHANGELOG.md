@@ -15,6 +15,19 @@
 - `engine/tests/installer.test.ts` corre el instalador de verdad contra un `HOME` temporal, con
   `llama-server` y `systemctl` simulados: es lo único que prueba sus decisiones, porque hasta ahora de
   `scripts/` sólo se comprobaban la sintaxis y shellcheck.
+### `consolidate` ya no le roba episodios a otra memoria ni crea memorias sin origen (#233)
+
+- La herramienta MCP marcaba sus episodios con `UPDATE episodes SET consolidated_into = ?` **sin
+  comprobar que estuvieran pendientes**, así que un episodio que ya pertenecía a otra memoria pasaba a
+  la nueva y dejaba a la anterior con un `source_episode_ids` que ya no apuntaba a nada. Y si ninguno de
+  los ids existía o era de otro ámbito, la memoria se insertaba igual, sin un solo episodio detrás.
+- Ahora sólo toma episodios pendientes del ámbito pedido, como la consolidación nocturna, y si no queda
+  ninguno falla con un error que dice qué pasó en vez de insertar una memoria huérfana. La excepción
+  deshace el `INSERT` porque todo ocurre en la misma transacción.
+- **La consolidación nocturna**, que llama a esa misma herramienta, habría empezado a fallar la corrida
+  entera cuando el LLM cita el mismo episodio en dos memorias. Un episodio pertenece a una sola memoria
+  —`consolidated_into` guarda un id—, así que la primera se lo queda y la segunda busca otra evidencia;
+  sin ninguna, se salta con su línea de log y la corrida sigue.
 
 ## 0.8.0 — 2026-11-01
 
