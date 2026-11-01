@@ -9,7 +9,7 @@ const OPTIONS = [
   { id: "system", label: "Tema del sistema", Icon: MonitorIcon },
 ] as const;
 
-/** Tres botones con aria-pressed: el estado se lee sin depender del icono ni del color. */
+/** Three buttons with aria-pressed: the state reads without relying on the icon or the colour. */
 export function ThemeToggle({ choice, onChange }: { choice: ThemeChoice; onChange: (choice: ThemeChoice) => void }) {
   return (
     <div role="group" aria-label="Tema" className="flex items-center gap-0.5 rounded-md border border-edge p-0.5">

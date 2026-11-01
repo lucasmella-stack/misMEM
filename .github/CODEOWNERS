@@ -2,7 +2,7 @@
 # AGENTS.md marks as dangerous to change blind: the schema and migrations (a mistake
 # breaks a production database), the contribution machinery and the security policy.
 *                                   @lucasmella-stack @iDiagoValeta
-/engine/src/db.ts                   @lucasmella-stack @iDiagoValeta
+/engine/src/store/db.ts             @lucasmella-stack @iDiagoValeta
 /engine/Dockerfile.mismem-brain     @lucasmella-stack @iDiagoValeta
 /.github/                           @lucasmella-stack @iDiagoValeta
 /AGENTS.md                          @lucasmella-stack @iDiagoValeta

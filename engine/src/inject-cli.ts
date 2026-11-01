@@ -1,20 +1,12 @@
 #!/usr/bin/env node
-/**
- * mismem-inject — hook `UserPromptSubmit` de Claude Code: adelanta recuerdos
- * relevantes antes de que el modelo responda, sin que tenga que pedirlos.
- *
- * Busca con el prompt, descarta los ámbitos privados y lo que el contexto ya tiene,
- * y devuelve unos pocos por `additionalContext`. La búsqueda va con `reinforce:false`:
- * algo que el usuario no pidió no es uso y no puede subir la saliencia.
- *
- * Corre en cada turno, así que tiene tope de tiempo, nunca sale con error y ante
- * cualquier problema no inyecta nada: un hook que rompe no vale un recuerdo.
- */
+// mismem-inject: the Claude Code `UserPromptSubmit` hook, which brings relevant memories
+// forward before the model answers, searching with `reinforce: false` because a search nobody
+// asked for is not use. It runs every turn, so it never fails and simply injects nothing.
 import { readFileSync } from "node:fs";
-import { defaultDbPath, openDb } from "./db.js";
+import { defaultDbPath, openDb } from "./store/db.js";
 import { envPositiveNumber } from "./env.js";
-import { callRemoteTool, readStdin } from "./hook-client.js";
-import { serverReady } from "./hook-readiness.js";
+import { callRemoteTool, readStdin } from "./hooks/client.js";
+import { serverReady } from "./hooks/readiness.js";
 import {
   DEFAULT_MAX_CHARS,
   DEFAULT_MAX_MEMORIES,
@@ -23,12 +15,12 @@ import {
   parseScopeList,
   selectForInjection,
   worthRecalling,
-} from "./inject.js";
+} from "./hooks/inject.js";
 import type { RecallHit } from "./schema.js";
-import { recallHybrid } from "./tools.js";
+import { recallHybrid } from "./recall/recall.js";
 
 const DEFAULT_TIMEOUT_MS = 2500;
-/** Cuántos recuerdos pedirle al recall antes de filtrar: el filtro descarta varios. */
+/** How many memories to ask recall for before filtering; the filter drops several. */
 const CANDIDATES = 10;
 
 async function search(query: string, timeoutMs: number): Promise<RecallHit[]> {
@@ -37,7 +29,7 @@ async function search(query: string, timeoutMs: number): Promise<RecallHit[]> {
   const url = process.env.MISMEM_HOOK_URL;
   if (url) {
     const dbPath = defaultDbPath();
-    // Un servidor sin `reinforce` descarta el campo y refuerza igual: no se le habla.
+    // A server without `reinforce` drops the field and reinforces anyway, so it is not called.
     if (!(await serverReady(url, dbPath, timeoutMs))) return [];
     const result = (await callRemoteTool(url, "recall", args, timeoutMs)) as { hits?: RecallHit[] };
     return result?.hits ?? [];
@@ -70,14 +62,14 @@ async function main(): Promise<void> {
 
   const hits = await search(prompt, envPositiveNumber("MISMEM_HOOK_TIMEOUT_MS", DEFAULT_TIMEOUT_MS));
 
-  // Un id que ya figura en el transcript ya está en el contexto: repetirlo es pagarlo dos veces.
+  // An id already in the transcript is already in context: repeating it pays twice.
   let alreadyPresent = new Set<string>();
   if (transcript) {
     try {
       const raw = readFileSync(transcript, "utf8");
       alreadyPresent = new Set(hits.filter((hit) => raw.includes(hit.id)).map((hit) => hit.id));
     } catch {
-      /* sin transcript legible se inyecta igual: repetir es más barato que no recordar */
+      /* without a readable transcript, inject anyway: repeating costs less than not remembering */
     }
   }
 
@@ -107,6 +99,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err: unknown) => {
-  // Sin recuerdos se responde igual; con el turno cortado, no.
+  // Without memories the turn still goes on; with the turn cut short, it does not.
   process.stderr.write(`[mismem-inject] ${err instanceof Error ? err.message : String(err)}\n`);
 });

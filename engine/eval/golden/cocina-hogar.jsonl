@@ -62,6 +62,6 @@
 {"type": "query", "id": "hog-q35", "kind": "rasgo", "query": "¿Cómo organiza la comida de la semana para no cocinar cada día?", "expect": ["hog-t1"]}
 {"type": "query", "id": "hog-q36", "kind": "rasgo", "query": "¿Qué evita al limpiar la casa y dónde guarda los botes?", "expect": ["hog-t2"]}
 {"type": "query", "id": "hog-q37", "kind": "ajena", "query": "¿Cómo se reproduce la monstera deliciosa en su hábitat natural?", "expect": []}
-{"type": "query", "id": "hog-q38", "kind": "ajena", "query": "¿Qué técnica usaban los canteros para levantar un arco ojival?", "expect": []}
-{"type": "query", "id": "hog-q39", "kind": "ajena", "query": "¿Cómo se calcula la energía de un fotón según su frecuencia?", "expect": []}
+{"type": "query", "id": "hog-q38", "kind": "ajena", "query": "¿Cómo migran las tortugas marinas?", "expect": []}
+{"type": "query", "id": "hog-q39", "kind": "ajena", "query": "¿Qué pigmento colorea la lavanda?", "expect": []}
 {"type": "query", "id": "hog-q40", "kind": "ajena", "query": "¿Qué reyes gobernaron en la península durante el siglo XIII?", "expect": []}

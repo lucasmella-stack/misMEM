@@ -62,6 +62,6 @@
 {"type": "query", "id": "oci-q35", "kind": "rasgo", "query": "¿Qué disfruta más, ver una película en una sala o en su sofá?", "expect": ["oci-t1"]}
 {"type": "query", "id": "oci-q36", "kind": "rasgo", "query": "¿Qué se lleva siempre cuando viaja?", "expect": ["oci-t2"]}
 {"type": "query", "id": "oci-q37", "kind": "ajena", "query": "¿Qué función cumplían los arbotantes en las catedrales góticas?", "expect": []}
-{"type": "query", "id": "oci-q38", "kind": "ajena", "query": "¿Cómo se calcula la energía de un fotón a partir de su frecuencia?", "expect": []}
+{"type": "query", "id": "oci-q38", "kind": "ajena", "query": "¿Dónde estaba Persépolis?", "expect": []}
 {"type": "query", "id": "oci-q39", "kind": "ajena", "query": "¿Qué planta tropical produce el fruto del que sale la vainilla?", "expect": []}
 {"type": "query", "id": "oci-q40", "kind": "ajena", "query": "¿Cómo se gobernaba un feudo en la Europa medieval?", "expect": []}

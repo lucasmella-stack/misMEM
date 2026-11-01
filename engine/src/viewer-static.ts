@@ -1,16 +1,16 @@
-/**
- * Sirve la interfaz compilada (engine/ui → dist/ui) en /viewer.
- *
- * Los ficheros de assets/ llevan el hash en el nombre: se cachean para siempre. El
- * index.html no, porque es el que apunta a los hashes de la versión que corre.
- */
+// Serves the compiled interface (engine/ui -> dist/ui) at /viewer. Assets carry the hash in
+// their name and are cached forever; index.html is not, because it points at the hashes of
+// the version that is running.
 import { readFileSync, statSync } from "node:fs";
 import type { ServerResponse } from "node:http";
 import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** Junto al server-http.js compilado: dist/ui. */
-const DEFAULT_UI_DIR = fileURLToPath(new URL("./ui/", import.meta.url));
+/**
+ * Next to the compiled server-http.js: dist/ui. Anchored to this module and never to the
+ * working directory, which is wherever the person running the command happened to be.
+ */
+export const UI_DIR = fileURLToPath(new URL("./ui/", import.meta.url));
 
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -24,9 +24,9 @@ const TYPES: Record<string, string> = {
   ".map": "application/json; charset=utf-8",
 };
 
-// Los scripts sólo del propio servidor. Los estilos además admiten inline: la librería del
-// grafo inserta sus propios <style> (tooltip) y sin esto el navegador los bloquea. Un estilo
-// inyectado no ejecuta código; lo que importa cerrar es script-src.
+// Scripts only from this server. Styles also allow inline: the graph library inserts its own
+// <style> (tooltip) and the browser blocks it otherwise. An injected style runs no code; what
+// matters is closing script-src.
 const CSP = [
   "default-src 'none'",
   "script-src 'self'",
@@ -46,16 +46,16 @@ function send(res: ServerResponse, status: number, type: string, body: string | 
   res.end(body);
 }
 
-/** `pathname` es el de la URL: /, /viewer, /viewer/ o /viewer/assets/… */
-export function serveUi(res: ServerResponse, pathname: string, dir = DEFAULT_UI_DIR): void {
+/** `pathname` is the URL's: /, /viewer, /viewer/ or /viewer/assets/... */
+export function serveUi(res: ServerResponse, pathname: string, dir = UI_DIR): void {
   const root = resolve(dir);
   const relative = pathname.replace(/^\/(viewer\/?)?/, "");
 
   if (relative && relative !== "index.html") {
     try {
-      // Un % mal formado hace lanzar a decodeURIComponent: también es un 404.
+      // A malformed % makes decodeURIComponent throw, which is a 404 too.
       const file = resolve(root, decodeURIComponent(relative));
-      // Nada fuera de dist/ui, aunque la ruta traiga `..` codificado.
+      // Nothing outside dist/ui, even with a URL-encoded `..` in the path.
       if (!file.startsWith(root + sep) || !statSync(file).isFile()) throw new Error("fuera de la interfaz");
       res.setHeader("cache-control", "public, max-age=31536000, immutable");
       send(res, 200, TYPES[extname(file)] ?? "application/octet-stream", readFileSync(file));
@@ -70,7 +70,7 @@ export function serveUi(res: ServerResponse, pathname: string, dir = DEFAULT_UI_
   try {
     html = readFileSync(join(root, "index.html"));
   } catch {
-    // Pasa corriendo con tsx sin compilar, o con un paquete armado sin la interfaz.
+    // Happens when running through tsx without a build, or from a package built without the interface.
     send(
       res,
       503,
@@ -83,4 +83,24 @@ export function serveUi(res: ServerResponse, pathname: string, dir = DEFAULT_UI_
   res.setHeader("content-security-policy", CSP);
   res.setHeader("referrer-policy", "no-referrer");
   send(res, 200, TYPES[".html"] as string, html);
+}
+
+/**
+ * The images the sign-in page needs, by served path. That page cannot reach anything under
+ * /viewer — signing in is exactly what it is for — so the engine hands them over itself.
+ * Missing them only costs the image: a package built without the interface still signs in.
+ */
+export function loginAssets(dir = UI_DIR): Map<string, Buffer> {
+  const assets = new Map<string, Buffer>();
+  for (const [served, file] of [
+    ["/login-logo.webp", "logo.webp"],
+    ["/login-logo-dark.webp", "logo-dark.webp"],
+  ] as const) {
+    try {
+      assets.set(served, readFileSync(join(dir, file)));
+    } catch {
+      // Built without the interface: the page renders without its logo rather than failing.
+    }
+  }
+  return assets;
 }

@@ -1,7 +1,7 @@
 # misMEM — Despliegue en producción
 
 Guía para correr `mismem-brain` (el servidor MCP HTTP de misMEM) en un VPS con
-Docker detrás de Traefik. Reemplazá `mem.example.com` por tu dominio.
+Docker detrás de Traefik. `mem.example.com` se sustituye por el dominio propio.
 
 ---
 
@@ -47,7 +47,8 @@ docker pull ghcr.io/lucasmella-stack/mismem-brain:latest
 ```
 
 Trae `linux/amd64` o `linux/arm64` según el servidor. Los tags son la versión exacta
-(`0.5.0`), `major.minor` (`0.5`) y `latest`, que sale del release estable más alto.
+(`X.Y.Z`), `major.minor` (`X.Y`) y `latest`, que sale del release estable más alto salvo en una
+republicación manual (ver más abajo).
 
 Opción B — build en el servidor, para probar un cambio sin pasar por un release:
 
@@ -61,20 +62,19 @@ docker build -t mismem-brain:latest -f Dockerfile.mismem-brain .
 ### Cómo se publica la imagen
 
 El workflow `docker.yml` corre al pushear un tag `v*` y publica
-`ghcr.io/lucasmella-stack/mismem-brain` con la versión exacta, `major.minor` y,
-sólo desde el tag estable más alto, `latest`. Una pre-release (`v1.0.0-rc1`) nunca
-se lleva `latest`, y un tag puesto en retrospectiva tampoco: así un `v0.4.0` tardío
-no publica el árbol viejo encima del último release. Para republicar sin mover el
-tag, `workflow_dispatch` sobre el tag que corresponda; lanzado desde una rama falla
-al arrancar, para no publicar código sin release.
+`ghcr.io/lucasmella-stack/mismem-brain` con la versión exacta, `major.minor` y, en un
+push, `latest` sólo desde el tag estable más alto: una pre-release (`v1.0.0-rc1`) nunca
+se lo lleva, y un `v0.4.0` puesto en retrospectiva tampoco, para no publicar el árbol
+viejo encima del último release. Para republicar sin mover el tag, `workflow_dispatch`
+sobre el tag que corresponda; lanzado desde una rama falla al arrancar, para no publicar
+código sin release. Una republicación manual sí mueve `latest` con el árbol de ese tag,
+así que sólo se despacha el release vigente.
 
 **Si el push falla con `denied: permission_denied: read_package`**, el paquete existe
-pero no le da escritura a este repositorio. Pasó acá: los push de v0.1.0 y v0.2.0
-crearon el paquete en julio de 2026, GitHub no lo vinculó al repo, y desde v0.3.0 todo
-push murió ahí. El workflow no tenía nada mal —ya declaraba `permissions: packages:
-write`—, y el paquete no aparecía en la lista de paquetes de la cuenta por estar
-privado y sin vincular: hace falta la API (`gh api "user/packages?package_type=container"`,
-con scope `read:packages`) para verlo.
+pero no le da escritura a este repositorio: GitHub lo creó desde un push y no lo vinculó
+al repo. El workflow ya declara `permissions: packages: write`, y el paquete no aparece
+en la lista de la cuenta por estar privado y sin vincular: hace falta la API
+(`gh api "user/packages?package_type=container"`, con scope `read:packages`) para verlo.
 
 Se arregla una sola vez desde *Package settings*
 (`https://github.com/users/<usuario>/packages/container/mismem-brain/settings`):
@@ -161,7 +161,7 @@ y EmbeddingGemma 2, que cruza idiomas:
 
 ```yaml
   mismem-embed:
-    image: ghcr.io/ggml-org/llama.cpp:server   # fijá el digest que probaste
+    image: ghcr.io/ggml-org/llama.cpp:server   # conviene fijar el digest probado
     container_name: mismem-embed
     restart: unless-stopped
     command: ["-m", "/models/embeddinggemma-2-Q8_0.gguf", "--embedding",
@@ -180,17 +180,12 @@ y EmbeddingGemma 2, que cruza idiomas:
 Y en `mismem-brain` (sumándolo a la red `internal`):
 
 ```yaml
-      MISMEM_EMBEDDING_PROVIDER: openai
       MISMEM_EMBEDDING_URL: http://mismem-embed:8080
-      MISMEM_EMBEDDING_MODEL: embeddinggemma-2
-      MISMEM_EMBEDDING_QUERY_PREFIX: "task: search result | query: "
-      MISMEM_EMBEDDING_DOC_PREFIX: "title: none | text: "
-      MISMEM_EMBEDDING_MIN_SCORE: "0.65"
 ```
 
-El modelo (310 MB) se baja una vez de
+El modelo (296 MB) se baja una vez de
 [ggml-org/embeddinggemma-2-GGUF](https://huggingface.co/ggml-org/embeddinggemma-2-GGUF).
-Con el límite de 2 GB el contenedor queda pegado al tope: vigilalo con
+Con el límite de 2 GB el contenedor queda pegado al tope: se vigila con
 `docker stats`. Después de levantarlo, o de sembrar una DB que traía vectores
 de otro modelo, hay que indexar:
 
@@ -216,7 +211,7 @@ mucho 64 filas por llamada, así que solos tardarían varias pasadas en vaciar l
 
 ## Fase 3 — Sembrar la DB (opcional)
 
-Si querés llevar tu memoria local al servidor:
+Para llevar la memoria local al servidor:
 
 ```bash
 scp ~/.mismem/mem.db <tu-servidor>:/tmp/mem.db
@@ -269,7 +264,8 @@ docker exec mismem-brain node dist/ingest-cli.js vscode /tmp/vscode
 
 ## Tareas programadas
 
-Tres, en el `crontab` del servidor. El orden importa: el respaldo va antes de
+Tres tareas en cuatro entradas del `crontab` del servidor: el respaldo y su
+rotación, la consolidación y el olvido. El orden importa: el respaldo va antes de
 todo lo que borra.
 
 ```bash
@@ -291,15 +287,15 @@ docker exec mismem-brain rm -f "$tmp"
 30 4 * * * docker exec mismem-brain node /app/dist/forget-cli.js --before-days 90 --salience-below 0.1 >> /var/log/mismem-forget.log 2>&1
 ```
 
-- **`mismem-forget` borra de verdad si no le pasás `--dry-run`** (la tool MCP
-  `forget`, en cambio, simula por defecto). Probá primero con `--dry-run`.
+- **`mismem-forget` borra de verdad si no se le pasa `--dry-run`** (la tool MCP
+  `forget`, en cambio, simula por defecto). Conviene probar primero con `--dry-run`.
 - La consolidación marca como ruido lo que el LLM no usó, con saliencia 0,05;
   el olvido se lo lleva cuando la memoria cumple los 30 días de gracia y todos
   sus episodios superan `--before-days` (90 en el ejemplo), junto con ellos. Por
   eso el ejemplo guarda 30 días de respaldos: con menos, lo que se marcó mal ya
   no se recupera.
 - Los logs del cron nombran ámbitos y los primeros caracteres de algunas
-  memorias: tratalos como datos personales y rotalos (`logrotate`).
+  memorias: se tratan como datos personales y se rotan (`logrotate`).
 - `scripts/backup-mismem-from-server.ps1` hace el mismo respaldo desde Windows.
 
 Detalle de la consolidación en
@@ -308,7 +304,7 @@ Detalle de la consolidación en
 ## Medir el recall
 
 `mismem-bench` cuenta cuántas veces la memoria esperada sale entre las
-devueltas, con un banco de preguntas armado desde tu propia memoria. No
+devueltas, con un banco de preguntas armado desde la propia memoria. No
 refuerza, así que se puede correr contra la base viva:
 
 ```bash
@@ -347,6 +343,8 @@ Los defaults son los del código (`engine/src`).
 | `MISMEM_HTTP_HOST` | `127.0.0.1` | Bind address. Por defecto sólo loopback; los contenedores fijan `0.0.0.0` a propósito (Dockerfile y ejemplo de compose), y con esa dirección conviene definir `MISMEM_AUTH_*` |
 | `MISMEM_ALLOWED_HOSTS` | — | Sin auth, el servidor sólo atiende `Host` de loopback (`localhost`, `127.0.0.1`, `[::1]`, `*.localhost`) y responde 403 al resto, contra DNS rebinding. Lista separada por comas para añadir otros nombres. Con auth no se filtra |
 | `MISMEM_HTTP_MAX_BODY_BYTES` | `4194304` (4 MiB) | Tope del cuerpo de `POST /mcp`; más grande responde 413 sin juntarlo en memoria |
+| `MISMEM_SESSION_HOURS` | `12` | Cuánto dura la sesión del visor antes de volver a pedir la contraseña. La firma se deriva de `MISMEM_AUTH_*`: cambiar la contraseña cierra todas las sesiones vivas |
+| `MISMEM_LOGIN_MAX_BODY_BYTES` | `4096` | Tope del cuerpo de `POST /login`. Nadie entra con más que eso |
 | `MISMEM_VIEWER_ALLOW_DELETE` | apagado | `1` deja que la interfaz olvide memorias y rasgos, siempre en dos pasos con confirmación. Apagado, esos dos POST responden 403; corregir, deshacer una consolidación y cristalizar no dependen de él |
 | `MISMEM_AUTH_USER` / `MISMEM_AUTH_PASS` | — | BasicAuth nativa. Sin ninguna, **sin auth**; con una sola, el servidor no arranca |
 | `MISMEM_SALIENCE_HALF_LIFE_DAYS` | `90` | Días en que una memoria sin uso pierde la mitad de su saliencia |
@@ -397,6 +395,7 @@ modelo y la URL base se proponen como respuesta por defecto, y `MISMEM_INSTALL_A
 | `MISMEM_INSTALL_MODEL` | el de una instalación anterior, si no vacío | Modelo de consolidación. Obligatorio con `openai` y `compatible`; con los otros, vacío usa el de misMEM |
 | `MISMEM_INSTALL_BASE_URL` | el de una instalación anterior, si no `http://127.0.0.1:11434/v1` | Con proveedor `compatible`, URL base del servidor (con `/v1`) |
 | `MISMEM_INSTALL_HOOKS` | `yes` con `--yes` | `yes` o `no` para los hooks de Claude Code. Si la versión instalada no trae `mismem-inject` y `mismem-used`, queda en `no` |
+| `MISMEM_INSTALL_GEMMA_GGUF` | `<XDG_DATA_HOME>/mismem/models/embeddinggemma-2-Q8_0.gguf` | Ruta de un GGUF de EmbeddingGemma 2 que ya se tenga; con `--embeddings gemma` evita la descarga |
 | `MISMEM_INSTALL_VERSION` | `latest` | Al instalar desde npm (`--from-npm`), la versión del paquete |
 | `REPLACE_EXISTING` | `no` | Con `yes`, el instalador reemplaza un MCP `mismem` de opencode que ya tiene otro comando; sin ella lo deja como está y avisa. En Claude Code, Claude Desktop, VS Code y Cursor la entrada `mismem` se reescribe siempre, y unos hooks de misMEM de Claude Code configurados de otra forma nunca se tocan |
 
@@ -420,13 +419,11 @@ Sin default: si falta una de las dos (como variable o como parámetro del script
 | Var | Default | Descripción |
 |-----|---------|-------------|
 | `MISMEM_EMBEDDINGS` | `auto` | `off` apaga la capa; con `auto`, si el servidor no responde se busca sólo por palabras |
-| `MISMEM_EMBEDDING_PROVIDER` | `ollama` | `ollama` (`/api/embed`) u `openai` (`/v1/embeddings`, p. ej. llama-server) |
-| `MISMEM_EMBEDDING_URL` | `http://127.0.0.1:11434` (ollama) / `http://127.0.0.1:8080` (openai) | Servidor de embeddings |
-| `MISMEM_OLLAMA_URL` | — | Nombre anterior de la URL; sólo vale para `ollama` |
-| `MISMEM_EMBEDDING_MODEL` | `nomic-embed-text` | Modelo. Cambiarlo reindexa solo |
-| `MISMEM_EMBEDDING_QUERY_PREFIX` | vacío | Prefijo que algunos modelos piden en la consulta. Cambiarlo no toca ningún vector guardado |
-| `MISMEM_EMBEDDING_DOC_PREFIX` | vacío | Prefijo que algunos modelos piden en el documento. Cambiarlo reindexa solo en el siguiente backfill |
-| `MISMEM_EMBEDDING_MIN_SCORE` | `0.65` con las familias `nomic-embed-text` y EmbeddingGemma (el nombre aparece en el id, sin distinguir mayúsculas); `0.5` con cualquier otro modelo | Parecido mínimo (coseno) para que una memoria cuente. Depende del modelo; `0` trae todo. Un valor explícito gana siempre al default |
+| `MISMEM_EMBEDDING_URL` | `http://127.0.0.1:8080` | Servidor de embeddings con `/v1/embeddings`: llama-server, u Ollama en `http://127.0.0.1:11434`. Con otro servidor, fijar también `MISMEM_EMBEDDING_MODEL` con un modelo que sirva (por ejemplo `nomic-embed-text` y, para ese, `MISMEM_EMBEDDING_MIN_SCORE=0.65`) |
+| `MISMEM_EMBEDDING_MODEL` | `embeddinggemma-2` | Modelo. Cambiarlo reindexa solo |
+| `MISMEM_EMBEDDING_QUERY_PREFIX` | el de EmbeddingGemma (`task: search result \| query: `) si el modelo es de esa familia (su id contiene `embeddinggemma`, sin distinguir mayúsculas); si no, vacío | Prefijo de consulta. Vacío a propósito (`=`) lo quita. Cambiarlo no toca ningún vector guardado |
+| `MISMEM_EMBEDDING_DOC_PREFIX` | el de EmbeddingGemma (`title: none \| text: `) si el modelo es de esa familia; si no, vacío | Prefijo de documento. Vacío a propósito (`=`) lo quita. Cambiarlo reindexa solo en el siguiente backfill |
+| `MISMEM_EMBEDDING_MIN_SCORE` | `0.65` con la familia EmbeddingGemma; `0.5` con cualquier otro modelo | Parecido mínimo (coseno) para que una memoria cuente. 0,65 es el mayor corte que no pierde aciertos con EmbeddingGemma (PR #181); `0` trae todo. Un valor explícito gana siempre |
 | `MISMEM_EMBEDDING_MAX_CHARS` | `4000` | Tope del texto de cada memoria al indexar. Cambiarlo reindexa solo en el siguiente backfill |
 | `MISMEM_EMBEDDING_TIMEOUT_MS` | `3000` | Espera por consulta (el reindexado usa 120 s) |
 
@@ -498,7 +495,7 @@ Nunca sale con error ni escribe en stdout: un hook que rompe no vale un punto de
 
 ### Antes de apagar el refuerzo por aparición
 
-Mirá primero qué reforzaría, sin escribir nada:
+Primero se puede ver qué reforzaría, sin escribir nada:
 
 ```bash
 mismem-used --transcript ~/.claude/projects/<proyecto>/<sesión>.jsonl --dry-run
@@ -508,7 +505,7 @@ mismem-used --transcript ~/.claude/projects/<proyecto>/<sesión>.jsonl --dry-run
 medición, sobre esos 573 casos).** Es la señal que
 se busca, pero cambia el balance con el olvido: si casi nada se refuerza, el decaimiento
 manda y `forget` empieza a borrar memorias que antes se salvaban por aparecer. Conviene
-dejar `MISMEM_REINFORCE_ON_RECALL=on` unos días, mirar los `--dry-run`, y recién después
+dejar `MISMEM_REINFORCE_ON_RECALL=on` unos días, mirar los `--dry-run`, y sólo entonces
 apagarlo — ajustando `MISMEM_SALIENCE_HALF_LIFE_DAYS` o el `salience_below` de `forget`
 si hace falta.
 
@@ -564,7 +561,7 @@ archivo. Nunca los imprime.
 }
 ```
 
-### Antes de activarlo: qué sale de tu máquina
+### Antes de activarlo: qué sale de la máquina
 
 Lo inyectado viaja en **cada prompt** al proveedor del modelo. Un recuerdo personal
 entra en una conversación de trabajo salvo que lo excluyas:
@@ -573,7 +570,7 @@ entra en una conversación de trabajo salvo que lo excluyas:
 MISMEM_HOOK_EXCLUDE_SCOPES=personal,chatgpt,lucas,bardon
 ```
 
-Mirá primero qué inyectaría, sin mandar nada:
+Primero se puede ver qué inyectaría, sin mandar nada:
 
 ```bash
 echo '{"prompt":"tu pregunta"}' | mismem-inject --dry-run

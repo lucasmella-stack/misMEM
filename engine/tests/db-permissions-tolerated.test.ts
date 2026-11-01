@@ -15,7 +15,7 @@ vi.mock("node:fs", async (importOriginal) => {
   };
 });
 
-import { openDb } from "../src/db.js";
+import { openDb } from "../src/store/db.js";
 
 describe("db-permissions-tolerated: openDb when chmod fails", () => {
   let dir: string;

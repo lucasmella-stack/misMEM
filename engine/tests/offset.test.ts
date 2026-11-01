@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { ServerResponse } from "node:http";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
-import { capture, consolidate } from "../src/tools.js";
-import { handleRecent, parseOffset } from "../src/viewer.js";
-import { handleMemories } from "../src/viewer-api.js";
+import { openDb } from "../src/store/db.js";
+import { capture } from "../src/memory/capture.js";
+import { consolidate } from "../src/memory/consolidate.js";
+import { handleRecent, parseOffset } from "../src/http/viewer/read.js";
+import { handleMemories } from "../src/http/viewer/api.js";
 
 let db: DB;
 

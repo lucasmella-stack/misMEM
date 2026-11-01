@@ -1,10 +1,10 @@
-/** Las vistas del panel principal. Vive aquí para que la lógica de búsqueda no dependa de React. */
+/** The views of the main panel. They live here so the search logic does not depend on React. */
 export type View = "memories" | "traits" | "pending" | "results" | "graph";
 
 /**
- * A dónde lleva el texto de la caja de búsqueda. En el grafo el texto filtra en local y
- * al instante: saltar a Resultados desmontaría la vista que se está mirando. Sin texto no
- * se mueve nadie, porque borrar la búsqueda no debe cambiar de pestaña.
+ * Where the search box text leads. In the graph the text filters locally and instantly: jumping
+ * to Results would unmount the view being looked at. With no text nobody moves, because clearing
+ * the search must not change tab.
  */
 export function viewAfterQuery(current: View, query: string): View {
   if (!query.trim()) return current;

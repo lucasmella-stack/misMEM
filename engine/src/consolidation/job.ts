@@ -1,15 +1,11 @@
-/**
- * Una corrida de consolidación lanzada desde la interfaz, en segundo plano.
- *
- * Tarda minutos y una petición HTTP no puede esperarla: el servidor la arranca, guarda su
- * log y su resumen, y la interfaz pregunta cómo va. Una sola a la vez: dos corridas sobre
- * los mismos episodios los destilarían dos veces y pagarían dos veces.
- */
+// A consolidation run started from the UI, in the background. It takes minutes and an HTTP request
+// cannot wait, so the server keeps its log and the UI polls. One at a time: two runs over the same
+// episodes would distill and pay twice.
 import type { Database as DB } from "better-sqlite3";
 import { loadLlmConfig, type LlmConfig } from "./llm.js";
 import { runConsolidation, type RunOptions, type RunSummary } from "./run.js";
 
-/** Lo que se guarda del log: lo último basta para ver por dónde va. */
+/** What the log keeps: the latest is enough to see where it is. */
 const MAX_LOG_LINES = 200;
 
 export interface JobState {
@@ -54,7 +50,7 @@ export class ConsolidationJob {
     return { ...this.current, log: [...this.current.log] };
   }
 
-  /** Para los tests y el apagado: espera a que termine la corrida en curso. */
+  /** For tests and shutdown: waits for the run in progress. */
   finished(): Promise<void> {
     return this.done;
   }
@@ -65,7 +61,7 @@ export class ConsolidationJob {
     try {
       llm = this.loadConfig();
     } catch (err) {
-      // Sin clave no se arranca nada: mejor decirlo ahora que tras un minuto de "en curso".
+      // Without a key nothing starts: better to say it now than after a minute of "running".
       throw new JobError(400, err instanceof Error ? err.message : String(err));
     }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatInjection } from "../src/inject.js";
+import { formatInjection } from "../src/hooks/inject.js";
 import {
   assistantReply,
   injectedMemories,
@@ -7,7 +7,7 @@ import {
   overlap,
   recalledMemories,
   usedMemoryIds,
-} from "../src/usage.js";
+} from "../src/hooks/usage.js";
 
 const user = (text: string) => ({ type: "user", message: { content: [{ type: "text", text }] } });
 const assistant = (text: string) => ({
@@ -67,10 +67,19 @@ describe("usedMemoryIds", () => {
     expect(usedMemoryIds([usado], "")).toEqual([]);
   });
 
-  it("pocas palabras compartidas no alcanzan aunque la fracción sea alta", () => {
-    const corto = { id: "corto", text: "usa docker" };
-    expect(overlap(corto.text, "usa docker").fraction).toBe(1);
-    expect(usedMemoryIds([corto], "usa docker")).toEqual([]);
+  it("una sola palabra compartida no alcanza aunque la fracción sea alta", () => {
+    // Measured on 898 memories put in front over eight days: a single word in common passes
+    // by chance about as often as it passes for a reason.
+    const corto = { id: "corto", text: "docker" };
+    expect(overlap(corto.text, "docker").fraction).toBe(1);
+    expect(usedMemoryIds([corto], "docker")).toEqual([]);
+  });
+
+  it("dos palabras distintivas compartidas sí alcanzan", () => {
+    // The floor used to be three, which left most turns writing a single memory, and a pair
+    // needs two in the same turn: that is what `co_use` is built from.
+    const dos = { id: "dos", text: "usa docker" };
+    expect(usedMemoryIds([dos], "el servicio usa docker detrás del proxy")).toEqual(["dos"]);
   });
 
   it("las palabras vacías no cuentan como solapamiento", () => {
@@ -80,7 +89,7 @@ describe("usedMemoryIds", () => {
 });
 
 describe("injectedMemories", () => {
-  // Claude Code guarda el additionalContext de un hook así, no como tool_result.
+  // Claude Code stores a hook's additionalContext this way, not as tool_result.
   const adjunto = (texto: unknown, tipo = "hook_additional_context") => ({
     type: "attachment",
     attachment: { type: tipo, content: texto },

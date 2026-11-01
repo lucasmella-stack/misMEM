@@ -1,8 +1,6 @@
-/**
- * Argumentos de mismem-consolidate. Aparte del CLI, que corre al importarse, para poder
- * probarlos. Estricto porque cada corrida cuesta: un `--scope` sin valor consolidaba
- * todos los ámbitos y un número mal escrito dejaba la corrida muda con exit 0.
- */
+// Arguments for mismem-consolidate, kept apart from the CLI because the CLI runs on import.
+// Strict because every run costs: a `--scope` without a value would consolidate every scope and
+// a mistyped number would leave the run silent with exit 0.
 import { ArgsError, flagNumber, flagValue } from "./cli-args.js";
 
 export interface ConsolidateArgs {

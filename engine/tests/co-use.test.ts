@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
-import { capture, consolidate, crystallize, reinforce } from "../src/tools.js";
-import { reinforceMemories } from "../src/salience.js";
+import { openDb } from "../src/store/db.js";
+import { capture } from "../src/memory/capture.js";
+import { consolidate } from "../src/memory/consolidate.js";
+import { crystallize } from "../src/memory/crystallize.js";
+import { reinforce } from "../src/memory/reinforce.js";
+import { reinforceMemories } from "../src/memory/salience.js";
 
 let db: DB;
 
@@ -61,8 +64,8 @@ describe("use_count", () => {
   });
 
   it("no lo mueve la aparición en un recall, sólo el uso medido", () => {
-    // La señal hebbiana se contamina si la aparición cuenta como uso:
-    // reinforceMemories() también la llama el camino de recall.
+    // The Hebbian signal is polluted if surfacing counts as use: the recall path
+    // calls reinforceMemories() too.
     const id = memory("el deploy usa docker compose");
 
     reinforceMemories(db, [id]);
@@ -162,8 +165,8 @@ describe("co_use", () => {
   });
 
   it("al borrarse un recuerdo se van sus pares, sin dejar huérfanos", () => {
-    // forget() barre por antigüedad y saliencia, pero termina en un DELETE:
-    // lo que garantiza que la tabla no acumule basura es la cascada.
+    // forget() sweeps by age and salience but ends in a DELETE: the cascade is what
+    // keeps the table from piling up garbage.
     const a = memory("el deploy usa docker compose");
     const b = memory("el backup corre a las tres");
     reinforce(db, { memory_ids: [a, b] });
