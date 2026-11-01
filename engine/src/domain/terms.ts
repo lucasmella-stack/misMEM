@@ -22,7 +22,11 @@ const STOPWORDS = new Set(
 // episode has enough substance to reach the LLM at all.
 const RESCUE_STOPWORDS = new Set(
   (
-    "cada hay puede pueden podemos podria tiene tienen tenemos tengo hace hacen hacer " +
+    "cada hay puedo puedes puede podemos podeis pueden podria podrias podriamos podriais podrian " +
+    "hago haces hace hacemos haceis hacen hacer " +
+    "tengo tienes tiene tenemos teneis tienen " +
+    "quiero quieres quiere queremos quereis quieren " +
+    "sabemos sabeis saben " +
     "entre desde hasta segun durante mientras aunque sino tan tanto tanta tantos tantas " +
     "todo toda todos todas otro otra otros otras mismo misma mismos mismas " +
     "ahora antes despues tambien ademas entonces casi solo cuantas cuantos"

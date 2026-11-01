@@ -129,6 +129,14 @@ describe("recall léxico: frases normales", () => {
     expect(memoryIds("¿qué podemos hacer con el despliegue?")).toEqual([target]);
   });
 
+  it("la primera persona del mismo verbo tampoco tapa el tema", () => {
+    // Same gap one person down: "puedo" and "hacer" are not in the memory, so leaving them
+    // in the rescue demanded two matches from a question whose only topic word is
+    // "despliegue".
+    const target = memory("dev", "el despliegue del servicio usa docker compose en el servidor de casa");
+    expect(memoryIds("¿qué puedo hacer con el despliegue?")).toEqual([target]);
+  });
+
   it("al relajar hacen falta dos palabras: una sola en común no alcanza", () => {
     const both = memory("pc", "el teclado retroiluminado tiene luces RGB");
     memory("pc", "el teclado mecánico nuevo");
@@ -136,15 +144,30 @@ describe("recall léxico: frases normales", () => {
   });
 
   it("al relajar, lo que coincide en más palabras va primero", () => {
-    // The three-match one is deliberately longer: bm25 penalises length and, without the
-    // order by matches, it would jump ahead of the short two-match one. This way the test
-    // measures that criterion and not the rank FTS5 already returns.
-    const three = memory(
-      "pc",
-      "las luces del teclado del portátil y además varias palabras de relleno para alargarla",
-    );
-    const two = memory("pc", "luces del teclado externo");
-    expect(memoryIds("cómo apago las luces del teclado de mi portátil")).toEqual([three, two]);
+    // Weight ties on purpose: the two-match candidate carries two rare words, worth as much
+    // as the three-match one's rare plus two shared with the corpus, so only the matches key
+    // can put it second. Its text is also shorter, so FTS5 ranks it first: with that key
+    // gone the order flips, which is what makes this fixture measure the key it names.
+    for (const gist of [
+      "sistema proyecto kubernetes del servidor",
+      "sistema proyecto traefik del servidor",
+      "sistema proyecto grafana del servidor",
+      "sistema proyecto del servidor",
+      "sistema del servidor uno",
+      "sistema del servidor dos",
+      "sistema del servidor tres",
+    ]) {
+      memory("dev", gist);
+    }
+    const three = capture(db, { scope: "dev", body: "kubernetes proyecto sistema listo" }).id;
+    const two = capture(db, { scope: "dev", body: "traefik grafana listo" }).id;
+    const hits = recall(db, {
+      query: "kubernetes proyecto sistema traefik grafana",
+      reinforce: false,
+    }).hits;
+    expect(
+      hits.filter((hit) => hit.layer === "episode").map((hit) => hit.id),
+    ).toEqual([three, two]);
   });
 
   it("una pregunta de más de cuarenta palabras se rescata si todas están en la memoria", () => {

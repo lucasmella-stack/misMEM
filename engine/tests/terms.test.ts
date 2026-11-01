@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { searchTerms } from "../src/domain/terms.js";
+import { isRescueStopword, searchTerms } from "../src/domain/terms.js";
 
 describe("palabras de la consulta estricta", () => {
   it("quita las vacías y conserva la que da el tema", () => {
@@ -16,5 +16,26 @@ describe("palabras de la consulta estricta", () => {
 
   it("si ninguna es lo bastante larga, la consulta va como vino", () => {
     expect(searchTerms("la de")).toEqual(["la", "de"]);
+  });
+});
+
+describe("palabras que sólo el rescate descarta", () => {
+  it("cubre el presente entero de los verbos que ya estaban a medias", () => {
+    // Half a paradigm is worse than none: a question like "¿qué puedo hacer?" kept a verb as
+    // if it named the topic and still demanded two matches.
+    for (const word of [
+      "puedo", "puedes", "podemos", "podéis", "pueden",
+      "hago", "haces", "hacemos", "hacéis", "hacen",
+      "tengo", "tienes", "tenemos", "tenéis", "tienen",
+      "quiero", "quieres", "quiere", "queremos", "queréis", "quieren",
+      "sabemos", "sabéis", "saben",
+    ]) {
+      expect(isRescueStopword(word), word).toBe(true);
+    }
+  });
+
+  it("no toca las palabras que pueden dar el tema", () => {
+    expect(isRescueStopword("despliegue")).toBe(false);
+    expect(isRescueStopword("kubernetes")).toBe(false);
   });
 });
