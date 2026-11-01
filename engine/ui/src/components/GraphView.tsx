@@ -9,6 +9,7 @@ import {
   filterGraph,
   neighborsOf,
   scopePalette,
+  topicPalette,
   visibleDegrees,
   type GraphFilters,
 } from "../lib/graph";
@@ -148,9 +149,45 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
     [settings.nodeSize, sizing],
   );
 
+  // Only asked for when it paints: it costs a cosine per pair on the server. The key is the
+  // Temas tab's, so coming from there the colours are already in hand.
+  const topicsQuery = useQuery({
+    queryKey: ["topics", scope ?? ""],
+    queryFn: ({ signal }) => api.topics(scope, signal),
+    enabled: settings.colorBy === "topic",
+  });
+
+  const byTopic = useMemo(
+    () => topicPalette(topicsQuery.data?.topics ?? [], drawnIds),
+    [topicsQuery.data, drawnIds],
+  );
+
+  // The painted ones, in the panel's order: the legend names what the canvas shows.
+  const paintedTopics = useMemo(() => {
+    const painted: Array<{ entry: { id: string; gist: string }; color: string; drawn: number }> = [];
+    for (const topic of topicsQuery.data?.topics ?? []) {
+      const color = byTopic.get(topic.entry.id);
+      if (!color) continue;
+      painted.push({
+        entry: topic.entry,
+        color,
+        drawn: topic.members.filter((id) => drawnIds.has(id)).length,
+      });
+    }
+    // Same order the palette ranked them by, so the legend reads top to bottom like the drawing.
+    return painted.sort((a, b) => b.drawn - a.drawn);
+  }, [topicsQuery.data, byTopic, drawnIds]);
+
   const nodeColor = useCallback(
-    (node: Node) => colorOfNode(node, palette, settings.colorByScope),
-    [palette, settings.colorByScope],
+    (node: Node) =>
+      colorOfNode(node, (n) =>
+        settings.colorBy === "scope"
+          ? palette.get(n.scope)
+          : settings.colorBy === "topic"
+            ? byTopic.get(String(n.id))
+            : undefined,
+      ),
+    [palette, byTopic, settings.colorBy],
   );
 
   const nodeCanvasObject = useCallback(
@@ -303,6 +340,7 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
         onChange={changeSettings}
         scopes={scopes}
         width={size.width}
+        topics={settings.colorBy === "topic" ? paintedTopics : undefined}
         connectome={
           data?.connectome && (
             <ConnectomePanel

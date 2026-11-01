@@ -6,12 +6,8 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConnectomePanel } from "../ui/src/components/graph/ConnectomePanel";
-import {
-  COMMIT_DELAY_MS,
-  DEFAULT_SETTINGS,
-  GraphPanel,
-  type GraphSettings,
-} from "../ui/src/components/GraphPanel";
+import { DEFAULT_SETTINGS, GraphPanel, type GraphSettings } from "../ui/src/components/GraphPanel";
+import { COMMIT_DELAY_MS } from "../ui/src/components/graph/PanelRows";
 import type { ConnectomeSummary } from "../ui/src/api";
 import { installDomStubs } from "./support/dom";
 
@@ -27,6 +23,11 @@ const summary: ConnectomeSummary = {
   hubs: [{ id: "m1", degree: 3, strength: 0.6, support: 5 }],
 };
 
+const TOPICS = [
+  { entry: { id: "m1", gist: "arquitectura de Daimon" }, color: "#d42300" },
+  { entry: { id: "m2", gist: "facturación de ConteNube" }, color: "#946300" },
+];
+
 function panel(overrides: Partial<GraphSettings> = {}, width = 375) {
   const onChange = vi.fn();
   render(
@@ -35,6 +36,7 @@ function panel(overrides: Partial<GraphSettings> = {}, width = 375) {
       onChange={onChange}
       scopes={["s"]}
       width={width}
+      topics={TOPICS}
       connectome={
         <ConnectomePanel
           summary={summary}
@@ -148,5 +150,28 @@ describe("el selector de qué mide el tamaño", () => {
 
     await user.click(toggle);
     expect(onChange.mock.calls).toEqual([[{ sizeByConnections: false }]]);
+  });
+});
+
+describe("el color de los nodos", () => {
+  it("viene por ámbito y deja elegir tema o ninguno", async () => {
+    const user = userEvent.setup();
+    const onChange = panel({}, 1000);
+
+    const porAmbito = screen.getByRole("radio", { name: /ámbito/i });
+    expect(porAmbito.getAttribute("aria-checked")).toBe("true");
+
+    await user.click(screen.getByRole("radio", { name: /tema/i }));
+    expect(onChange.mock.calls).toEqual([[{ colorBy: "topic" }]]);
+  });
+
+  it("con el color por tema enseña los temas, no los ámbitos", async () => {
+    const user = userEvent.setup();
+    panel({ colorBy: "topic" }, 1000);
+
+    await user.click(screen.getByRole("radio", { name: /tema/i }));
+
+    expect(screen.queryByLabelText("Colores por ámbito")).toBeNull();
+    expect(screen.getByLabelText("Colores por tema")).toBeTruthy();
   });
 });
