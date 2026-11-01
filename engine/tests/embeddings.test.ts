@@ -84,6 +84,25 @@ describe("embedPendingMemories", () => {
     expect(second.reembedded).toBe(0);
   });
 
+  it("los ids prioritarios entran en el presupuesto antes que el resto", async () => {
+    makeMemory("vida", "cashflow uno");
+    makeMemory("vida", "cashflow dos");
+    const priority = makeMemory("vida", "mezcla nueva");
+
+    const r = await embedPendingMemories(db, {
+      embedFn: fakeEmbed,
+      model: "fake",
+      maxRows: 1,
+      priorityIds: [priority],
+    });
+
+    expect(r).toMatchObject({ pending: 3, embedded: 1 });
+    const embedded = db.prepare("SELECT memory_id FROM memory_embeddings").all() as Array<{
+      memory_id: string;
+    }>;
+    expect(embedded.map((row) => row.memory_id)).toEqual([priority]);
+  });
+
   it("corta temprano si el embedder está caído", async () => {
     makeMemory("vida", "una");
     makeMemory("vida", "otra");

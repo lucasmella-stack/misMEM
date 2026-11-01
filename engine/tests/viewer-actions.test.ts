@@ -3,7 +3,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Database as DB } from "better-sqlite3";
 import { openDb } from "../src/store/db.js";
 import type { ConsolidationJob } from "../src/consolidation/job.js";
-import { saveMemoryEmbedding } from "../src/embeddings/store.js";
+import { saveMemoryEmbedding, embedPendingMemories } from "../src/embeddings/store.js";
+import type { EmbedFn } from "../src/embeddings/provider.js";
 import { capture } from "../src/memory/capture.js";
 import { consolidate } from "../src/memory/consolidate.js";
 import { crystallize } from "../src/memory/crystallize.js";
@@ -60,12 +61,12 @@ describe("writeGuard", () => {
 });
 
 describe("acciones sobre memorias", () => {
-  it("editar cambia el texto y tira el vector viejo", async () => {
+  it("editar cambia el texto, tira el vector viejo y no dice que reembebió si no lo hizo", async () => {
     const { memoryId } = memoryFrom("a", "texto viejo", ["e1"]);
     saveMemoryEmbedding(db, memoryId, "m", Float32Array.from([1, 0]));
 
     const out = await editMemory(db, memoryId, { gist: "  texto nuevo ", details: "más" }, noReembed);
-    expect(out).toEqual({ id: memoryId, reembedded: true });
+    expect(out).toEqual({ id: memoryId, reembedded: false });
     expect(db.prepare("SELECT gist, details FROM memories WHERE id = ?").get(memoryId)).toEqual({
       gist: "texto nuevo",
       details: "más",
@@ -74,6 +75,35 @@ describe("acciones sobre memorias", () => {
     // And the FTS index sees the new text, not the old.
     expect(count("SELECT COUNT(*) AS n FROM memories_fts WHERE memories_fts MATCH 'nuevo'")).toBe(1);
     expect(count("SELECT COUNT(*) AS n FROM memories_fts WHERE memories_fts MATCH 'viejo'")).toBe(0);
+  });
+
+  it("en un backfill lleno, la memoria editada va primero y acaba con vector", async () => {
+    for (let i = 0; i < 70; i++) memoryFrom("a", `pendiente ${i}`, [`p${i}`]);
+    const { memoryId } = memoryFrom("a", "texto viejo", ["e1"]);
+    const embedFn: EmbedFn = async (texts) => texts.map(() => Float32Array.from([1, 0]));
+
+    const out = await editMemory(db, memoryId, { gist: "texto nuevo" }, (db, priorityIds) =>
+      embedPendingMemories(db, { embedFn, model: "fake", maxRows: 64, priorityIds }),
+    );
+
+    expect(out).toEqual({ id: memoryId, reembedded: true });
+    expect(count("SELECT COUNT(*) AS n FROM memory_embeddings WHERE memory_id = ?", memoryId)).toBe(1);
+  });
+
+  it("con el embedder caído la edición se guarda pero no dice que reembebió", async () => {
+    const { memoryId } = memoryFrom("a", "texto viejo", ["e1"]);
+
+    const out = await editMemory(db, memoryId, { gist: "texto nuevo" }, (db, priorityIds) =>
+      embedPendingMemories(db, {
+        embedFn: async () => null,
+        model: "fake",
+        maxRows: 64,
+        priorityIds,
+      }),
+    );
+
+    expect(out).toEqual({ id: memoryId, reembedded: false });
+    expect(count("SELECT COUNT(*) AS n FROM memory_embeddings WHERE memory_id = ?", memoryId)).toBe(0);
   });
 
   it("editar sin embedder igual guarda", async () => {

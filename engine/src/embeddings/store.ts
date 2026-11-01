@@ -192,6 +192,15 @@ function invalidEmbeddingIds(db: DB, model: string): string[] {
   return rows.filter((row) => !isValidStoredVector(row.vec)).map((row) => row.memory_id);
 }
 
+export interface BackfillOptions extends ResolveOptions {
+  /**
+   * Ids embedded before the rest of the backlog, inside the same `maxRows` budget. A viewer
+   * edit passes its own memory: with a backlog longer than the cap, its scan position would
+   * otherwise leave it unembedded while the response claimed the opposite.
+   */
+  priorityIds?: readonly string[];
+}
+
 /**
  * Embeds memories, traits and pending episodes that have no vector, an outdated model or a
  * fingerprint that no longer matches their text and the current config (idempotent). It
@@ -199,7 +208,7 @@ function invalidEmbeddingIds(db: DB, model: string): string[] {
  */
 export async function embedPendingMemories(
   db: DB,
-  opts: ResolveOptions = {},
+  opts: BackfillOptions = {},
 ): Promise<BackfillStats> {
   const cfg = loadEmbeddingConfig();
   if (!cfg.enabled && !opts.embedFn) {
@@ -254,7 +263,17 @@ export async function embedPendingMemories(
   // A bounded caller embeds at most `maxRows` rows across the three layers; `pending` keeps
   // reporting the whole backlog so the rest is visibly waiting for the next pass.
   const budget = opts.maxRows ?? Number.POSITIVE_INFINITY;
-  const selectedRows = pendingRows.slice(0, budget);
+  // The scan order of the backlog is stable, so without this a priority row created last would
+  // fall outside the cap on every pass until the rows ahead of it were done.
+  const priority = new Set(opts.priorityIds ?? []);
+  const orderedRows =
+    priority.size === 0
+      ? pendingRows
+      : [
+          ...pendingRows.filter((row) => priority.has(row.id)),
+          ...pendingRows.filter((row) => !priority.has(row.id)),
+        ];
+  const selectedRows = orderedRows.slice(0, budget);
   const memories = await embedInBatches(
     selectedRows,
     resolved.embedFn,
