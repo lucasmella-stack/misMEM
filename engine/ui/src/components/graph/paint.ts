@@ -81,7 +81,7 @@ export function paintNode(node: Node, ctx: CanvasRenderingContext2D, scale: numb
   if (glow > 0 && lit) {
     const halo = radius * (HALO_MIN_SCALE + HALO_GROWTH * glow);
     const gradient = ctx.createRadialGradient(node.x, node.y, radius, node.x, node.y, halo);
-    gradient.addColorStop(0, tokens.brand);
+    gradient.addColorStop(0, tokens.graphHalo);
     gradient.addColorStop(1, "transparent");
     ctx.globalAlpha = HALO_MAX_ALPHA * glow;
     ctx.beginPath();

@@ -15,6 +15,25 @@
 - `engine/tests/installer.test.ts` corre el instalador de verdad contra un `HOME` temporal, con
   `llama-server` y `systemctl` simulados: es lo único que prueba sus decisiones, porque hasta ahora de
   `scripts/` sólo se comprobaban la sintaxis y shellcheck.
+
+### El conectoma deja de ser un panel aparte que tapaba los ajustes (#209)
+
+- **Los dos paneles del grafo se tapaban por debajo de 34rem.** A 375 px el del conectoma cubría
+  entero el de ajustes, y entre lo que tapaba estaba el único interruptor que apaga la capa: desde el
+  teléfono se entraba y no se salía. La lectura del conectoma pasa a ser el cuerpo de su propia
+  sección dentro de *Ajustes del grafo*, así que el solapamiento desaparece por construcción.
+- **El deslizador de soporte mínimo pedía el grafo entero en cada paso**, y cada petición recalcula el
+  NPMI de toda la tabla `co_use`: cinco pulsaciones de flecha eran cinco `GET /api/graph`, cuatro
+  abortadas. Ahora el número se mueve al instante y el valor viaja una sola vez, cuando se deja de
+  mover.
+- **El halo tiene su propio token** (`--color-graph-halo`) en los dos temas: el rosa de marca
+  resplandece sobre una superficie oscura, pero en claro el mismo tono a baja opacidad leía como un
+  cerco gris sucio.
+- **Los deslizadores no tenían nombre accesible**: `aria-labelledby` iba al contenedor y el
+  `role="slider"` lo tiene el pulgar, así que ninguno se anunciaba. La etiqueta llega ahora al pulgar.
+- Los tests de interfaz pueden renderizar componentes (`jsdom` y testing-library, con versión exacta):
+  hasta ahora sólo probaban lógica pura, y nada de esto se puede ver sin montar el panel.
+
 ### `consolidate` ya no le roba episodios a otra memoria ni crea memorias sin origen (#233)
 
 - La herramienta MCP marcaba sus episodios con `UPDATE episodes SET consolidated_into = ?` **sin
@@ -217,6 +236,7 @@
   conserva su copia y `tests/support.test.ts` falla si las dos dejan de coincidir.
 - De paso, `queries/graph.ts` deja de reimplementar el acumulador de `store/connectome.ts`: el halo
   del lienzo y la lista del panel responden ya a una sola definición de hub.
+
 ### El logo oficial encabeza el README
 
 - `docs/assets/logo.webp` y `logo-dark.webp`, el mismo logo con el fondo blanco quitado y la tinta en
