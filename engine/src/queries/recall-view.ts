@@ -16,9 +16,9 @@ export const MAX_DETAILS_CHARS = 1200;
 /** What `recall` returns to a model: the search hit plus the columns only its table knows. */
 export interface RecallHitView extends RecallHit {
   /**
-   * `created_at` as YYYY-MM-DD in UTC: a model reads a date, not an epoch. Absent when
-   * `created_at` is not a usable epoch (a restored or hand-edited row), so one bad row
-   * cannot fail the whole recall.
+   * `created_at` as YYYY-MM-DD in UTC: a model reads a date, not an epoch. Absent when it is
+   * not finite or outside `Date`'s range, so one corrupted row cannot fail the whole recall;
+   * a row written in seconds is a valid date in milliseconds and keeps one.
    */
   date?: string;
   /** The distilled detail of a memory, absent when it holds nothing. */

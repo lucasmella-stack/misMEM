@@ -8,6 +8,15 @@ acordarse de pedir nada. Son opcionales; `scripts/install.sh` los configura si s
 | `mismem-inject` | `UserPromptSubmit` | Busca con el prompt y adelanta unos pocos recuerdos. Busca con `reinforce: false`: lo que el usuario no pidió no es uso. Se mantiene dormido hasta comprobar que el servidor expone `reinforce`, así que se puede configurar antes de desplegar |
 | `mismem-used` | `Stop` | Mira el último turno (lo que el modelo pidió con `recall` y lo que la inyección le puso delante) y refuerza sólo aquello cuyas palabras distintivas reaparecen en la respuesta. Es una aproximación: falla hacia no reforzar |
 
+Dos matices sobre esa aproximación:
+
+- Con `MISMEM_HOOK_URL`, la inyección recibe de `recall` el `text` ya recortado a 2.000 caracteres
+  (`MAX_TEXT_CHARS`). Sin servidor remoto lee la base y recibe el texto entero, así que lo inyectado no es
+  lo mismo en los dos caminos cuando un recuerdo pasa del tope.
+- `mismem-used` mide el solapamiento sobre el texto que llegó al contexto, recortado cuando vino de un
+  `recall` por MCP. El recorte puede quitar palabras que la respuesta no repetía, así que para un gist por
+  encima del tope el error ya no cae siempre del lado de no reforzar.
+
 ## Qué sale de la máquina
 
 Lo inyectado viaja en **cada prompt** al proveedor del modelo, así que `MISMEM_HOOK_EXCLUDE_SCOPES`
