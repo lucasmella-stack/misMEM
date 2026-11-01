@@ -7,12 +7,11 @@ import { effectiveSalience } from "../memory/salience.js";
 import { excludeNoiseSql } from "../store/rows.js";
 import { escapeFts } from "./fts.js";
 import {
-  informativeTerms,
-  RELAXED_MAX_TERMS,
+  planTerms,
   relaxRows,
   relaxedFts,
   relaxedTerms,
-  type RelaxedTerm,
+  type RelaxedPlan,
 } from "./rescue.js";
 
 export const CANDIDATE_POOL_LIMIT = 50;
@@ -117,38 +116,45 @@ export function lexicalCandidates(
     strictRows.traits.length === 0 &&
     strictRows.memories.length === 0 &&
     strictRows.episodes.length === 0;
-  // Frequency is only queried when a rescue is really needed: up to twelve counts over
-  // memories_fts that a normal search must not pay for.
-  let rescuedTerms: RelaxedTerm[] | null = null;
-  let rescuedWordCount = 0;
+  // Frequency is only queried when a rescue is really needed: one count per question word
+  // over memories_fts that a normal search must not pay for.
+  let rescuedPlan: RelaxedPlan | null = null;
   let rows = strictRows;
   if (strictEmpty && rescue) {
-    const { terms, wordCount } = relaxedTerms(input.query);
-    const relaxed = relaxedFts(terms);
-    if (relaxed !== strict) {
-      rows = run(relaxed);
-      rescuedTerms = informativeTerms(db, terms);
-      // The ratio counts what is actually searched; RELAXED_MAX_TERMS already trimmed the
-      // query, and demanding words that never got searched would be unreachable.
-      rescuedWordCount = Math.min(wordCount, RELAXED_MAX_TERMS);
+    const relaxedQuery = relaxedTerms(input.query);
+    // A question made only of rescue fillers ("¿qué podemos hacer?") leaves no term to OR:
+    // the empty expression matched nothing yet still paid three MATCH '""' and a plan.
+    if (relaxedQuery.terms.length > 0) {
+      const relaxed = relaxedFts(relaxedQuery.terms);
+      if (relaxed !== strict) {
+        rows = run(relaxed);
+        // Both sides of the presence gate cover the whole question, never the capped search:
+        // the cap only trims the candidate query, and counting the numerator over its twelve
+        // words made the gate unreachable from forty-one content words on.
+        rescuedPlan = planTerms(db, relaxedQuery, [
+          ...rows.traits,
+          ...rows.memories,
+          ...rows.episodes,
+        ]);
+      }
     }
   }
   const traits: RecallHit[] = (
-    rescuedTerms
-      ? relaxRows(rows.traits, rescuedTerms, rescuedWordCount)
+    rescuedPlan
+      ? relaxRows(rows.traits, rescuedPlan)
       : rows.traits
   ).map(({ fts_rank: _ftsRank, ...row }) => ({ layer: "trait" as const, ...row }));
   const episodes: RecallHit[] = (
-    rescuedTerms
-      ? relaxRows(rows.episodes, rescuedTerms, rescuedWordCount)
+    rescuedPlan
+      ? relaxRows(rows.episodes, rescuedPlan)
       : rows.episodes
   ).map(({ fts_rank: _ftsRank, ...row }) => ({ layer: "episode" as const, ...row }));
 
   // Rescue already comes ordered by matches and cut to RELAXED_MAX_RESULTS. The strict path
   // keeps FTS5's order and breaks ties by decayed salience: the raw value favoured what was
   // used long ago and is not what the client sees in the hit.
-  const orderedMemories = rescuedTerms
-    ? relaxRows(rows.memories, rescuedTerms, rescuedWordCount)
+  const orderedMemories = rescuedPlan
+    ? relaxRows(rows.memories, rescuedPlan)
     : rows.memories.sort(
         (a, b) =>
           Number(a.fts_rank) - Number(b.fts_rank) ||

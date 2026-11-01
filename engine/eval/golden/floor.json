@@ -1,18 +1,18 @@
 {
   "limit": 5,
   "lexico": {
-    "literal": { "hits": 46 },
-    "parafrasis": { "hits": 1 },
-    "sinonimo": { "hits": 22 },
-    "coloquial": { "hits": 24 },
-    "sin_tildes": { "hits": 29 },
-    "errata": { "hits": 26 },
-    "ingles": { "hits": 2 },
-    "larga": { "hits": 5 },
+    "literal": { "hits": 47 },
+    "parafrasis": { "hits": 2 },
+    "sinonimo": { "hits": 27 },
+    "coloquial": { "hits": 26 },
+    "sin_tildes": { "hits": 32 },
+    "errata": { "hits": 28 },
+    "ingles": { "hits": 3 },
+    "larga": { "hits": 17 },
     "clave": { "hits": 24 },
-    "ambito": { "hits": 14 },
-    "episodio": { "hits": 20 },
-    "rasgo": { "hits": 9 }
+    "ambito": { "hits": 17 },
+    "episodio": { "hits": 21 },
+    "rasgo": { "hits": 10 }
   },
   "lexico_ajenas_max": 4
 }

@@ -1,7 +1,7 @@
 // Owns the lax rescue: its prefix, rarity and minimum-match constants and the scoring that
 // decides which candidates survive when the strict query found nothing.
 import type { Database as DB } from "better-sqlite3";
-import { plain, searchTerms } from "../domain/terms.js";
+import { isRescueStopword, plain, searchTerms } from "../domain/terms.js";
 import { excludeNoiseSql } from "../store/rows.js";
 import { FTS_TOKEN_SPLIT, quoteFts } from "./fts.js";
 import type { RankedCandidate } from "./lexical.js";
@@ -13,16 +13,23 @@ const PREFIX_FROM_LENGTH = 5;
 const PREFIX_TRIM = 3;
 const PREFIX_MIN = 4;
 
-// How many distinct informative terms must match. One would let in any memory sharing a
-// rare but unrelated word; two force the candidate to talk about the same thing twice, and
-// common words do not count.
+// How many matching words a rescued record needs. One is too easy: any record sharing a
+// rare but unrelated word would come back. The exception is a one-word query, which cannot
+// reach two. The rescue sees at most RELAXED_MAX_TERMS words, so a bar that grew with the
+// query would stop growing at twelve and change silently if that cap moved; two is what
+// the golden corpus supports.
 const RELAXED_MIN_INFORMATIVE = 2;
-// In a long question two matches prove nothing even if rare, so the ratio raises the
-// minimum with the size of the query. It is measured over every searched word, not only the
-// informative ones: in a tiny corpus almost everything looks rare, and two common words
-// rescued an unrelated long question (the astronomy case in the tests).
-// Informative terms still drive the match count and the order; this only sets the bar.
-const RELAXED_MIN_RATIO = 0.3;
+// A query is mostly made of words no record contains when it is about something else. In
+// that case the few words that do exist are not evidence: the astronomy question of the
+// unit test keeps only "sistema" out of seven content words. Requiring 30 % of the query
+// words (stopwords excluded, before the term cap) to exist keeps it out, while a real long
+// question leaves most of its words in the corpus.
+const RELAXED_MIN_PRESENT_RATIO = 0.3;
+// A record matched only by generic words proves nothing, so at least one rare word is
+// required. Two made no difference to off-topic questions once the added function words
+// were stopwords (measured before the presence gate, which later brought them to 4/48), but cost two colloquial questions and nine
+// questions overall on the golden corpus, so one stays.
+const RELAXED_MIN_RARE_MATCHES = 1;
 // A term is rare when it appears in few memories; one that appears in many does not tell a
 // paraphrase from a coincidence (bm25's IDF idea). The floor of 3 documents protects small
 // corpora and the fraction grows with the base, so "few" means the same at 300 memories and
@@ -33,8 +40,16 @@ const RELAXED_RARE_FRACTION = 0.05;
 // turning the answer into a dump. This is the rescue's only cap; the strict path keeps its
 // own candidate pool.
 const RELAXED_MAX_RESULTS = 3;
-// Word cap so the rescue query does not grow without bound.
-export const RELAXED_MAX_TERMS = 12;
+// Word cap so the rescue query does not grow without bound. It only limits what the
+// candidate query searches: the presence gate still reads the whole question, or a question
+// of 41 content words could never reach 30 % however much of it is in a memory.
+const RELAXED_MAX_TERMS = 12;
+// The presence gate runs one FTS count per word it inspects, and nothing caps the query: the
+// inject hook passes the whole prompt. Sixty-four content words is far above any real
+// question, so the count stays bounded while the gate still sees all of a long one. Both
+// sides of the ratio stop at this same bound, or the denominator would grow past what the
+// numerator can ever reach.
+const RELAXED_PRESENCE_MAX_TERMS = 64;
 
 export interface RelaxedTerm {
   word: string;
@@ -42,10 +57,14 @@ export interface RelaxedTerm {
   prefix: string | null;
 }
 
-interface RelaxedQuery {
-  /** Terms searched and counted, with repeated prefixes already merged. */
+export interface RelaxedQuery {
+  /** Terms searched by the candidate query, repeated prefixes already merged and capped. */
   terms: RelaxedTerm[];
-  /** Distinct words before merging prefixes: tells whether the query is a single one. */
+  /** Every rescue term before the term cap: the presence gate reads the first
+   * RELAXED_PRESENCE_MAX_TERMS of them. */
+  allTerms: RelaxedTerm[];
+  /** Distinct words before merging prefixes: it says whether the query has a single word,
+   * which the gate cannot ask by its own count, since two forms of one word merge to one. */
   wordCount: number;
 }
 
@@ -59,7 +78,10 @@ export function relaxedTerms(query: string): RelaxedQuery {
   const terms: RelaxedTerm[] = [];
   for (const term of searchTerms(query)) {
     for (const word of plain(term).split(FTS_TOKEN_SPLIT)) {
-      if (!word || seen.has(word)) continue;
+      // The rescue drops filler the strict query keeps, through its own list: the strict
+      // AND needs those words to match when they are the whole query, but an OR over them
+      // only adds candidates that share nothing.
+      if (!word || seen.has(word) || isRescueStopword(word)) continue;
       seen.add(word);
       terms.push({
         word,
@@ -70,8 +92,10 @@ export function relaxedTerms(query: string): RelaxedQuery {
       });
     }
   }
+  const allTerms = dedupeByPrefix(terms);
   return {
-    terms: dedupeByPrefix(terms).slice(0, RELAXED_MAX_TERMS),
+    terms: allTerms.slice(0, RELAXED_MAX_TERMS),
+    allTerms,
     wordCount: terms.length,
   };
 }
@@ -115,24 +139,60 @@ export function relaxedFts(terms: RelaxedTerm[]): string {
 // `memories_fts` and not on the rescued layer: memories are where generic vocabulary piles
 // up, while traits and episodes are sparse and would make almost anything look rare.
 // Unscoped, because the vocabulary is the person's, and free of noise like the search.
-function documentFrequency(db: DB, term: RelaxedTerm): number {
-  const q = term.prefix ? `${quoteFts(term.prefix)}*` : quoteFts(term.word);
-  const row = db
-    .prepare(
-      `SELECT count(*) AS n
-       FROM memories_fts f JOIN memories m ON m.rowid = f.rowid
-       WHERE memories_fts MATCH ? AND ${excludeNoiseSql("m")}`,
-    )
-    .get(q) as { n: number };
-  return row.n;
+// Prepared once: the gate runs up to RELAXED_PRESENCE_MAX_TERMS counts per recall.
+function documentFrequencyCounter(db: DB): (term: RelaxedTerm) => number {
+  const statement = db.prepare(
+    `SELECT count(*) AS n
+     FROM memories_fts f JOIN memories m ON m.rowid = f.rowid
+     WHERE memories_fts MATCH ? AND ${excludeNoiseSql("m")}`,
+  );
+  return (term) => {
+    const q = term.prefix ? `${quoteFts(term.prefix)}*` : quoteFts(term.word);
+    return (statement.get(q) as { n: number }).n;
+  };
 }
 
-// The terms that tell things apart. An absent term scores 0, the rarest value, and is kept: it
-// cannot match a memory but can match an episode or trait (a new install has no memories).
-// The price, however big the base: an episode sharing two absent words with an unrelated
-// question ("cambiar la configuración del móvil" vs the server's) is rescued anyway, and only
-// words common in the memories, above `rare`, stop it. A term in every memory is the topic.
-export function informativeTerms(db: DB, terms: RelaxedTerm[]): RelaxedTerm[] {
+/**
+ * A query word with its weight. Frequency is measured over memories, so 0 means "no memory
+ * has it": it may still live in a trait or a pending episode, which is why presence is also
+ * checked against the candidates.
+ */
+interface PlannedTerm {
+  term: RelaxedTerm;
+  /** Memories where the term appears; 0 means it may still live in traits or episodes. */
+  frequency: number;
+  /** Surfaces rarer words first when ordering the rescue; log(1 + N / (1 + df)). */
+  idf: number;
+  /** Rare enough to tell records apart, or present in every memory (tiny corpus topic). */
+  informative: boolean;
+}
+
+/**
+ * What the rescue may demand: `present` and `wordCount` stop at the same deduplicated
+ * RELAXED_PRESENCE_MAX_TERMS set, so the gate compares like with like; `terms` is the
+ * capped set a candidate is scored against, without the words no record has.
+ */
+export interface RelaxedPlan {
+  terms: PlannedTerm[];
+  /** Question words found in some memory of the base or in a candidate, over the gated set. */
+  present: number;
+  /** Deduplicated content words of the question, up to RELAXED_PRESENCE_MAX_TERMS: the
+   * gate's denominator. */
+  wordCount: number;
+  /** Distinct words before merging prefixes: two forms of one word merge into a single term
+   * but the question still has two words, and only this count tells a one-word query apart. */
+  distinctWords: number;
+}
+
+/**
+ * One prepared count serves every word the gate inspects, so a long question stops paying
+ * for names no record has; only the capped terms are scored.
+ */
+export function planTerms(
+  db: DB,
+  { terms, allTerms, wordCount }: RelaxedQuery,
+  rows: readonly RankedCandidate[],
+): RelaxedPlan {
   const total = (
     db
       .prepare(
@@ -143,59 +203,100 @@ export function informativeTerms(db: DB, terms: RelaxedTerm[]): RelaxedTerm[] {
       .get() as { n: number }
   ).n;
   const rare = Math.max(RELAXED_RARE_MIN_DOCS, Math.ceil(total * RELAXED_RARE_FRACTION));
-  return terms.filter((term) => {
-    const frequency = documentFrequency(db, term);
-    return frequency <= rare || frequency === total;
-  });
+  const candidateTokens = rows.map((row) => tokensOf(row.search_text ?? row.text));
+  const searched = new Set(terms.map(({ word }) => word));
+  const frequencyOf = documentFrequencyCounter(db);
+  const planned: PlannedTerm[] = [];
+  let present = 0;
+  for (const term of allTerms.slice(0, RELAXED_PRESENCE_MAX_TERMS)) {
+    const frequency = frequencyOf(term);
+    const inCandidates = candidateTokens.some((tokens) => termInTokens(tokens, term));
+    // A word absent from every memory of the base and from every candidate cannot match
+    // anything; keeping it only inflated the required number of coincidences.
+    if (frequency === 0 && !inCandidates) continue;
+    present += 1;
+    if (!searched.has(term.word)) continue;
+    planned.push({
+      term,
+      frequency,
+      idf: Math.log(1 + total / (1 + frequency)),
+      // A term present in every memory is the corpus topic, not noise, and a term absent
+      // from the memories may still distinguish an episode or a trait.
+      informative: frequency <= rare || frequency === total,
+    });
+  }
+  return {
+    terms: planned,
+    present,
+    wordCount: Math.min(allTerms.length, RELAXED_PRESENCE_MAX_TERMS),
+    distinctWords: wordCount,
+  };
 }
 
-// How many of the query's distinct informative terms appear in the text, counted by the
-// same prefix that was searched; common words do not count, and tokens split like FTS5
-// (underscore included), or `columna_beta` would not match `beta`. A token shorter than the
-// prefix length never matches by prefix: "solar" trims to "sola", and "una sola pasada"
-// rescued an unrelated question without that guard. The plural of a four-letter singular is lost either way.
-function countRelaxedMatches(text: string, terms: RelaxedTerm[]): number {
-  const tokens = plain(text)
+/** FTS5 splits on every non-letter, including `_`; the rescue has to count the same way. */
+function tokensOf(text: string): string[] {
+  return plain(text)
     .split(FTS_TOKEN_SPLIT)
     .filter(Boolean);
-  return terms.reduce((count, { word, prefix }) => {
-    const found = tokens.some((token) =>
-      prefix
-        ? token.length >= PREFIX_FROM_LENGTH && token.startsWith(prefix)
-        : token === word,
-    );
-    return found ? count + 1 : count;
-  }, 0);
 }
 
 /**
- * Keeps only the rescue candidates that reach the minimum of informative terms and orders
- * them by those matches, not by salience or age. The cap stops the rescue from becoming a
- * second list.
+ * Whether a token satisfies a query term. A token shorter than PREFIX_FROM_LENGTH cannot
+ * match by prefix: "solar" trims to "sola", and without the guard any four-letter word
+ * counted as an inflection, rescuing an unrelated question ("una sola pasada").
  */
-export function relaxRows<T extends RankedCandidate>(
-  rows: T[],
-  informative: RelaxedTerm[],
-  queryWords: number,
-): T[] {
-  if (rows.length === 0 || informative.length === 0) return [];
-  // A single-word query cannot gather two matches: if rescue got here the prefix changed
-  // the query, and the prefix already requires PREFIX_FROM_LENGTH letters, so a short word
-  // goes exact and is never rescued. In the rest, the ratio raises the minimum with its size.
-  const required =
-    queryWords === 1
-      ? 1
-      : Math.max(RELAXED_MIN_INFORMATIVE, Math.ceil(queryWords * RELAXED_MIN_RATIO));
-  // If there are not as many informative terms as the query requires, nobody can qualify.
-  if (informative.length < required) return [];
+function termInTokens(tokens: readonly string[], { word, prefix }: RelaxedTerm): boolean {
+  return tokens.some((token) =>
+    prefix
+      ? token.length >= PREFIX_FROM_LENGTH && token.startsWith(prefix)
+      : token === word,
+  );
+}
+
+/**
+ * Keeps only rescued candidates that clear the bar and orders them by how much they
+ * explain the question, not by salience or age. The cap keeps the rescue a last resort
+ * instead of a second result list.
+ */
+export function relaxRows<T extends RankedCandidate>(rows: T[], plan: RelaxedPlan): T[] {
+  if (rows.length === 0) return [];
+  const terms = plan.terms;
+  if (terms.length === 0 || !terms.some(({ informative }) => informative)) return [];
+  // If most of the question is about things no record contains, the few words that do
+  // exist are not evidence; this keeps a long off-topic question from being rescued by two
+  // generic words while a real long question still passes with most of its words present.
+  // Both sides use the same deduplicated set, capped alike: words absent everywhere keep
+  // their place in the denominator even though they are dropped from the search.
+  if (plan.present / plan.wordCount < RELAXED_MIN_PRESENT_RATIO) return [];
+  // A one-word question cannot reach two matches; anything else asks for two. "One word" is one
+  // content word left after stopwords and rescue fillers (fillers plus one topic word count as
+  // one), not the plan keeping one term: two forms of a word dedupe to one prefix and still count
+  // as two words, or "decidir decision" rescues "decision" alone.
+  const singleWord = plan.distinctWords === 1;
+  const required = singleWord ? 1 : RELAXED_MIN_INFORMATIVE;
+  // A one-word query has only one term to match, so asking for two rare ones would make
+  // the rescue unreachable ("deudas" against "la deuda").
+  const rareRequired = singleWord ? 1 : RELAXED_MIN_RARE_MATCHES;
   return rows
-    .map((row) => ({
-      row,
-      matches: countRelaxedMatches(row.search_text ?? row.text, informative),
-    }))
-    .filter(({ matches }) => matches >= required)
+    .map((row) => {
+      const tokens = tokensOf(row.search_text ?? row.text);
+      const matched = terms.filter(({ term }) => termInTokens(tokens, term));
+      return {
+        row,
+        matches: matched.length,
+        informative: matched.filter(({ informative }) => informative).length,
+        weight: matched.reduce((sum, { idf }) => sum + idf, 0),
+      };
+    })
+    // A candidate made only of common words proves nothing; one rare word is the minimum
+    // signal, and the count of all matches still has to clear two.
+    .filter(
+      ({ matches, informative }) => matches >= required && informative >= rareRequired,
+    )
     .sort(
       (a, b) =>
+        b.weight - a.weight ||
+        b.informative - a.informative ||
         b.matches - a.matches ||
         Number(a.row.fts_rank) - Number(b.row.fts_rank) ||
         a.row.id.localeCompare(b.row.id),

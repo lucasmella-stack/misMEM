@@ -9,14 +9,29 @@ y episodios no la llevan. Las constantes están en
 
 ## Por palabras (siempre)
 
-FTS5 exige que estén **todas** las palabras de la consulta, sin contar las vacías ("qué", "sobre", "the"...).
+FTS5 exige que estén **todas** las palabras de la consulta, sin contar las vacías ("qué", "sobre", "the"...);
+si todas son vacías, conserva las largas para no quedarse sin consulta.
 
 ### El rescate
 
 Si esa consulta estricta no devuelve nada y las memorias no tienen vectores comparables, `recall` reintenta
-con una consulta OR y conserva sólo los candidatos que comparten al menos dos términos informativos. Con una
-sola palabra basta una; en consultas largas, el 30 % de sus palabras. Devuelve hasta 3 por capa. El rescate
-alcanza a rasgos, episodios y memorias, y no altera una búsqueda que ya encontró algo.
+con una consulta OR sobre las mismas palabras menos un relleno más amplio: la estricta conserva las palabras de función que un
+recuerdo puede contener, y el rescate ignora además verbos y adverbios coloquiales ("puedo", "antes", "cada",
+"todo"). La consulta OR conserva las palabras que no aparecen en ninguna memoria de la base ni en ningún
+candidato; de la puntuación y del recuento de presencia sí las descarta: en una pregunta larga suelen ser
+contexto ("ayer", "oye"), y puntuar por ellas sólo sumaba ruido. No las quita del denominador: el 30 % se mide
+sobre las palabras de contenido de la pregunta, contando una vez las que comparten prefijo, aparezcan o no en
+la base. La presencia se mide sobre las memorias sin mirar el ámbito y con el prefijo del rescate, así que una
+palabra cuenta aunque el candidato luego no la puntúe. Conserva los candidatos que comparten al menos dos
+términos, uno de ellos informativo (los que aparecen en el 5 % de memorias más raras, con un mínimo de tres, o
+en todas; también el que no aparece en ninguna memoria pero sí en un episodio o rasgo candidato); cuando tras
+quitar ese relleno queda una sola palabra de contenido, basta una. Si las palabras presentes no llegan al 30 %
+de las palabras de contenido de la consulta entera (sin repetir las que comparten prefijo y como mucho las
+primeras 64), no hay rescate: la pregunta habla de otra cosa. Ese tope de 64 acota también los recuentos, para
+que el prompt entero de un hook no gaste uno por palabra. Los candidatos
+se ordenan por la suma de IDF de los términos que comparten, y después por términos informativos y coincidencias.
+Devuelve hasta 3 por capa. El rescate alcanza a rasgos, episodios y memorias, y no altera una búsqueda que ya
+encontró algo.
 
 Con capa semántica el rescate apenas suma aciertos, empuja hacia abajo la respuesta buena y trae
 memorias de preguntas que no vienen al caso; sin ella es lo que hace aparecer la paráfrasis que la
@@ -144,7 +159,7 @@ Línea base del 2026-11-01 (tope 5, aciertos dentro del tope; caduca cuando camb
 
 | Modo | Global | MRR | Paráfrasis | Episodio | Rasgo | Ajenas con algo | Recuerdos por pregunta |
 |---|---|---|---|---|---|---|---|
-| Léxico | 222/432 | 0,49 | 1/72 | 20/24 | 9/24 | 4/48 | 0,9 |
+| Léxico | 254/432 | 0,54 | 2/72 | 21/24 | 10/24 | 4/48 | 1,6 |
 | Semántico (`embeddinggemma-2`, corte 0,65) | 411/432 | 0,87 | 64/72 | 23/24 | 19/24 | 12/48 | 4,9 |
 
 En el semántico, las tres capas compiten en el mismo ranking: rasgos y episodios pendientes pasan de 0/24 a

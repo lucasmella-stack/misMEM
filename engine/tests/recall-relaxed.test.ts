@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import type { Database as DB } from "better-sqlite3";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import type { Database as DB, Statement } from "better-sqlite3";
 import { openDb } from "../src/store/db.js";
 import { capture } from "../src/memory/capture.js";
 import { consolidate } from "../src/memory/consolidate.js";
@@ -68,6 +68,97 @@ describe("recall léxico: frases normales", () => {
     expect(memoryIds("florfitt docker")).toEqual([exact]);
   });
 
+  it("rescata una pregunta larga aunque la mayoría de sus palabras no estén en ningún recuerdo", () => {
+    // The strict query requires every word, and the old rescue demanded 30% of the raw
+    // query words, absent ones included. The target shares only two terms, so both paths
+    // missed even though the question names the memory unambiguously.
+    const target = memory("hogar", "el contrato del piso vence en marzo");
+    memory("hogar", "la notaría cierra los viernes por la tarde");
+    expect(
+      memoryIds(
+        "oye, el otro día cuando firmamos el contrato del piso, ¿qué papeles llevamos a la notaría del centro?",
+      ),
+    ).toContain(target);
+  });
+
+  it("no rescata si las palabras presentes no llegan al 30 % de la consulta", () => {
+    // Eight content words, two of them in the record: 2/8 = 25 %. Without the presence
+    // gate the candidate clears the two-match bar and would be rescued.
+    memory("dev", "kubernetes traefik en produccion");
+    expect(
+      memoryIds("kubernetes traefik ingress panel metricas martes jueves viernes"),
+    ).toEqual([]);
+  });
+
+  it("rescata justo en el 30 % de palabras presentes", () => {
+    // 3/10 is exactly the threshold: the gate rejects only what falls below it.
+    const target = memory("dev", "kubernetes traefik ingress en produccion");
+    expect(
+      memoryIds("kubernetes traefik ingress panel metricas martes jueves viernes sabado domingo"),
+    ).toEqual([target]);
+  });
+
+  it("las formas de una misma palabra cuentan una vez en el 30 %", () => {
+    // The gate counted the numerator after merging prefix-sharing words but divided by
+    // every distinct word: these eight forms reduce to three terms, and the target has two
+    // of them, but 2/8 stayed below the threshold and the rescue was discarded.
+    const target = memory("dev", "trabajando como trabajador en un proyecto");
+    expect(
+      memoryIds(
+        "trabajo trabajar trabajando trabajador proyecto proyectos proyectar configurar",
+      ),
+    ).toEqual([target]);
+  });
+
+  it("la puerta mide la consulta entera, no las palabras que caben en el tope de 12", () => {
+    // Fifteen content words and four in the record: 4/15 = 27 % on the question, but
+    // 4/12 = 33 % if the denominator is the capped rescue query. The cap must not soften
+    // the gate; this candidate only comes back with the old arithmetic.
+    memory("dev", "kubernetes docker nginx postgres en produccion");
+    expect(
+      memoryIds(
+        "kubernetes docker nginx postgres redis grafana prometheus terraform ansible vagrant packer consul vault kong envoy",
+      ),
+    ).toEqual([]);
+  });
+
+  it("un verbo coloquial no tapa la única palabra con tema", () => {
+    // The review of this change found "¿qué podemos hacer con el despliegue?" returning
+    // nothing: "podemos" and "hacer" survived the stopword list, the two-match bar then
+    // required both, and the memory only has "despliegue". The rescue ignores those verbs.
+    const target = memory("dev", "el despliegue del servicio usa docker compose en el servidor de casa");
+    expect(memoryIds("¿qué podemos hacer con el despliegue?")).toEqual([target]);
+  });
+
+  it("la primera persona del mismo verbo tampoco tapa el tema", () => {
+    // Same gap one person down: "puedo" and "hacer" are not in the memory, so leaving them
+    // in the rescue demanded two matches from a question whose only topic word is
+    // "despliegue".
+    const target = memory("dev", "el despliegue del servicio usa docker compose en el servidor de casa");
+    expect(memoryIds("¿qué puedo hacer con el despliegue?")).toEqual([target]);
+  });
+
+  it("una pregunta de sólo relleno no gasta una consulta relajada", () => {
+    // "podemos" and "hacer" are the only content words and both are rescue fillers, so the
+    // OR expression had nothing in it: it matched nothing and still paid three MATCH '""'
+    // plus the plan. The strict query already found nothing; the rescue must not run.
+    memory("dev", "el despliegue del servicio usa docker compose");
+    const statement = Object.getPrototypeOf(db.prepare("SELECT 1")) as Statement;
+    const all = vi.spyOn(statement, "all");
+    let hits: string[] = [];
+    let relaxedMatches = 0;
+    try {
+      hits = memoryIds("¿qué podemos hacer?");
+      relaxedMatches = all.mock.calls.filter(
+        ([params]) => (params as { q?: string } | undefined)?.q === '""',
+      ).length;
+    } finally {
+      all.mockRestore();
+    }
+    expect(hits).toEqual([]);
+    expect(relaxedMatches).toBe(0);
+  });
+
   it("al relajar hacen falta dos palabras: una sola en común no alcanza", () => {
     const both = memory("pc", "el teclado retroiluminado tiene luces RGB");
     memory("pc", "el teclado mecánico nuevo");
@@ -75,15 +166,120 @@ describe("recall léxico: frases normales", () => {
   });
 
   it("al relajar, lo que coincide en más palabras va primero", () => {
-    // The three-match one is deliberately longer: bm25 penalises length and, without the
-    // order by matches, it would jump ahead of the short two-match one. This way the test
-    // measures that criterion and not the rank FTS5 already returns.
-    const three = memory(
-      "pc",
-      "las luces del teclado del portátil y además varias palabras de relleno para alargarla",
+    // Weight ties on purpose: the two-match candidate carries two rare words, worth as much
+    // as the three-match one's rare plus two shared with the corpus, so only the matches key
+    // can put it second. Its text is also shorter, so FTS5 ranks it first: with that key
+    // gone the order flips, which is what makes this fixture measure the key it names.
+    for (const gist of [
+      "sistema proyecto kubernetes del servidor",
+      "sistema proyecto traefik del servidor",
+      "sistema proyecto grafana del servidor",
+      "sistema proyecto del servidor",
+      "sistema del servidor uno",
+      "sistema del servidor dos",
+      "sistema del servidor tres",
+    ]) {
+      memory("dev", gist);
+    }
+    const three = capture(db, { scope: "dev", body: "kubernetes proyecto sistema listo" }).id;
+    const two = capture(db, { scope: "dev", body: "traefik grafana listo" }).id;
+    const hits = recall(db, {
+      query: "kubernetes proyecto sistema traefik grafana",
+      reinforce: false,
+    }).hits;
+    expect(
+      hits.filter((hit) => hit.layer === "episode").map((hit) => hit.id),
+    ).toEqual([three, two]);
+  });
+
+  it("una pregunta de más de cuarenta palabras se rescata si todas están en la memoria", () => {
+    // The gate divided a numerator capped at twelve terms by the whole question, so from
+    // 41 content words on, 12/N stayed below 30 % even when every word was in the record.
+    // The memory repeats each word with a suffix (usually its plural), so the strict query
+    // misses it and only the rescue's prefix finds it.
+    const words = [
+      "servidor", "teclado", "pantalla", "impresora", "contrato", "factura",
+      "recibo", "cliente", "proyecto", "modulo", "funcion", "prueba", "error",
+      "registro", "alerta", "informe", "reunion", "correo", "fichero", "carpeta",
+      "variable", "endpoint", "comando", "usuario", "sesion", "token", "script",
+      "columna", "tabla", "consulta", "repositorio", "commit", "despliegue",
+      "contenedor", "orquestador", "balanceador", "certificado", "dominio",
+      "proveedor", "pasarela", "auditoria", "presupuesto",
+    ];
+    const id = memory(
+      "dev",
+      words.map((word) => (/[aeiou]$/.test(word) ? `${word}s` : `${word}es`)).join(" "),
     );
-    const two = memory("pc", "luces del teclado externo");
-    expect(memoryIds("cómo apago las luces del teclado de mi portátil")).toEqual([three, two]);
+    expect(memoryIds(words.join(" "))).toEqual([id]);
+  });
+
+  it("una pregunta de quinientas palabras no gasta un recuento de presencia por palabra", () => {
+    // The inject hook passes the whole prompt and nothing caps RecallInput.query: one
+    // prepared FTS count per content word made the gate's cost grow with the prompt. It now
+    // reads at most 64 words and prepares its count once.
+    const words = [
+      "servidor", "teclado", "pantalla", "impresora", "contrato", "factura",
+      "recibo", "cliente", "proyecto", "modulo", "funcion", "prueba", "error",
+      "registro", "alerta", "informe", "reunion", "correo", "fichero", "carpeta",
+      "variable", "endpoint", "comando", "usuario", "sesion", "token", "script",
+      "columna", "tabla", "consulta", "repositorio", "commit", "despliegue",
+      "contenedor", "orquestador", "balanceador", "certificado", "dominio",
+      "proveedor", "pasarela", "auditoria", "presupuesto",
+    ];
+    const id = memory(
+      "dev",
+      words.map((word) => (/[aeiou]$/.test(word) ? `${word}s` : `${word}es`)).join(" "),
+    );
+    // Under the bound the answer does not change: the plurals force the rescue.
+    expect(memoryIds(words.join(" "))).toEqual([id]);
+
+    const filler = Array.from({ length: 460 }, (_, i) => `z${i.toString(36)}`);
+    // What costs is each execution of the count, so the spy watches them: with the bound
+    // removed this reaches five hundred and the test fails on the number, not only on the
+    // answer. The count is 64, not the constant, so raising the bound fails here; and the
+    // count statement is prepared once, so preparing per word fails here too.
+    const statement = Object.getPrototypeOf(db.prepare("SELECT 1")) as Statement;
+    const get = vi.spyOn(statement, "get");
+    const prepare = vi.spyOn(db, "prepare");
+    let hits: string[] = [];
+    let counts = 0;
+    let presenceStatements = 0;
+    try {
+      hits = memoryIds([...words, ...filler].join(" "));
+      counts = (get.mock.contexts as Statement[]).filter(
+        (context) =>
+          context.source.includes("count(*) AS n") &&
+          context.source.includes("memories_fts MATCH"),
+      ).length;
+      presenceStatements = prepare.mock.calls.filter(
+        ([sql]) =>
+          sql.includes("count(*) AS n") && sql.includes("memories_fts MATCH"),
+      ).length;
+    } finally {
+      get.mockRestore();
+      prepare.mockRestore();
+    }
+    expect(hits).toEqual([id]);
+    expect(counts).toBe(64);
+    expect(presenceStatements).toBe(1);
+  });
+
+  it("al relajar, dos términos raros adelantan a tres comunes", () => {
+    // The ordering case above is nested: one candidate contains every word of the other,
+    // so dropping the IDF key still leaves the longer match first. Here the matched sets
+    // are disjoint. The three common words are in every memory (frequency === total), so
+    // they are informative but worth log 2 each; the two rare ones are worth log(1 + N).
+    for (let i = 0; i < 20; i++) memory("dev", `sistema proyecto configuracion nota ${i}`);
+    const raro = capture(db, { scope: "dev", body: "kubernetes traefik en produccion" }).id;
+    const comun = capture(db, { scope: "dev", body: "sistema proyecto configuracion del equipo" })
+      .id;
+    const hits = recall(db, {
+      query: "kubernetes traefik sistema proyecto configuracion",
+      reinforce: false,
+    }).hits;
+    expect(
+      hits.filter((hit) => hit.layer === "episode").map((hit) => hit.id),
+    ).toEqual([raro, comun]);
   });
 
   it("una pregunta ajena y larga con dos palabras comunes no rescata nada", () => {
@@ -132,6 +328,27 @@ describe("recall léxico: frases normales", () => {
     const two = memory("dev", "despliegue de kubernetes con traefik en el ingress");
 
     expect(memoryIds("sistema equipo kubernetes traefik")).toEqual([two]);
+  });
+
+  it("una palabra rara junto a una común basta para rescatar", () => {
+    // This record shares one common word ("sistema") and one rare one ("kubernetes"). With
+    // RELAXED_MIN_RARE_MATCHES at 2 it stops being rescued, so this test pins the calibrated
+    // value of one: the previous case passes with either value.
+    for (const gist of [
+      "sistema de archivos del servidor",
+      "sistema de energía del portátil",
+      "sistema de notificaciones del móvil",
+      "receta de masa madre",
+      "el clima de A Coruña",
+      "equipo de fútbol del barrio",
+      "equipo de diseño de la oficina",
+      "equipo de música del salón",
+    ]) {
+      memory("pc", gist);
+    }
+    // The plural keeps the strict AND from matching, so only the rescue can find it.
+    const id = memory("dev", "sistemas de kubernetes en producción");
+    expect(memoryIds("sistema kubernetes")).toEqual([id]);
   });
 
   it("el rescate devuelve como mucho tres recuerdos", () => {
