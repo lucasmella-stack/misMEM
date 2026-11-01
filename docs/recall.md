@@ -13,14 +13,16 @@ FTS5 exige que estén **todas** las palabras de la consulta, sin contar las vac�
 
 ### El rescate
 
-Si esa consulta estricta no devuelve nada y no hay capa semántica, `recall` reintenta con una consulta OR
-y conserva sólo los candidatos que comparten al menos dos términos informativos. Con una sola palabra
-basta una; en consultas largas, el 30 % de sus palabras. Devuelve hasta 3 por capa. El rescate alcanza a
-rasgos, episodios y memorias, y no altera una búsqueda que ya encontró algo.
+Si esa consulta estricta no devuelve nada y las memorias no tienen vectores comparables, `recall` reintenta
+con una consulta OR y conserva sólo los candidatos que comparten al menos dos términos informativos. Con una
+sola palabra basta una; en consultas largas, el 30 % de sus palabras. Devuelve hasta 3 por capa. El rescate
+alcanza a rasgos, episodios y memorias, y no altera una búsqueda que ya encontró algo.
 
 Con capa semántica el rescate apenas suma aciertos, empuja hacia abajo la respuesta buena y trae
 memorias de preguntas que no vienen al caso; sin ella es lo que hace aparecer la paráfrasis que la
-consulta estricta deja fuera. Por eso sólo entra cuando no hay nada que puntuar.
+consulta estricta deja fuera. Por eso sólo se apaga cuando las memorias tienen vectores comparables: un
+vector de rasgo o de episodio no puntúa ninguna memoria, y ahí el rescate sigue siendo lo único que trae la
+paráfrasis.
 
 La rareza de un término que cuenta para el rescate tiene un suelo de 3 documentos y una fracción del 5 % de
 la base, de modo que "pocos" significa lo mismo con 300 memorias que con 3.000. Se calibró con

@@ -147,6 +147,18 @@ END;
 CREATE TRIGGER IF NOT EXISTS layer_embeddings_trait_ad AFTER DELETE ON traits BEGIN
   DELETE FROM layer_embeddings WHERE layer = 'trait' AND item_id = old.id;
 END;
+-- A vector means nothing once the text it was computed from changes: it would keep matching
+-- the old words. The WHEN keeps a no-op update from throwing away a valid vector.
+CREATE TRIGGER IF NOT EXISTS layer_embeddings_episode_body_au
+AFTER UPDATE OF body ON episodes
+WHEN old.body IS NOT new.body BEGIN
+  DELETE FROM layer_embeddings WHERE layer = 'episode' AND item_id = new.id;
+END;
+CREATE TRIGGER IF NOT EXISTS layer_embeddings_trait_name_au
+AFTER UPDATE OF name ON traits
+WHEN old.name IS NOT new.name BEGIN
+  DELETE FROM layer_embeddings WHERE layer = 'trait' AND item_id = new.id;
+END;
 `;
 
 // Additive migrations over DBs created before the column/index existed.
