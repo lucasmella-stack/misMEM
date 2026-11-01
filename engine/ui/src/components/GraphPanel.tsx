@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronDownIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -59,6 +59,9 @@ interface Props {
   scopes: string[];
   /** Width of the graph container: decides whether the panel starts expanded. */
   width: number;
+  /** The connectome's reading, inside this panel's own section: as a second floating panel it
+   *  covered the settings below ~34rem, the switch that turns it off among them. */
+  connectome?: ReactNode;
 }
 
 function ToggleRow({
@@ -82,6 +85,9 @@ function ToggleRow({
   );
 }
 
+/** How long a deferred slider waits before telling the parent: enough for a burst of arrow keys. */
+export const COMMIT_DELAY_MS = 250;
+
 function SliderRow({
   id,
   label,
@@ -89,6 +95,7 @@ function SliderRow({
   min,
   max,
   step,
+  deferCommit,
   onValueChange,
 }: {
   id: string;
@@ -97,23 +104,45 @@ function SliderRow({
   min: number;
   max: number;
   step: number;
+  /** For a value whose change costs a request: the parent hears the last one, not every step. */
+  deferCommit?: boolean;
   onValueChange: (value: number) => void;
 }) {
+  // The dragged value, shown right away. Without it a deferred slider would not move until the
+  // parent answered, and the number would lag behind the thumb.
+  const [draft, setDraft] = useState<number>();
+  const pending = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const shown = draft ?? value;
+
+  useEffect(() => () => clearTimeout(pending.current), []);
+
+  const change = (next: number) => {
+    if (!deferCommit) return onValueChange(next);
+    setDraft(next);
+    // Radix commits on every arrow key, so waiting for the release is not enough: five presses
+    // were five requests. The timer collapses the burst and the last value is the one that counts.
+    clearTimeout(pending.current);
+    pending.current = setTimeout(() => {
+      setDraft(undefined);
+      onValueChange(next);
+    }, COMMIT_DELAY_MS);
+  };
+
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-3 text-ink-muted">
         <span id={id}>{label}</span>
-        <span className="tabular-nums text-ink-soft">{value}</span>
+        <span className="tabular-nums text-ink-soft">{shown}</span>
       </div>
       <Slider
         aria-labelledby={id}
-        value={[value]}
+        value={[shown]}
         min={min}
         max={max}
         step={step}
         onValueChange={(next) => {
           const first = next[0];
-          if (first !== undefined) onValueChange(first);
+          if (first !== undefined) change(first);
         }}
       />
     </div>
@@ -132,7 +161,7 @@ function Section({ title, defaultOpen, children }: { title: string; defaultOpen?
   );
 }
 
-export function GraphPanel({ settings, onChange, scopes, width }: Props) {
+export function GraphPanel({ settings, onChange, scopes, width, connectome }: Props) {
   // In a narrow container the panel covers half the graph: it starts collapsed and opens when
   // touched. While the parent has not measured (width 0) it stays collapsed and expands as soon
   // as a desktop width arrives; after that the person's choice rules.
@@ -187,15 +216,21 @@ export function GraphPanel({ settings, onChange, scopes, width }: Props) {
             onChange={(v) => onChange({ coUse: v })}
           />
           {settings.coUse && (
-            <SliderRow
-              id="gp-co-use-min-n"
-              label="Soporte mínimo"
-              value={settings.coUseMinN}
-              min={1}
-              max={10}
-              step={1}
-              onValueChange={(v) => onChange({ coUseMinN: v })}
-            />
+            <>
+              <SliderRow
+                id="gp-co-use-min-n"
+                label="Soporte mínimo"
+                value={settings.coUseMinN}
+                min={1}
+                max={10}
+                step={1}
+                // Each step asks the server for the whole graph, which recomputes the NPMI of the
+                // entire co_use table: the value travels once the person stops moving it.
+                deferCommit
+                onValueChange={(v) => onChange({ coUseMinN: v })}
+              />
+              {connectome}
+            </>
           )}
         </Section>
 

@@ -270,17 +270,23 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
         />
       )}
 
-      <GraphPanel settings={settings} onChange={changeSettings} scopes={scopes} width={size.width} />
-
-      {settings.coUse && data?.connectome && (
-        <ConnectomePanel
-          summary={data.connectome}
-          labels={labels}
-          maxHubStrength={maxHubStrength}
-          drawn={drawnIds}
-          onSelect={(id) => onSelect("memory", id)}
-        />
-      )}
+      <GraphPanel
+        settings={settings}
+        onChange={changeSettings}
+        scopes={scopes}
+        width={size.width}
+        connectome={
+          data?.connectome && (
+            <ConnectomePanel
+              summary={data.connectome}
+              labels={labels}
+              maxHubStrength={maxHubStrength}
+              drawn={drawnIds}
+              onSelect={(id) => onSelect("memory", id)}
+            />
+          )
+        }
+      />
 
       {data === undefined && graphQuery.isPending && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center">

@@ -1,5 +1,7 @@
 interface Tokens {
   brand: string;
+  /** The connectome halo, its own token: brand reads as a smudge over a light surface. */
+  graphHalo: string;
   ink: string;
   inkMuted: string;
   inkSoft: string;
@@ -8,6 +10,7 @@ interface Tokens {
 
 const FALLBACK_TOKENS: Tokens = {
   brand: "#f087ad",
+  graphHalo: "#f087ad",
   ink: "#e8e4dc",
   inkMuted: "#a09c93",
   inkSoft: "#d2cec6",
@@ -28,6 +31,7 @@ export function tokensNow(): Tokens {
     const read = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback;
     cachedTokens = {
       brand: read("--color-brand", FALLBACK_TOKENS.brand),
+      graphHalo: read("--color-graph-halo", FALLBACK_TOKENS.graphHalo),
       ink: read("--color-ink", FALLBACK_TOKENS.ink),
       inkMuted: read("--color-ink-muted", FALLBACK_TOKENS.inkMuted),
       inkSoft: read("--color-ink-soft", FALLBACK_TOKENS.inkSoft),
