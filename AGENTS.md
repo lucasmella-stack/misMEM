@@ -68,6 +68,8 @@ pnpm typecheck && pnpm test && pnpm knip && pnpm dup && pnpm lint && pnpm build
   reproducirlos en local: [Qué comprueba CI](CONTRIBUTING.md#qué-comprueba-ci). Un cambio en `scripts/`, en el
   Dockerfile o en `.github/` los toca.
 - Un test suelto: `pnpm test tests/<área>.test.ts`.
+- Contra el servidor de embeddings real, arrancado: `pnpm test:integration` (por defecto EmbeddingGemma 2 en
+  `:8080`; `MISMEM_EMBEDDING_URL` y las demás `MISMEM_EMBEDDING_*` lo cambian). No corre en CI.
 - Desarrollo: `pnpm dev` (MCP por stdio), `pnpm dev:http` (servidor en `:3200`, sin interfaz compilada) y
   `pnpm dev:ui` (la interfaz, con `/api` hacia el servidor de `MISMEM_DEV_API`, por defecto `:3200`).
 - Medir el recall, tras `pnpm build`: `node dist/bench-cli.js --bank <banco.jsonl> --db <base.db>`.

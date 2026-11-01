@@ -2,14 +2,17 @@
 
 ## Sin publicar
 
-### La suite de tests ya no llama al Ollama de quien la corre
+### La suite de tests ya no llama al servidor de embeddings de quien la corre, y hay una suite que sí lo prueba
 
 - Tras consolidar, `runConsolidation` rellena los vectores con la configuración real, así que cada corrida de
-  la suite hacía 24 peticiones a `127.0.0.1:11434`: cargaba `nomic-embed-text` en el Ollama de la máquina y,
-  con ese Ollama ocupado, un test de consolidación pasaba de 5 s y fallaba de forma intermitente.
-- Vitest arranca ahora con `MISMEM_EMBEDDINGS=off`; el test que quiere un proveedor sustituye `fetch`. Un
-  test nuevo comprueba que consolidar no llama a `fetch`.
-- Medido en un espacio de red propio con un Ollama falso que anota cada petición: 24 antes, 0 después.
+  `pnpm test` hacía 24 peticiones a `127.0.0.1:11434` que ningún test comprobaba: cargaba un modelo en el Ollama
+  de la máquina y, con ese Ollama ocupado, un test de consolidación pasaba de 5 s y fallaba de forma intermitente.
+  `pnpm test` arranca ahora con `MISMEM_EMBEDDINGS=off`, y un test falla si consolidar vuelve a llamar a `fetch`.
+  Medido en un espacio de red propio con un servidor falso que anota cada petición: 24 antes, 0 después.
+- **`pnpm test:integration`** prueba el servidor de embeddings real, por defecto EmbeddingGemma 2 en `:8080` con
+  los prefijos y el corte que escribe el instalador: vectores válidos, una paráfrasis en castellano que la
+  búsqueda por palabras no encuentra, una consulta de otro tema que no trae nada, el indexado y el backfill de la
+  consolidación. Sin servidor falla en vez de saltarse. No corre en CI.
 
 ### La pantalla de entrada perdía su logo al instalar desde npm
 
