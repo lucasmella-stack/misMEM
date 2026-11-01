@@ -80,8 +80,14 @@ type OriginEpisode =
   | { id: string; missing: true }
   | { id: string; scope: string; text: string; created_at: number; linked_here: boolean };
 
+interface MemoryEmbedding {
+  model: string;
+  dims: number;
+  created_at: number;
+}
+
 export interface MemoryDetail {
-  memory: MemoryView;
+  memory: MemoryView & { embedding: MemoryEmbedding | null };
   episodes: OriginEpisode[];
   traits: TraitView[];
 }
@@ -124,7 +130,13 @@ export function memoryDetail(db: DB, id: string, at: number): MemoryDetail | nul
       .all(id) as TraitRow[]
   ).map(traitView);
 
-  return { memory: memoryView(row, at), episodes, traits };
+  // Only the detail needs the vector metadata: the lists would pay one query per row for
+  // something they do not show.
+  const embedding = db
+    .prepare("SELECT model, dims, created_at FROM memory_embeddings WHERE memory_id = ?")
+    .get(id) as MemoryEmbedding | undefined;
+
+  return { memory: { ...memoryView(row, at), embedding: embedding ?? null }, episodes, traits };
 }
 
 /** The scopes of some memories: what validates that a trait's evidence exists in its scope. */

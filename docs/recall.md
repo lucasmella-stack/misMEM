@@ -33,7 +33,8 @@ elige la mayor que las deje a cero.
 
 Con un servidor de embeddings corriendo, `recall` suma búsqueda por significado: "problemas de plata"
 encuentra memorias que dicen "deudas". El modelo por defecto es EmbeddingGemma 2, multilingüe, servido por
-`llama-server` en `http://127.0.0.1:8080`.
+`llama-server` en `http://127.0.0.1:8080`. Si ese puerto ya lo ocupa otra cosa, el instalador monta el
+servidor en el primero libre y escribe `MISMEM_EMBEDDING_URL`.
 Los vectores se guardan como BLOB en la misma SQLite y la búsqueda es coseno en JS, sin extensiones
 nativas. Si el servidor no responde, todo degrada silenciosamente a FTS5 puro.
 
@@ -76,6 +77,33 @@ La búsqueda sólo compara vectores del modelo configurado. Cambiar de modelo re
 backfill (`mismem-embed`); cambiar un prefijo no se detecta y exige `mismem-embed --force`. Todas las
 variables, con sus defaults, están en
 [DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única).
+
+## Qué devuelve
+
+Cada hit lleva `layer`, `id`, `scope`, su `text`, `created_at` tal cual lo guarda la base y, cuando la
+búsqueda los trae, `salience` y `via`. El `recall` por MCP añade además:
+
+- `date`: `created_at` como YYYY-MM-DD en UTC, para que el modelo lea una fecha y no un epoch. Se omite
+  cuando el valor no es finito, cae fuera del rango de `Date` o su año no cabe en cuatro cifras (un epoch
+  en microsegundos, por ejemplo).
+- `details`: el detalle destilado de una memoria. Se omite cuando está vacío.
+- `polarity`: la polaridad de un rasgo, `shadow` o `light`. Se omite cuando es `neutral`, porque la
+  ausencia ya es el caso neutro.
+
+Dos topes, en puntos de código y con los puntos suspensivos dentro del tope: 2.000 en `text` y 1.200 en
+`details`. Cuando alguno se recorta, el hit lleva `truncated: true` sin decir cuál. La copia entera, que no
+se recorta, se lee con `mem_get_observation` y el id del hit.
+
+Una búsqueda sin resultados añade dos campos, tanto en `recall` como en el alias `mem_search`,
+porque un ámbito mal escrito y una memoria vacía se parecen demasiado:
+
+- `scopes`: los ámbitos que sí tienen memorias, rasgos o episodios pendientes, de más a menos contenido y
+  como mucho 20. Los marcadores de ruido no cuentan.
+- `hint`: sólo cuando se pidió un `scope`. Dice que ese ámbito no tiene nada que coincida, y que se repita la
+  búsqueda sin él o con otro de los de `scopes`; si `scopes` está vacío, dice que la memoria aún no guarda
+  contenido.
+
+Con resultados la respuesta no cambia: no lleva `scopes` ni `hint`.
 
 ## Medirlo
 

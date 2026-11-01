@@ -15,8 +15,9 @@ interface Props {
 }
 
 /**
- * The side of the connectome view: how big the sample is and which memories are worth entering
- * through. It leads with the sample because with few turns every figure below it is noise.
+ * The connectome's reading: the sample's size and which memories are worth entering through. It
+ * leads with the sample because with few turns every figure below it is noise. It holds no
+ * position of its own: as a second floating panel it covered the settings below ~34rem.
  */
 export function ConnectomePanel({ summary, labels, maxHubStrength, drawn, onSelect }: Props) {
   // Turns alone never dilute the degeneracy: NPMI scores a pair seen once at the maximum no
@@ -26,9 +27,7 @@ export function ConnectomePanel({ summary, labels, maxHubStrength, drawn, onSele
   const visibles = summary.hubs.filter((hub) => drawn.has(hub.id));
 
   return (
-    <aside className="absolute top-3 right-3 z-10 flex max-h-[calc(100%-1.5rem)] w-[min(16rem,calc(100%-1.5rem))] flex-col gap-2 overflow-y-auto rounded-lg border border-edge bg-surface-raised/95 px-3 py-2 text-xs shadow-lg backdrop-blur-sm">
-      <h2 className="font-semibold text-ink-soft">Conectoma</h2>
-
+    <div className="flex flex-col gap-2">
       <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-ink-muted">
         <dt>Turnos medidos</dt>
         <dd className="text-right tabular-nums text-ink-soft">{summary.turns}</dd>
@@ -85,6 +84,6 @@ export function ConnectomePanel({ summary, labels, maxHubStrength, drawn, onSele
               : "Ningún par dibujado supera el soporte mínimo. Baja el soporte o deja que se acumule uso."}
         </p>
       )}
-    </aside>
+    </div>
   );
 }

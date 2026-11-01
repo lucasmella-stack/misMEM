@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { GraphData, GraphLink, GraphNode } from "../ui/src/api";
 import { escapeHtml, filterGraph, neighborsOf, scopePalette, type GraphFilters } from "../ui/src/lib/graph";
-import { CANVAS_LABEL_CHARS } from "../ui/src/lib/graph";
+import { CANVAS_LABEL_CHARS, topicPalette, visibleDegrees } from "../ui/src/lib/graph";
+import { pointerRadius, radiusOf, type Node } from "../ui/src/components/graph/paint";
 import { GRAPH_LABEL_CHARS } from "../src/queries/graph.js";
 
 const node = (id: string, layer: GraphNode["layer"], label: string, scope = "s"): GraphNode => ({
@@ -147,5 +148,106 @@ describe("paleta por ámbito", () => {
     expect(paleta.size).toBe(12);
     expect(paleta.get("s12")).toBeUndefined();
     expect(new Set(paleta.values()).size).toBe(12);
+  });
+});
+
+describe("el tamaño de un nodo", () => {
+  const degrees = (links: GraphLink[]) => visibleDegrees(links);
+
+  it("cuenta las aristas visibles de cada nodo, no las del servidor", () => {
+    const counted = degrees([link("a", "b"), link("a", "c"), link("b", "c")]);
+
+    expect(counted.get("a")).toBe(2);
+    expect(counted.get("b")).toBe(2);
+    expect(counted.get("c")).toBe(2);
+  });
+
+  it("un nodo sin aristas cuenta cero, no queda fuera", () => {
+    expect(degrees([link("a", "b")]).get("solo") ?? 0).toBe(0);
+  });
+
+  it("con las mismas aristas, más conexiones es más radio", () => {
+    const counted = degrees([link("hub", "a"), link("hub", "b"), link("hub", "c"), link("a", "b")]);
+    const sizing = { degrees: counted, maxDegree: 3 };
+
+    const hub = radiusOf(node("hub", "memory", "hub") as Node, 1, sizing);
+    const hoja = radiusOf(node("c", "memory", "hoja") as Node, 1, sizing);
+
+    expect(hub).toBeGreaterThan(hoja);
+  });
+
+  it("el radio nunca pasa de tres veces el mínimo", () => {
+    const counted = new Map([["hub", 50]]);
+    const sizing = { degrees: counted, maxDegree: 50 };
+
+    const hub = radiusOf(node("hub", "memory", "hub") as Node, 1, sizing);
+    const suelto = radiusOf(node("x", "memory", "x") as Node, 1, { degrees: new Map(), maxDegree: 50 });
+
+    expect(hub / suelto).toBeCloseTo(3, 5);
+  });
+
+  it("cambia al cambiar los filtros, porque cuenta lo que se dibuja", () => {
+    const conParecido = degrees([link("a", "b"), link("a", "c", "related")]);
+    const sinParecido = degrees([link("a", "b")]);
+
+    expect(conParecido.get("a")).toBe(2);
+    expect(sinParecido.get("a")).toBe(1);
+  });
+
+  it("con el tamaño por saliencia el radio es el de siempre, ajeno a las conexiones", () => {
+    const salient = { ...node("a", "memory", "a"), salience: 1 } as Node;
+    const flojo = { ...node("b", "memory", "b"), salience: 0 } as Node;
+
+    expect(radiusOf(salient, 1)).toBeGreaterThan(radiusOf(flojo, 1));
+    // A trait still outweighs any memory: it is the layer that organizes them.
+    expect(radiusOf(node("t", "trait", "t") as Node, 1)).toBeGreaterThan(radiusOf(salient, 1));
+  });
+
+  it("el área para pinchar nunca baja de 7 px y crece con el nodo", () => {
+    const grande = { degrees: new Map([["hub", 50]]), maxDegree: 50 };
+
+    expect(pointerRadius(node("x", "memory", "x") as Node, 1)).toBe(7);
+    expect(pointerRadius(node("hub", "memory", "hub") as Node, 3, grande)).toBeGreaterThan(7);
+  });
+});
+
+describe("la paleta por tema", () => {
+  const topic = (...members: string[]) => ({ members });
+  /** The first colour of the shared palette: which one it is does not matter, that it is first does. */
+  const SCOPE_COLORS_FIRST = topicPalette([topic("solo")]).get("solo");
+
+  it("pinta a cada miembro con el color de su tema", () => {
+    const palette = topicPalette([topic("a", "b"), topic("c")]);
+
+    expect(palette.get("a")).toBe(palette.get("b"));
+    expect(palette.get("c")).not.toBe(palette.get("a"));
+  });
+
+  it("deja sin color los temas que pasan de la paleta, en vez de repetir colores", () => {
+    const many = Array.from({ length: 40 }, (_, i) => topic(`m${i}`));
+
+    const palette = topicPalette(many);
+    const used = new Set(palette.values());
+
+    expect(used.size).toBe(palette.size);
+    expect(palette.size).toBeLessThan(many.length);
+    // Topics arrive sorted by size: the first ones are the ones that get painted.
+    expect(palette.has("m0")).toBe(true);
+    expect(palette.has("m39")).toBe(false);
+  });
+
+  it("gasta los colores en los temas que se dibujan, no en los más grandes del total", () => {
+    // The first is huge but off screen; the second is small and on it.
+    const fuera = topic(...Array.from({ length: 50 }, (_, i) => `fuera${i}`));
+    const dentro = topic("visible1", "visible2");
+
+    const palette = topicPalette([fuera, dentro], new Set(["visible1", "visible2"]));
+
+    expect(palette.get("visible1")).toBe(SCOPE_COLORS_FIRST);
+    expect(palette.has("fuera0")).toBe(false);
+  });
+
+  it("sin temas devuelve una paleta vacía y no revienta", () => {
+    expect(topicPalette([]).size).toBe(0);
   });
 });

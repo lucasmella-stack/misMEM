@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ago, exact, percent } from "../ui/src/format";
+import { ago, exact, percent, when } from "../ui/src/format";
 
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 9, 25, 12, 0, 0);
@@ -25,6 +25,22 @@ describe("exact", () => {
     const value = exact(NOW);
     expect(value).toContain("2026");
     expect(value.length).toBeGreaterThan(0);
+  });
+});
+
+describe("when", () => {
+  it("junta la fecha relativa con la absoluta entre paréntesis", () => {
+    const ts = NOW - 3 * DAY;
+    const value = when(ts, NOW);
+
+    expect(value).toContain("hace 3 días");
+    expect(value).toContain(exact(ts));
+    expect(value.endsWith(`(${exact(ts)})`)).toBe(true);
+  });
+
+  it("sin fecha conocida da 'nunca'", () => {
+    expect(when(null, NOW)).toBe("nunca");
+    expect(when(undefined, NOW)).toBe("nunca");
   });
 });
 

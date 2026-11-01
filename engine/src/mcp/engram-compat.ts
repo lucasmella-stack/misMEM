@@ -7,6 +7,7 @@ import { updateEngramTarget } from "../memory/engram-update.js";
 import { pendingEpisodes } from "../memory/pending.js";
 import { observationById } from "../queries/observation.js";
 import { recallHybrid } from "../recall/recall.js";
+import { requestedScope, searchResponse } from "../queries/recall-view.js";
 import type { EmbedFn } from "../embeddings/provider.js";
 
 export { ENGRAM_TOOLS } from "./engram-tools.js";
@@ -75,7 +76,7 @@ export async function dispatchEngramTool(
     case "mem_search": {
       return recallHybrid(db, args, searchOptions.embedFn, {
         embeddingModel: searchOptions.embeddingModel,
-      });
+      }).then((result) => searchResponse(db, result.hits, requestedScope(args)));
     }
 
     case "mem_context": {
