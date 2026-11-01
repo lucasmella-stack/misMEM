@@ -1,6 +1,6 @@
 import type { Database as DB } from "better-sqlite3";
 import { envNonNegativeNumber, envPositiveNumber } from "../env.js";
-import { embedPendingMemories } from "../embeddings/store.js";
+import { AUTO_BACKFILL_MAX_ROWS, embedPendingMemories } from "../embeddings/store.js";
 import type { EmbedFn } from "../embeddings/provider.js";
 import { distill, loadLlmConfig, LlmFatalError, type LlmConfig } from "./llm.js";
 import {
@@ -132,6 +132,9 @@ export async function runConsolidation(
     uncitedStrikes,
   };
   const state: RunState = newRunState();
+  // Memories this run distils; they go first to the backfill so a long backlog does not
+  // leave them without a vector, the same way the consolidate tool treats its own memory.
+  const createdIds: string[] = [];
 
   const pendingIn = db.prepare(
     `SELECT COUNT(*) AS n FROM episodes
@@ -156,6 +159,7 @@ export async function runConsolidation(
         summary.memories_created += created.memories;
         summary.episodes_consolidated += created.episodes;
         summary.episodes_dropped_pareto_l0 += created.dropped_l0;
+        createdIds.push(...(created.memory_ids ?? []));
         if (created.episodes === 0 && !created.skipped) break;
         if ((pendingIn.get({ scope, cutoff }) as { n: number }).n === 0) break;
         if (!hasCallsLeft(ctx, state)) break;
@@ -187,6 +191,8 @@ export async function runConsolidation(
       const emb = await embedPendingMemories(db, {
         timeoutMs: 120_000,
         batchSize: 8,
+        maxRows: AUTO_BACKFILL_MAX_ROWS,
+        priorityIds: createdIds,
         embedFn: opts.embedFn,
       });
       // Layer failures are invisible in the memory counters, and a run that only had traits

@@ -5,6 +5,7 @@ import { dirname, resolve } from "node:path";
 import { homedir } from "node:os";
 import { seedTurnsFromUse } from "./connectome.js";
 import { contentHash } from "../domain/hash.js";
+import { excludeNoiseSql } from "./rows.js";
 
 export function defaultDbPath(): string {
   return resolve(process.env.MISMEM_DB ?? `${homedir()}/.mismem/mem.db`);
@@ -202,6 +203,25 @@ function migrate(db: DB): void {
   }
   if (!memoryCols.some((c) => c.name === "use_count")) {
     db.exec("ALTER TABLE memories ADD COLUMN use_count INTEGER NOT NULL DEFAULT 0");
+  }
+
+  // Noise markers never compete in recall and never earn an embedding, but databases older than
+  // that rule still carry theirs. They are derived data: deleting them costs nothing and keeps
+  // them out of anything that reads the vector table straight.
+  db.exec(`
+    DELETE FROM memory_embeddings
+    WHERE memory_id IN (
+      SELECT m.id FROM memories m WHERE NOT (${excludeNoiseSql("m")})
+    )`);
+
+  // A vector only knows its model and dims, so a prefix change or an edited text left it
+  // looking valid. The fingerprint (a hash of the exact text sent) makes that visible to
+  // the backfill; legacy rows start NULL and are re-embedded once. Additive and repeatable.
+  for (const table of ["memory_embeddings", "layer_embeddings"]) {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === "fingerprint")) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN fingerprint TEXT`);
+    }
   }
 
   // Legacy triggers reindexed FTS on any UPDATE, even when only salience,

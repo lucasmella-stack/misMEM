@@ -1,6 +1,7 @@
 // Owns the memory_embeddings SQL: saving vectors, brute-force search over them, backfill and
 // index status. The vectors of traits and pending episodes live in `layers.ts`.
 import type { Database as DB } from "better-sqlite3";
+import { readMeta, writeMeta } from "../store/meta.js";
 import { excludeNoiseSql } from "../store/rows.js";
 import {
   embedInBatches,
@@ -8,23 +9,107 @@ import {
   type ResolveOptions,
 } from "./batch.js";
 import {
-  embedPendingLayersResolved,
-  layerIndexStatus,
-  type LayerIndexStatus,
+  embedLayerRowsResolved,
+  pendingLayerRows,
 } from "./layers.js";
-import { loadEmbeddingConfig } from "./provider.js";
+import {
+  embeddingFingerprint,
+  loadEmbeddingConfig,
+  type EmbeddingConfig,
+} from "./provider.js";
 import { cosine } from "./vector.js";
 
+const activeDimsKey = (model: string): string => `embedding_dims:${model}`;
+
+
+/**
+ * The width the embedder last produced for this model. Ground truth over the stored majority:
+ * after a provider change of width, the old vectors outnumber the new and are the stale ones.
+ */
+export function recordedDims(db: DB, model: string): number | undefined {
+  const raw = readMeta(db, activeDimsKey(model));
+  const value = Number(raw);
+  return raw !== undefined && Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+
+
+/** Ids of the active model's rows that a previous version stored unusable. */
+export function invalidEmbeddingIds(db: DB, model: string): string[] {
+  // Noise markers never reach the backfill, so counting their rows would keep `--status`
+  // reporting an invalid vector that nothing can cure.
+  const rows = db
+    .prepare(
+      `SELECT e.memory_id, e.vec
+       FROM memory_embeddings e JOIN memories m ON m.id = e.memory_id
+       WHERE e.model = ? AND ${excludeNoiseSql("m")}`,
+    )
+    .all(model) as Array<{ memory_id: string; vec: Buffer }>;
+  return rows.filter((row) => !isValidStoredVector(row.vec)).map((row) => row.memory_id);
+}
+
+
+
+/**
+ * Automatic backfills (the consolidate tool, a viewer edit, the nightly run) can fire while a
+ * client waits, so they embed at most this many rows per call and leave the rest for the next
+ * pass. `mismem-embed` passes no cap: there the wait is the job and the progress is visible.
+ */
+export const AUTO_BACKFILL_MAX_ROWS = 64;
+
+/** Stored text of a memory as the backfill embeds it. */
+function memoryEmbeddingText(row: { gist: string; details: string | null }): string {
+  return row.details ? `${row.gist}\n${row.details}` : row.gist;
+}
+
+/**
+ * SQLite cannot hash, so the pending queries and the status call back into these functions.
+ * Deterministic and built from the config of this call, which is what turns "the vector no
+ * longer describes its row" into a plain SQL predicate.
+ */
+export function registerFingerprintFunctions(db: DB, cfg: EmbeddingConfig): void {
+  db.function("mismem_fp_text", { deterministic: true }, (text: string) =>
+    embeddingFingerprint(text, cfg),
+  );
+  db.function("mismem_fp_memory", { deterministic: true }, (gist: string, details: string | null) =>
+    embeddingFingerprint(memoryEmbeddingText({ gist, details }), cfg),
+  );
+}
+
+/**
+ * `text` is the untruncated text the caller embedded; the fingerprint truncates it the same
+ * way the request does. Omitted (fixtures, callers that just saved the row), the row's
+ * current text is read, which is the same string they were embedding.
+ */
 export function saveMemoryEmbedding(
   db: DB,
   memoryId: string,
   model: string,
   vec: Float32Array,
+  text?: string,
+  cfg: EmbeddingConfig = loadEmbeddingConfig(),
 ): void {
+  const source = text ?? currentMemoryText(db, memoryId);
+  const fingerprint = embeddingFingerprint(source, cfg);
   db.prepare(
-    `INSERT OR REPLACE INTO memory_embeddings (memory_id, model, dims, vec, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(memoryId, model, vec.length, Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength), Date.now());
+    `INSERT OR REPLACE INTO memory_embeddings (memory_id, model, dims, vec, created_at, fingerprint)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(
+    memoryId,
+    model,
+    vec.length,
+    Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength),
+    Date.now(),
+    fingerprint,
+  );
+}
+
+function currentMemoryText(db: DB, memoryId: string): string {
+  const row = db.prepare("SELECT gist, details FROM memories WHERE id = ?").get(memoryId) as
+    | { gist: string; details: string | null }
+    | undefined;
+  if (!row) throw new Error(`no existe la memoria: ${memoryId}`);
+  return memoryEmbeddingText(row);
 }
 
 export interface SemanticHit {
@@ -124,27 +209,23 @@ function isValidStoredVector(vec: Buffer): boolean {
   return Number.isFinite(squares) && squares > 0;
 }
 
-/** Ids of the active model's rows that a previous version stored unusable. */
-function invalidEmbeddingIds(db: DB, model: string): string[] {
-  // Noise markers never reach the backfill, so counting their rows would keep `--status`
-  // reporting an invalid vector that nothing can cure.
-  const rows = db
-    .prepare(
-      `SELECT e.memory_id, e.vec
-       FROM memory_embeddings e JOIN memories m ON m.id = e.memory_id
-       WHERE e.model = ? AND ${excludeNoiseSql("m")}`,
-    )
-    .all(model) as Array<{ memory_id: string; vec: Buffer }>;
-  return rows.filter((row) => !isValidStoredVector(row.vec)).map((row) => row.memory_id);
+export interface BackfillOptions extends ResolveOptions {
+  /**
+   * Ids embedded before the rest of the backlog, inside the same `maxRows` budget. A viewer
+   * edit passes its own memory: with a backlog longer than the cap, its scan position would
+   * otherwise leave it unembedded while the response claimed the opposite.
+   */
+  priorityIds?: readonly string[];
 }
 
 /**
- * Embeds memories, traits and pending episodes that have no vector or an outdated model
- * (idempotent). It covers any pending write path and allows an explicit reindex.
+ * Embeds memories, traits and pending episodes that have no vector, an outdated model or a
+ * fingerprint that no longer matches their text and the current config (idempotent). It
+ * covers any pending write path and allows an explicit reindex.
  */
 export async function embedPendingMemories(
   db: DB,
-  opts: ResolveOptions = {},
+  opts: BackfillOptions = {},
 ): Promise<BackfillStats> {
   const cfg = loadEmbeddingConfig();
   if (!cfg.enabled && !opts.embedFn) {
@@ -157,10 +238,12 @@ export async function embedPendingMemories(
     };
   }
   const resolved = resolveEmbedOptions(opts, cfg);
+  registerFingerprintFunctions(db, cfg);
   const needsEmbedding = [
     "e.memory_id IS NULL",
     "e.model <> @model",
     opts.expectedDims !== undefined ? "e.dims <> @expectedDims" : null,
+    "COALESCE(e.fingerprint, '') <> mismem_fp_memory(m.gist, m.details)",
   ]
     .filter((value): value is string => value !== null)
     .join(" OR ");
@@ -194,83 +277,54 @@ export async function embedPendingMemories(
     had_embedding: number;
   }>;
 
+  // A bounded caller embeds at most `maxRows` rows across the three layers; `pending` keeps
+  // reporting the whole backlog so the rest is visibly waiting for the next pass.
+  const budget = opts.maxRows ?? Number.POSITIVE_INFINITY;
+  // The scan order of the backlog is stable, so without this a priority row created last would
+  // fall outside the cap on every pass until the rows ahead of it were done.
+  const priority = new Set(opts.priorityIds ?? []);
+  const orderedRows =
+    priority.size === 0
+      ? pendingRows
+      : [
+          ...pendingRows.filter((row) => priority.has(row.id)),
+          ...pendingRows.filter((row) => !priority.has(row.id)),
+        ];
+  // Read the other two layers first: a memory backlog at least as long as the cap would
+  // otherwise spend it all every pass and traits and episodes would never get a vector.
+  const pendingLayers = pendingLayerRows(db, resolved);
+  const layerPending = pendingLayers.traits.length + pendingLayers.episodes.length;
+  // Reserve a quarter of the cap for them, never more than they need, and at least one row
+  // for any finite cap; memories take the rest.
+  const reserved = Number.isFinite(budget)
+    ? Math.min(Math.ceil(budget / 4), layerPending)
+    : layerPending;
+  const selectedRows = orderedRows.slice(0, budget - reserved);
+  let savedDims: number | undefined;
   const memories = await embedInBatches(
-    pendingRows,
+    selectedRows,
     resolved.embedFn,
     resolved.batchSize,
     (m) => (m.details ? `${m.gist}\n${m.details}` : m.gist).slice(0, resolved.maxChars),
     (m, vec) => {
-      saveMemoryEmbedding(db, m.id, resolved.model, vec);
+      saveMemoryEmbedding(db, m.id, resolved.model, vec, memoryEmbeddingText(m), resolved.cfg);
+      savedDims = vec.length;
       return true;
     },
   );
+  // The status reads this instead of guessing from the majority, which lags a width change.
+  if (savedDims !== undefined) writeMeta(db, activeDimsKey(resolved.model), String(savedDims));
 
-  const layers = await embedPendingLayersResolved(db, resolved);
-  // Memory rows always save, so the top-level shape carries no discarded counter: only the
-  // layers can refuse a vector that went stale while the embedder worked.
-  return {
-    pending: pendingRows.length,
-    embedded: memories.embedded,
-    reembedded: memories.reembedded,
-    failed: memories.failed,
-    layers,
-  };
-}
-
-export interface EmbeddingIndexStatus {
-  memories: number;
-  embedded: number;
-  missing: number;
-  compatible: number;
-  stale_model: number;
-  layers: { trait: LayerIndexStatus; episode: LayerIndexStatus };
-  /** Active-model rows a previous version stored with a non-finite component or a zero norm. */
-  invalid: number;
-  models: Array<{ model: string; dims: number; count: number }>;
-}
-
-export function getEmbeddingIndexStatus(
-  db: DB,
-  activeModel: string,
-): EmbeddingIndexStatus {
-  const memories = (
-    db.prepare("SELECT COUNT(*) AS n FROM memories").get() as { n: number }
-  ).n;
-  const embedded = (
-    db.prepare("SELECT COUNT(*) AS n FROM memory_embeddings").get() as {
-      n: number;
-    }
-  ).n;
-  const compatible = (
-    db
-      .prepare(
-        "SELECT COUNT(*) AS n FROM memory_embeddings WHERE model = ?",
-      )
-      .get(activeModel) as { n: number }
-  ).n;
-  const models = db
-    .prepare(
-      `SELECT model, dims, SUM(count) AS count FROM (
-         SELECT model, dims, COUNT(*) AS count FROM memory_embeddings GROUP BY model, dims
-         UNION ALL
-         SELECT model, dims, COUNT(*) AS count FROM layer_embeddings GROUP BY model, dims
-       )
-       GROUP BY model, dims
-       ORDER BY count DESC, model, dims`,
-    )
-    .all() as Array<{ model: string; dims: number; count: number }>;
-
-  return {
-    memories,
-    embedded,
-    missing: memories - embedded,
-    compatible,
-    stale_model: embedded - compatible,
-    layers: {
-      trait: layerIndexStatus(db, "trait", activeModel),
-      episode: layerIndexStatus(db, "episode", activeModel),
-    },
-    invalid: invalidEmbeddingIds(db, activeModel).length,
-    models,
-  };
+  // Traits and pending episodes follow the same run: a caller that backfills memories
+  // never leaves the other two layers without vectors. Whatever the memories did not use
+  // (backlog shorter than their share) returns to them here, so the cap is never exceeded.
+  const layers = await embedLayerRowsResolved(
+    db,
+    resolved,
+    pendingLayers,
+    budget - selectedRows.length,
+  );
+  // Memory rows always save, so their discarded count is always 0 and BackfillStats does not
+  // declare it: only the layers can refuse a vector that went stale while the embedder worked.
+  return { pending: pendingRows.length, ...memories, layers };
 }

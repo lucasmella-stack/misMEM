@@ -3,7 +3,13 @@
 // index status. Memories keep their own table and code path in `store.ts`.
 import type { Database as DB } from "better-sqlite3";
 import { embedInBatches, type BatchRow, type ResolvedEmbedOptions } from "./batch.js";
-import { embedTexts, loadEmbeddingConfig, type EmbedFn } from "./provider.js";
+import {
+  embedTexts,
+  embeddingFingerprint,
+  loadEmbeddingConfig,
+  type EmbeddingConfig,
+  type EmbedFn,
+} from "./provider.js";
 import { checkedUnitVectors, cosine } from "./vector.js";
 
 export type LayerName = "trait" | "episode";
@@ -14,10 +20,14 @@ export function saveLayerEmbedding(
   itemId: string,
   model: string,
   vec: Float32Array,
+  text?: string,
+  cfg: EmbeddingConfig = loadEmbeddingConfig(),
 ): void {
+  const source = text ?? liveLayerText(db, layer, itemId);
+  if (source === undefined) throw new Error(`no existe el elemento de la capa ${layer}: ${itemId}`);
   db.prepare(
-    `INSERT OR REPLACE INTO layer_embeddings (layer, item_id, model, dims, vec, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT OR REPLACE INTO layer_embeddings (layer, item_id, model, dims, vec, created_at, fingerprint)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     layer,
     itemId,
@@ -25,6 +35,7 @@ export function saveLayerEmbedding(
     vec.length,
     Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength),
     Date.now(),
+    embeddingFingerprint(source, cfg),
   );
 }
 
@@ -51,10 +62,11 @@ function saveLayerEmbeddingIfCurrent(
   expectedText: string,
   model: string,
   vec: Float32Array,
+  cfg: EmbeddingConfig,
 ): boolean {
   return db.transaction(() => {
     if (liveLayerText(db, layer, itemId) !== expectedText) return false;
-    saveLayerEmbedding(db, layer, itemId, model, vec);
+    saveLayerEmbedding(db, layer, itemId, model, vec, expectedText, cfg);
     return true;
   })();
 }
@@ -120,7 +132,7 @@ export async function embedLayerItem(
 
   // The item can be renamed, consolidated or deleted while the embedder responds. The
   // helper checks and saves in one transaction so a stale vector cannot outlive its text.
-  return saveLayerEmbeddingIfCurrent(db, layer, itemId, row.text, model, vec);
+  return saveLayerEmbeddingIfCurrent(db, layer, itemId, row.text, model, vec, cfg);
 }
 
 export interface LayerSemanticHit {
@@ -220,6 +232,8 @@ export interface LayerIndexStatus {
   missing: number;
   compatible: number;
   stale_model: number;
+  /** Rows of the active model whose vector no longer matches their text or the config. */
+  outdated: number;
 }
 
 export function layerIndexStatus(
@@ -234,17 +248,22 @@ export function layerIndexStatus(
       : `FROM episodes ep
          LEFT JOIN layer_embeddings e ON e.layer = 'episode' AND e.item_id = ep.id
          WHERE ep.consolidated_into IS NULL`;
+  const text = layer === "trait" ? "t.name" : "ep.body";
   const row = db
     .prepare(
       `SELECT COUNT(*) AS items,
               COALESCE(SUM(CASE WHEN e.item_id IS NOT NULL THEN 1 ELSE 0 END), 0) AS embedded,
-              COALESCE(SUM(CASE WHEN e.model = @model THEN 1 ELSE 0 END), 0) AS compatible
+              COALESCE(SUM(CASE WHEN e.model = @model THEN 1 ELSE 0 END), 0) AS compatible,
+              COALESCE(SUM(CASE WHEN e.model = @model
+                                 AND COALESCE(e.fingerprint, '') <> mismem_fp_text(${text})
+                                THEN 1 ELSE 0 END), 0) AS outdated
        ${source}`,
     )
     .get({ model: activeModel }) as {
     items: number;
     embedded: number;
     compatible: number;
+    outdated: number;
   };
   return {
     items: row.items,
@@ -252,18 +271,26 @@ export function layerIndexStatus(
     missing: row.items - row.embedded,
     compatible: row.compatible,
     stale_model: row.embedded - row.compatible,
+    outdated: row.outdated,
   };
 }
 
+interface PendingLayerRow extends BatchRow {
+  id: string;
+  text: string;
+}
+
+export interface PendingLayerRows {
+  traits: PendingLayerRow[];
+  episodes: PendingLayerRow[];
+}
+
 /**
- * Embeds the traits and pending episodes without a vector or with a stale model
- * (idempotent). It runs inside the memory backfill, so a caller that backfills memories
- * never leaves the other two layers without vectors.
+ * Reads the traits and pending episodes without a vector or with a stale model, without
+ * embedding anything. The memory backfill calls this before spending its cap so it can
+ * reserve room for them; embedding the rows is the second step.
  */
-export async function embedPendingLayersResolved(
-  db: DB,
-  opts: ResolvedEmbedOptions,
-): Promise<{ pending: number; embedded: number; failed: number; discarded: number }> {
+export function pendingLayerRows(db: DB, opts: ResolvedEmbedOptions): PendingLayerRows {
   const needsEmbedding = [
     "e.item_id IS NULL",
     "e.model <> @model",
@@ -277,27 +304,52 @@ export async function embedPendingLayersResolved(
     expectedDims: opts.expectedDims,
     scope: opts.scope,
   };
+  // The text column differs per layer, so the hash comparison goes into each query.
+  const staleTrait = `${predicate} OR COALESCE(e.fingerprint, '') <> mismem_fp_text(t.name)`;
+  const staleEpisode = `${predicate} OR COALESCE(e.fingerprint, '') <> mismem_fp_text(ep.body)`;
 
-  const traitRows = db
+  const pendingTraits = db
     .prepare(
       `SELECT t.id, t.name AS text, e.item_id IS NOT NULL AS had_embedding
        FROM traits t
        LEFT JOIN layer_embeddings e ON e.layer = 'trait' AND e.item_id = t.id
-       WHERE (${predicate}) ${opts.scope ? "AND t.scope = @scope" : ""}`,
+       WHERE (${staleTrait}) ${opts.scope ? "AND t.scope = @scope" : ""}`,
     )
-    .all(params) as Array<{ id: string; text: string; had_embedding: number }>;
-  const episodeRows = db
+    .all(params) as PendingLayerRow[];
+  const pendingEpisodes = db
     .prepare(
       `SELECT ep.id, ep.body AS text, e.item_id IS NOT NULL AS had_embedding
        FROM episodes ep
        LEFT JOIN layer_embeddings e ON e.layer = 'episode' AND e.item_id = ep.id
        WHERE ep.consolidated_into IS NULL
-         AND (${predicate}) ${opts.scope ? "AND ep.scope = @scope" : ""}`,
+         AND (${staleEpisode}) ${opts.scope ? "AND ep.scope = @scope" : ""}`,
     )
-    .all(params) as Array<{ id: string; text: string; had_embedding: number }>;
+    .all(params) as PendingLayerRow[];
 
+  return { traits: pendingTraits, episodes: pendingEpisodes };
+}
+
+/**
+ * Embeds the traits and pending episodes already read, up to `maxRows`, split between the
+ * two layers. Whatever one of them leaves unused goes to the other, so neither starves
+ * while the other has a backlog. Idempotent: the next pass picks up what did not fit.
+ */
+export async function embedLayerRowsResolved(
+  db: DB,
+  opts: ResolvedEmbedOptions,
+  pending: PendingLayerRows,
+  maxRows: number,
+): Promise<{ pending: number; embedded: number; failed: number; discarded: number }> {
+  // Traits used to take the whole share first, so with more than half the budget in traits
+  // a pending episode never saw a row. Half each, and the unused half returns to the other.
+  const cap = Math.max(0, Math.floor(maxRows));
+  const half = Math.ceil(cap / 2);
+  const traitShare = Math.min(pending.traits.length, half);
+  const episodeShare = Math.min(pending.episodes.length, cap - traitShare);
+  const traitRows = pending.traits.slice(0, Math.min(pending.traits.length, cap - episodeShare));
+  const episodeRows = pending.episodes.slice(0, episodeShare);
   const stats: { pending: number; embedded: number; failed: number; discarded: number } = {
-    pending: traitRows.length + episodeRows.length,
+    pending: pending.traits.length + pending.episodes.length,
     embedded: 0,
     failed: 0,
     discarded: 0,
@@ -312,7 +364,7 @@ export async function embedPendingLayersResolved(
       opts.embedFn,
       opts.batchSize,
       (row) => row.text.slice(0, opts.maxChars),
-      (row, vec) => saveLayerEmbeddingIfCurrent(db, layer, row.id, row.text, opts.model, vec),
+      (row, vec) => saveLayerEmbeddingIfCurrent(db, layer, row.id, row.text, opts.model, vec, opts.cfg),
     );
     stats.embedded += batch.embedded;
     stats.failed += batch.failed;

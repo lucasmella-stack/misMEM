@@ -3,7 +3,8 @@
 // episodes against the configured server (EmbeddingGemma 2 on llama-server by default).
 // Idempotent: it fills missing or stale vectors; --force rebuilds compatible ones too.
 import { defaultDbPath, openDefaultDb } from "./store/db.js";
-import { embedPendingMemories, getEmbeddingIndexStatus } from "./embeddings/store.js";
+import { embedPendingMemories } from "./embeddings/store.js";
+import { getEmbeddingIndexStatus } from "./embeddings/status.js";
 import { loadEmbeddingConfig } from "./embeddings/provider.js";
 import { ArgsError, EXIT_USAGE } from "./cli-args.js";
 import { parseEmbedArgs } from "./embed-args.js";
@@ -16,7 +17,7 @@ function help(): void {
       "     MISMEM_EMBEDDING_MODEL, MISMEM_EMBEDDING_QUERY_PREFIX, MISMEM_EMBEDDING_DOC_PREFIX,\n" +
       "     MISMEM_EMBEDDING_MIN_SCORE, MISMEM_EMBEDDING_MAX_CHARS, MISMEM_EMBEDDING_TIMEOUT_MS,\n" +
       "     MISMEM_EMBEDDINGS=off\n" +
-      "Cambiar de modelo se detecta solo; cambiar un prefijo o MAX_CHARS no: reindexar con --force.",
+      "Cambiar de modelo, del prefijo de documento o de MAX_CHARS se detecta solo; el siguiente backfill reembebe lo afectado.",
   );
 }
 
@@ -34,7 +35,7 @@ async function main(): Promise<void> {
   const db = openDefaultDb();
   try {
     const cfg = loadEmbeddingConfig();
-    const status = getEmbeddingIndexStatus(db, cfg.model);
+    const status = getEmbeddingIndexStatus(db, cfg.model, cfg);
 
     if (args.status) {
       console.log(

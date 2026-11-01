@@ -5,7 +5,8 @@
 import { fileURLToPath } from "node:url";
 import { ArgsError, EXIT_USAGE } from "./cli-args.js";
 import { loadEmbeddingConfig, type EmbedFn } from "./embeddings/provider.js";
-import { embedPendingMemories, getEmbeddingIndexStatus } from "./embeddings/store.js";
+import { embedPendingMemories } from "./embeddings/store.js";
+import { getEmbeddingIndexStatus } from "./embeddings/status.js";
 import {
   EVAL_DEFAULT_LIMIT,
   jsonPayload,

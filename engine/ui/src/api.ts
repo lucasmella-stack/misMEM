@@ -10,6 +10,12 @@ export interface ScopeCount {
   traits: number;
 }
 
+interface EmbeddingRecord {
+  model: string;
+  dims: number;
+  created_at: number;
+}
+
 interface MemoryItem {
   id: string;
   scope: string;
@@ -17,12 +23,30 @@ interface MemoryItem {
   details: string | null;
   salience: number;
   stored_salience: number;
+  use_count: number;
   created_at: number;
   last_accessed_at: number | null;
   noise: boolean;
   sources?: number;
   episodes_left?: number;
   traits?: number;
+}
+
+/** The semantic index status; it never includes the provider URL. */
+export interface EmbeddingStatus {
+  enabled: boolean;
+  model: string;
+  /** The width search compares against; null when the base has no vector of the model. */
+  active_dims: number | null;
+  memories: number;
+  embedded: number;
+  missing: number;
+  compatible: number;
+  stale_model: number;
+  stale_dims: number;
+  /** Active-model vectors with a non-finite component or a zero norm; the next backfill redoes them. */
+  invalid: number;
+  models: Array<{ model: string; dims: number; count: number }>;
 }
 
 export interface TraitItem {
@@ -59,8 +83,15 @@ export interface SearchHit {
   via?: "semantic";
 }
 
+/** The `/api/search` response: the applied cap and whether the page filled it, so more may exist. */
+export interface SearchPage {
+  hits: SearchHit[];
+  limit: number;
+  truncated: boolean;
+}
+
 export interface MemoryDetail {
-  memory: MemoryItem;
+  memory: MemoryItem & { embedding: EmbeddingRecord | null };
   episodes: Array<EpisodeItem | Missing>;
   traits: TraitItem[];
 }
@@ -102,6 +133,22 @@ export interface ConnectomeSummary {
   /** Best support among the edges drawn: with every pair at 1, no figure above means anything. */
   max_n: number;
   hubs: Array<{ id: string; degree: number; strength: number; support: number }>;
+}
+
+/** One semantic island: memories that talk about the same thing. */
+interface Topic {
+  size: number;
+  scopes: Array<{ scope: string; n: number }>;
+  entry: { id: string; gist: string; salience: number };
+  members: string[];
+}
+
+export interface TopicsResult {
+  topics: Topic[];
+  /** Looked at and left out of every island. */
+  alone: number;
+  considered: number;
+  minScore: number;
 }
 
 export interface GraphData {
@@ -219,6 +266,7 @@ export const actions = {
 export const api = {
   session: (signal?: AbortSignal) => get<{ active: boolean }>("session", {}, signal),
   scopes: (signal?: AbortSignal) => get<{ scopes: ScopeCount[] }>("scopes", {}, signal),
+  embeddings: (signal?: AbortSignal) => get<EmbeddingStatus>("embeddings", {}, signal),
   consolidation: (signal?: AbortSignal) => get<ConsolidationState>("consolidate", {}, signal),
   memories: (scope: string | undefined, offset: number, signal?: AbortSignal) =>
     get<MemoriesPage>("memories", { scope, limit: String(PAGE_SIZE), offset: String(offset) }, signal),
@@ -228,11 +276,15 @@ export const api = {
       { layer: "episode", pending: "1", scope, limit: String(PAGE_SIZE), offset: String(offset) },
       signal,
     ),
-  traits: (scope: string | undefined, signal?: AbortSignal) =>
-    get<{ rows: TraitItem[] }>("recent", { layer: "trait", scope, limit: "200" }, signal),
+  traits: (scope: string | undefined, offset: number, signal?: AbortSignal) =>
+    get<{ rows: TraitItem[]; total: number }>(
+      "recent",
+      { layer: "trait", scope, limit: String(PAGE_SIZE), offset: String(offset) },
+      signal,
+    ),
   // The top 50: this is a relevance list and the tail adds nothing.
   search: (q: string, scope: string | undefined, signal?: AbortSignal) =>
-    get<{ hits: SearchHit[] }>("search", { q, scope, limit: "50" }, signal),
+    get<SearchPage>("search", { q, scope, limit: "50" }, signal),
   // `co_use_min_n` goes to the server and not to the client so the hubs and the sample it
   // reports describe the same edges that get drawn.
   graph: (
@@ -255,6 +307,8 @@ export const api = {
       },
       signal,
     ),
+  // Its cost is a cosine per pair, so the server caps how many memories it looks at.
+  topics: (scope: string | undefined, signal?: AbortSignal) => get<TopicsResult>("topics", { scope }, signal),
   memory: (id: string, signal?: AbortSignal) => get<MemoryDetail>(`memory/${encodeURIComponent(id)}`, {}, signal),
   trait: (id: string, signal?: AbortSignal) => get<TraitDetail>(`trait/${encodeURIComponent(id)}`, {}, signal),
 };

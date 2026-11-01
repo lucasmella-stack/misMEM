@@ -4,8 +4,8 @@
 import type { Database as DB } from "better-sqlite3";
 import { excludeNoiseSql, type ConsolidatedEpisodeRow, type MemoryRow, type TraitRow } from "../store/rows.js";
 
-/** The columns the export selects: `source_episode_ids` is not needed here. */
-type ExportMemoryRow = Omit<MemoryRow, "source_episode_ids">;
+/** The columns the export selects: `source_episode_ids` and `use_count` are not needed here. */
+type ExportMemoryRow = Omit<MemoryRow, "source_episode_ids" | "use_count">;
 type ExportTraitRow = Omit<TraitRow, "created_at">;
 
 export function exportMemories(db: DB, scope?: string): ExportMemoryRow[] {

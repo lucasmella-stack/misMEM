@@ -13,11 +13,8 @@ import {
   saveLayerEmbedding,
   semanticSearchLayer,
 } from "../src/embeddings/layers.js";
-import {
-  embedPendingMemories,
-  getEmbeddingIndexStatus,
-  saveMemoryEmbedding,
-} from "../src/embeddings/store.js";
+import { embedPendingMemories, saveMemoryEmbedding } from "../src/embeddings/store.js";
+import { getEmbeddingIndexStatus } from "../src/embeddings/status.js";
 import { runConsolidation } from "../src/consolidation/run.js";
 import type { EmbedFn } from "../src/embeddings/provider.js";
 
@@ -506,6 +503,27 @@ describe("backfill de rasgos y episodios", () => {
     expect(stats.layers).toEqual({ pending: 1, embedded: 0, failed: 0, discarded: 1 });
   });
 
+  it("renombrar un rasgo deja su fila pendiente", async () => {
+    const source = capture(db, { scope: "dev", body: "origen" });
+    const memory = consolidate(db, {
+      scope: "dev",
+      gist: "memoria de apoyo",
+      source_episode_ids: [source.id],
+    }).memory_id;
+    const trait = crystallize(db, {
+      scope: "dev",
+      name: "nombre viejo",
+      evidence_memory_ids: [memory],
+    }).trait_id;
+    const embed: EmbedFn = async (texts) => texts.map(() => axis(1));
+    await embedPendingMemories(db, { embedFn: embed, model: "fake" });
+
+    db.prepare("UPDATE traits SET name = ? WHERE id = ?").run("nombre nuevo", trait);
+    const again = await embedPendingMemories(db, { embedFn: embed, model: "fake" });
+
+    expect(again.layers).toMatchObject({ pending: 1, embedded: 1, failed: 0 });
+  });
+
   it("embeber un item recién escrito es opcional y un embedder caído no lanza", async () => {
     const episode = capture(db, { scope: "dev", body: "nota nueva" }).id;
 
@@ -783,6 +801,7 @@ describe("vectores de capa y ciclo de vida", () => {
       missing: 1,
       compatible: 1,
       stale_model: 0,
+      outdated: 0,
     });
     expect(status.layers.episode).toEqual({
       items: 2,
@@ -790,7 +809,40 @@ describe("vectores de capa y ciclo de vida", () => {
       missing: 1,
       compatible: 1,
       stale_model: 0,
+      outdated: 0,
     });
+  });
+
+  it("el estado cuenta los vectores de texto desactualizado en cada capa", async () => {
+    const source = capture(db, { scope: "dev", body: "origen" });
+    const memory = consolidate(db, {
+      scope: "dev",
+      gist: "memoria que cambia",
+      source_episode_ids: [source.id],
+    }).memory_id;
+    const trait = crystallize(db, {
+      scope: "dev",
+      name: "rasgo que cambia",
+      evidence_memory_ids: [memory],
+    }).trait_id;
+    capture(db, { scope: "dev", body: "episodio intacto" });
+    const embed: EmbedFn = async (texts) => texts.map(() => axis(1));
+    await embedPendingMemories(db, { embedFn: embed, model: "fake" });
+
+    db.prepare("UPDATE memories SET details = ? WHERE id = ?").run("detalle nuevo", memory);
+    // Renaming the trait would now drop its vector by trigger; a fingerprint that no longer matches
+    // is what a changed document prefix or MAX_CHARS leaves, so the test writes one directly.
+    db.prepare("UPDATE layer_embeddings SET fingerprint = ? WHERE layer = 'trait' AND item_id = ?").run(
+      "huella anterior",
+      trait,
+    );
+
+    const status = getEmbeddingIndexStatus(db, "fake");
+
+    expect(status.outdated).toBe(1);
+    expect(status.layers.trait.outdated).toBe(1);
+    expect(status.layers.episode.outdated).toBe(0);
+    expect(status.layers.episode.embedded).toBe(1);
   });
 
   it("abre una base creada antes de layer_embeddings, conserva sus datos y la usa", async () => {

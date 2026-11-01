@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, type Layer, type SearchHit } from "@/api";
+import { SearchHeader } from "@/components/SearchHeader";
 import { ago } from "@/format";
 import { cn } from "@/lib/utils";
 import type { Selection } from "@/lib/selection";
-import { Chip, Count, Empty, Failure, Loading, type ListProps, Row } from "./primitives";
+import { Chip, Empty, Failure, Loading, type ListProps, Row } from "./primitives";
 
 const LAYER_NAME: Record<Layer, string> = { episode: "episodio", memory: "memoria", trait: "rasgo" };
 
@@ -22,16 +23,27 @@ export function SearchResults({ term, scope, selected, onSelect }: ListProps & {
   if (!trimmed) {
     return <Empty>Escribe en la caja de búsqueda para recorrer toda la memoria.</Empty>;
   }
-  if (query.isPending) return <Loading label="Buscando en la memoria…" />;
+  // The header, and its live region, sit first in the same wrapper while loading and after, so React
+  // keeps that node and a screen reader announces the cap notice when it appears.
+  if (query.isPending) {
+    return (
+      <div className="flex flex-col gap-2">
+        <SearchHeader term={trimmed} scope={scope} count={0} truncated={false} fetching />
+        <Loading label="Buscando en la memoria…" />
+      </div>
+    );
+  }
   const hits = query.data?.hits ?? [];
 
   return (
     <div className="flex flex-col gap-2">
-      <Count>
-        Resultados para <q className="text-ink-soft">{trimmed}</q>
-        {scope ? ` en ${scope}` : ""}
-        {query.isFetching ? " · buscando…" : ""}
-      </Count>
+      <SearchHeader
+        term={trimmed}
+        scope={scope}
+        count={hits.length}
+        truncated={query.data?.truncated ?? false}
+        fetching={query.isFetching}
+      />
       {query.isError && <Failure what="los resultados" error={query.error} stale={hits.length > 0} />}
       {hits.length === 0 ? (
         query.isError ? null : <Empty>Nada coincide. Prueba con otras palabras o en toda la memoria.</Empty>

@@ -80,14 +80,41 @@ describe("consolidate", () => {
     expect(ep.consolidated_into).toBe(memory_id);
   });
 
-  it("does not consolidate episodes from a different scope", () => {
+  it("falla en vez de crear una memoria con episodios de otro ámbito", () => {
     const { id } = capture(db, { scope: "other", body: "x" });
-    const { consolidated } = consolidate(db, {
+    expect(() => consolidate(db, { scope: "s", gist: "g", source_episode_ids: [id] })).toThrow(
+      /pendiente/,
+    );
+    expect(db.prepare("SELECT count(*) n FROM memories").get()).toEqual({ n: 0 });
+  });
+
+  it("falla en vez de crear una memoria sin ningún episodio que la respalde", () => {
+    expect(() =>
+      consolidate(db, { scope: "s", gist: "g", source_episode_ids: ["01INEXISTENTE000000000000"] }),
+    ).toThrow(/pendiente/);
+    expect(db.prepare("SELECT count(*) n FROM memories").get()).toEqual({ n: 0 });
+  });
+
+  it("no le roba a otra memoria un episodio que ya consolidó", () => {
+    const { id: taken } = capture(db, { scope: "s", body: "uno" });
+    const { id: free } = capture(db, { scope: "s", body: "dos" });
+    const first = consolidate(db, { scope: "s", gist: "primera", source_episode_ids: [taken] });
+
+    const second = consolidate(db, {
       scope: "s",
-      gist: "g",
-      source_episode_ids: [id],
+      gist: "segunda",
+      source_episode_ids: [taken, free],
     });
-    expect(consolidated).toBe(0);
+
+    expect(second.consolidated).toBe(1);
+    const owner = (id: string) =>
+      (
+        db.prepare("SELECT consolidated_into FROM episodes WHERE id = ?").get(id) as {
+          consolidated_into: string;
+        }
+      ).consolidated_into;
+    expect(owner(taken)).toBe(first.memory_id);
+    expect(owner(free)).toBe(second.memory_id);
   });
 });
 

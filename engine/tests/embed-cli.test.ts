@@ -20,6 +20,16 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }));
 const SPAWNS = 60_000;
 
 describe("mismem-embed", () => {
+  it("la ayuda nombra el prefijo de documento, que es el único que invalida vectores", () => {
+    const result = spawnSync(
+      process.execPath,
+      ["--import", "tsx", join(ENGINE, "src", "embed-cli.ts"), "--help"],
+      { cwd: ENGINE, encoding: "utf8", timeout: SPAWNS },
+    );
+
+    expect(result.stdout).toContain("prefijo de documento");
+  });
+
   it("sale con 1 cuando sólo falla el backfill de rasgos y episodios", () => {
     const dbPath = join(dir, "mem.db");
     const db = openDb(dbPath);

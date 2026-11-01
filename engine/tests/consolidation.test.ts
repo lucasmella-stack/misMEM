@@ -83,6 +83,33 @@ describe("runConsolidation", () => {
     });
   });
 
+  it("dos memorias que citan el mismo episodio no rompen la corrida ni crean una memoria sin origen", async () => {
+    const shared = captureOld("s", "decidimos migrar el hosting a Hetzner por costo", 48);
+    captureOld("s", "el presupuesto de infra baja un 40%", 48);
+    captureOld("s", "hay que avisar al equipo del cambio", 48);
+    // A model can cite the same episode in two memories; only one of them can keep it.
+    const distillFn = vi.fn(async () => [
+      { gist: "Hosting en Hetzner", evidence_episode_ids: [shared] },
+      { gist: "Lo mismo visto de otra forma", evidence_episode_ids: [shared] },
+    ]);
+
+    const summary = await runConsolidation(db, {
+      paretoPrefilter: false,
+      llm: llmCfg,
+      distillFn,
+      log: () => {},
+    });
+
+    expect(summary.scopes_failed).toBe(0);
+    expect(summary.memories_created).toBe(1);
+    const sourceless = db
+      .prepare(
+        "SELECT count(*) n FROM memories m WHERE NOT EXISTS (SELECT 1 FROM episodes e WHERE e.consolidated_into = m.id)",
+      )
+      .get() as { n: number };
+    expect(sourceless.n).toBe(0);
+  });
+
   it("un ámbito chico que lleva tiempo quieto se consolida igual: si no, queda pendiente para siempre", async () => {
     const lone = captureOld("charla-vieja", "decidimos migrar el hosting a Hetzner por costo", 24 * 20);
     captureOld("activo", "idea suelta de esta semana", 48);
@@ -613,6 +640,59 @@ describe("runConsolidation", () => {
 
     // The backfill reads the real config: without vitest's env it reaches the developer's embedding server.
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("el backfill de la corrida nocturna respeta el tope de 64", async () => {
+    const insert = db.prepare(
+      "INSERT INTO memories (id, scope, gist, source_episode_ids, created_at) VALUES (?, 's', ?, '[]', ?)",
+    );
+    for (let i = 0; i < 70; i++) insert.run(`pending-${i}`, `pendiente ${i}`, Date.now());
+    const seen: string[] = [];
+    const embedFn = vi.fn(async (texts: string[]) => {
+      seen.push(...texts);
+      return texts.map(() => Float32Array.from([1, 0]));
+    });
+
+    await runConsolidation(db, { llm: llmCfg, embedFn, log: () => {} });
+
+    expect(seen).toHaveLength(64);
+    const stored = db.prepare("SELECT COUNT(*) AS n FROM memory_embeddings").get() as { n: number };
+    expect(stored.n).toBe(64);
+  });
+
+  it("la corrida embebe primero las memorias que acaba de destilar aunque el backlog pase del tope", async () => {
+    const insert = db.prepare(
+      "INSERT INTO memories (id, scope, gist, source_episode_ids, created_at) VALUES (?, 's', ?, '[]', ?)",
+    );
+    for (let i = 0; i < 70; i++) insert.run(`pending-${i}`, `pendiente ${i}`, Date.now());
+    const ids = [1, 2, 3].map((n) => captureOld("s", `decisión ${n} sobre el despliegue`, 48));
+    const distillFn = vi.fn().mockResolvedValue([
+      { gist: "decisión sobre el despliegue", evidence_episode_ids: ids },
+    ]);
+    const seen: string[] = [];
+    const embedFn = vi.fn(async (texts: string[]) => {
+      seen.push(...texts);
+      return texts.map(() => Float32Array.from([1, 0]));
+    });
+
+    await runConsolidation(db, {
+      minEpisodesPerScope: 1,
+      paretoPrefilter: false,
+      llm: llmCfg,
+      distillFn,
+      embedFn,
+      log: () => {},
+    });
+
+    // The backlog alone fills the 64 rows, so the new memory only gets a vector if it is
+    // ordered first: the stable scan order would leave it behind every pending row.
+    expect(seen).toHaveLength(64);
+    const created = db
+      .prepare("SELECT id FROM memories WHERE gist = 'decisión sobre el despliegue'")
+      .get() as { id: string };
+    expect(
+      db.prepare("SELECT 1 FROM memory_embeddings WHERE memory_id = ?").get(created.id),
+    ).toBeDefined();
   });
 
   it("respeta el tope de llamadas por corrida y deja el resto para la próxima", async () => {
