@@ -62,6 +62,6 @@
 {"type": "query", "id": "tra-q35", "kind": "rasgo", "query": "¿Cómo se organiza con las citas y los documentos?", "expect": ["tra-t1"]}
 {"type": "query", "id": "tra-q36", "kind": "rasgo", "query": "¿Qué hace cada poco con las facturas de casa?", "expect": ["tra-t2"]}
 {"type": "query", "id": "tra-q37", "kind": "ajena", "query": "¿Qué obligaciones tenía un vasallo con su señor en el siglo XII?", "expect": []}
-{"type": "query", "id": "tra-q38", "kind": "ajena", "query": "¿Cómo se calcula la energía de un fotón a partir de su frecuencia?", "expect": []}
+{"type": "query", "id": "tra-q38", "kind": "ajena", "query": "¿Cuántos satélites tenía Saturno en 2020?", "expect": []}
 {"type": "query", "id": "tra-q39", "kind": "ajena", "query": "¿Qué técnica usaban los canteros para levantar un arco ojival?", "expect": []}
-{"type": "query", "id": "tra-q40", "kind": "ajena", "query": "¿Cómo se reproduce la monstera deliciosa en su hábitat natural?", "expect": []}
+{"type": "query", "id": "tra-q40", "kind": "ajena", "query": "¿Cómo se fabrica una gaita gallega?", "expect": []}

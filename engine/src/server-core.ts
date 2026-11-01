@@ -1,7 +1,5 @@
-/**
- * Server core — registra las 6 tools canónicas + alias engram-compat.
- * Reusado por `server.ts` (stdio) y `server-http.ts` (StreamableHTTP).
- */
+// Server core: registers the six canonical tools plus the engram-compat aliases, shared by
+// `server.ts` (stdio) and `server-http.ts` (Streamable HTTP).
 import { createRequire } from "node:module";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
@@ -9,13 +7,15 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Database as DB } from "better-sqlite3";
-import { captureAndEmbed, embedWrittenLayer, recallHybrid, consolidate, crystallize, forget, reinforce } from "./tools.js";
+import { captureAndEmbed, embedWrittenLayer } from "./memory/embed-write.js";
+import { recallHybrid } from "./recall/recall.js";
+import { consolidate } from "./memory/consolidate.js";
+import { crystallize } from "./memory/crystallize.js";
+import { forget } from "./memory/forget.js";
+import { reinforce } from "./memory/reinforce.js";
 import { embedPendingMemories } from "./embeddings/store.js";
-import {
-  ENGRAM_TOOLS,
-  dispatchEngramTool,
-  isEngramTool,
-} from "./engram-compat.js";
+import { dispatchEngramTool, isEngramTool } from "./mcp/engram-compat.js";
+import { ENGRAM_TOOLS } from "./mcp/engram-tools.js";
 
 // The advertised inputSchemas are hand-written mirrors of the Zod schemas in schema.ts, which
 // are what actually validates calls. tests/tool-schemas.test.ts fails if the two drift.
@@ -164,12 +164,12 @@ export function createServer(db: DB): Server {
           break;
         case "consolidate": {
           result = consolidate(db, args);
-          // Best-effort: si hay embedder local, la memoria nueva queda
-          // embebida ya; si no, el backfill nocturno la levanta después.
+          // Best effort: with a local embedder the new memory is embedded right away; the
+          // nightly backfill picks it up otherwise.
           try {
             await embedPendingMemories(db);
           } catch {
-            /* semántica es opcional; nunca rompe el write path */
+            /* semantics are optional and never break the write path */
           }
           break;
         }

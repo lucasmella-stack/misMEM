@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { resolve } from "node:path";
-import { defaultDbPath, openDefaultDb } from "./db.js";
+import { defaultDbPath, openDefaultDb } from "./store/db.js";
+import { ingestStats } from "./queries/stats.js";
 import { walkAndIngest } from "./ingest/walk.js";
 import { ingestChatGPTExport } from "./ingest/chatgpt.js";
 import { ingestVSCodeTranscripts, ingestVSCodePrompts } from "./ingest/vscode.js";
@@ -45,7 +46,7 @@ async function main(): Promise<void> {
     }
     case "file": {
       const { readFile } = await import("node:fs/promises");
-      const { capture } = await import("./tools.js");
+      const { capture } = await import("./memory/capture.js");
       const content = await readFile(resolve(parsed.path), "utf8");
       const r = capture(db, { scope: parsed.scope, body: content });
       console.log(JSON.stringify(r));
@@ -63,15 +64,7 @@ async function main(): Promise<void> {
       break;
     }
     case "stats": {
-      const ep = db.prepare("SELECT COUNT(*) AS n FROM episodes").get() as { n: number };
-      const me = db.prepare("SELECT COUNT(*) AS n FROM memories").get() as { n: number };
-      const tr = db.prepare("SELECT COUNT(*) AS n FROM traits").get() as { n: number };
-      const scopes = db.prepare(
-        "SELECT scope, COUNT(*) AS n FROM episodes GROUP BY scope ORDER BY n DESC LIMIT 20"
-      ).all();
-      console.log(JSON.stringify({
-        db: DB_PATH, episodes: ep.n, memories: me.n, traits: tr.n, top_scopes: scopes,
-      }, null, 2));
+      console.log(JSON.stringify({ db: DB_PATH, ...ingestStats(db) }, null, 2));
       break;
     }
   }

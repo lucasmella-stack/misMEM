@@ -1,19 +1,12 @@
 #!/usr/bin/env node
-/**
- * mismem-used — hook `Stop` de Claude Code: refuerza los recuerdos que la respuesta usó.
- *
- * Lee por stdin el payload del hook (de ahí saca `transcript_path`), mira el último turno
- * y manda a `reinforce` sólo los recuerdos cuyas palabras reaparecen en la respuesta.
- *
- * Con MISMEM_HOOK_URL habla con el servidor remoto por JSON-RPC; sin ella abre la base
- * local. Nunca escribe en stdout salvo con --dry-run, y nunca sale con error: un hook que
- * rompe no vale un punto de saliencia.
- */
+// mismem-used: the Claude Code `Stop` hook, which reinforces the memories the answer used.
+// It reads `transcript_path` from the hook payload, looks at the last turn and reinforces only
+// the memories whose words reappear; it never exits with an error, so it cannot break a turn.
 import { readFileSync } from "node:fs";
-import { defaultDbPath, openDb } from "./db.js";
+import { defaultDbPath, openDb } from "./store/db.js";
 import { envOptionalPositiveNumber } from "./env.js";
-import { callRemoteTool, readStdin } from "./hook-client.js";
-import { reinforce } from "./tools.js";
+import { callRemoteTool, readStdin } from "./hooks/client.js";
+import { reinforce } from "./memory/reinforce.js";
 import {
   assistantReply,
   injectedMemories,
@@ -21,7 +14,7 @@ import {
   recalledMemories,
   usedMemoryIds,
   type UsageOptions,
-} from "./usage.js";
+} from "./hooks/usage.js";
 
 const REMOTE_TIMEOUT_MS = 5000;
 
@@ -40,7 +33,7 @@ async function main(): Promise<void> {
   const flagIndex = argv.indexOf("--transcript");
   const fromFlag = flagIndex >= 0 ? argv[flagIndex + 1] : undefined;
 
-  // Con --transcript no hace falta stdin, y leerlo igual es colgarse esperando a nadie.
+  // With --transcript stdin is not needed, and reading it anyway means waiting on nobody.
   let transcript = fromFlag;
   if (!transcript) {
     const stdin = await readStdin();
@@ -62,7 +55,7 @@ async function main(): Promise<void> {
     });
 
   const turn = lastTurn(lines);
-  // Lo que el modelo pidió y lo que el hook de inyección le puso delante, sin repetir ids.
+  // What the model asked for plus what the injection hook put in front of it, without repeated ids.
   const porId = new Map(
     [...recalledMemories(turn), ...injectedMemories(turn)].map((m) => [m.id, m]),
   );
@@ -89,6 +82,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err: unknown) => {
-  // Un hook que falla no puede cortarle el turno a nadie: se queja y sale bien.
+  // A failing hook cannot cut anyone's turn: it complains and exits clean.
   process.stderr.write(`[mismem-used] ${err instanceof Error ? err.message : String(err)}\n`);
 });

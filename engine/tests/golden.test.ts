@@ -3,10 +3,11 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
+import { isNoiseGist } from "../src/domain/noise.js";
 import type { EmbedFn } from "../src/embeddings/provider.js";
-import { loadGolden, parseFloor, parseGolden, runGolden } from "../src/golden.js";
-import { isNoiseGist } from "../src/noise.js";
+import { GOLDEN_KINDS, parseFloor, parseGolden } from "../src/recall/golden-corpus.js";
+import { loadGolden, runGolden } from "../src/recall/golden.js";
+import { openDb } from "../src/store/db.js";
 
 const DAY_MS = 86_400_000;
 const AT = Date.UTC(2026, 0, 15);
@@ -169,6 +170,20 @@ describe("parseGolden", () => {
     expect(() => parseGolden(files)).toThrow(/ajena/);
   });
 
+  it("rechaza una clave que acaba en -source, con fichero y línea", () => {
+    const files = [
+      {
+        name: "dev.jsonl",
+        text: [
+          JSON.stringify({ type: "memory", key: "m1", scope: "s", gist: "x", days_ago: 1 }),
+          JSON.stringify({ type: "episode", key: "m1-source", scope: "s", body: "y", days_ago: 1 }),
+        ].join("\n"),
+      },
+    ];
+
+    expect(() => parseGolden(files)).toThrow(/dev\.jsonl:2.*m1-source.*-source/);
+  });
+
   it("rechaza una clave repetida entre ficheros", () => {
     const files = [
       { name: "uno.jsonl", text: JSON.stringify({ type: "memory", key: "m1", scope: "s", gist: "x", days_ago: 1 }) },
@@ -180,9 +195,32 @@ describe("parseGolden", () => {
 });
 
 describe("loadGolden", () => {
+  it("resuelve la evidencia de un rasgo que apunta a otro rasgo listado después", () => {
+    const corpus = parseGolden([
+      {
+        name: "dev.jsonl",
+        text: [
+          JSON.stringify({ type: "memory", key: "m1", scope: "s", gist: "x", days_ago: 1 }),
+          JSON.stringify({ type: "trait", key: "t1", scope: "s", name: "uno", evidence: ["t2"] }),
+          JSON.stringify({ type: "trait", key: "t2", scope: "s", name: "dos", evidence: ["m1"] }),
+        ].join("\n"),
+      },
+    ]);
+
+    const ids = loadGolden(db, corpus, AT);
+
+    const row = db.prepare("SELECT evidence_memory_ids FROM traits WHERE id = ?").get(ids.get("t1")) as {
+      evidence_memory_ids: string;
+    };
+    expect(JSON.parse(row.evidence_memory_ids)).toEqual([ids.get("t2")]);
+  });
+
   it("inserta las memorias con su antigüedad, su saliencia y un episodio consolidado", () => {
     const corpus = parseGolden(FILES);
     const ids = loadGolden(db, corpus, AT);
+    // Ids derive from the key, never ulid(): fused recall breaks ties by id, so random ids would make the gate flaky.
+    expect(ids.get("dev-01")).toBe("golden-dev-01");
+    expect(db.prepare("SELECT 1 FROM episodes WHERE id = ?").get("golden-dev-01-source")).toBeDefined();
     const memoryId = ids.get("dev-01");
     const episodeId = ids.get("dev-e1");
     if (!memoryId || !episodeId) throw new Error("faltan ids en el mapa");
@@ -256,6 +294,10 @@ describe("runGolden", () => {
 });
 
 describe("parseFloor", () => {
+  it("rechaza un suelo para ajena y remite a lexico_ajenas_max", () => {
+    expect(() => parseFloor('{"limit":5,"lexico":{"ajena":{"hits":0}}}')).toThrow(/lexico_ajenas_max/);
+  });
+
   it("lee el suelo por tipo", () => {
     expect(parseFloor('{"limit":5,"lexico":{"literal":{"hits":2}}}')).toEqual({
       limit: 5,
@@ -315,6 +357,12 @@ const EXPECTED_KINDS: Record<string, number> = {
   ajena: 48,
 };
 
+// The per-kind loop below only walks the kinds floor.json has, so a kind dropped from the
+// floor would leave the gate silently. `ajena` is not scored: it has `lexico_ajenas_max`.
+function uncoveredKinds(floor: { lexico: Record<string, unknown> }): string[] {
+  return GOLDEN_KINDS.filter((kind) => kind !== "ajena" && !(kind in floor.lexico));
+}
+
 describe("eval/golden real", () => {
   it("los doce dominios tienen el reparto esperado", () => {
     const corpus = parseGolden(readGolden());
@@ -346,6 +394,14 @@ describe("eval/golden real", () => {
     expect(kinds).toEqual(EXPECTED_KINDS);
   });
 
+  it("detecta un suelo al que le falta un tipo", () => {
+    const floor = parseFloor(readFileSync(join(goldenDir, "floor.json"), "utf8"));
+    const rest = { ...floor.lexico };
+    delete rest.literal;
+
+    expect(uncoveredKinds({ lexico: rest })).toEqual(["literal"]);
+  });
+
   it("el modo léxico no baja del suelo por tipo y no devuelve ruido", async () => {
     const floor = parseFloor(readFileSync(join(goldenDir, "floor.json"), "utf8"));
     const corpus = parseGolden(readGolden());
@@ -354,6 +410,7 @@ describe("eval/golden real", () => {
 
     expect(report.noiseHits).toBe(0);
     expect(report.offTopic.withHits).toBeLessThanOrEqual(floor.lexico_ajenas_max ?? 0);
+    expect(uncoveredKinds(floor), "el suelo omite tipos que sí se miden").toEqual([]);
     for (const [kind, { hits }] of Object.entries(floor.lexico)) {
       const score = report.kinds[kind];
       expect(score, `el tipo ${kind} del suelo no aparece en el informe`).toBeDefined();

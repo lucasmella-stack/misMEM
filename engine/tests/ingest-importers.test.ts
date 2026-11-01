@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { join } from "node:path";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
+import { openDb } from "../src/store/db.js";
 import { ingestChatGPTExport } from "../src/ingest/chatgpt.js";
 import { ingestVSCodeTranscripts } from "../src/ingest/vscode.js";
 

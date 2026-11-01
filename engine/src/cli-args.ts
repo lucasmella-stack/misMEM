@@ -1,20 +1,18 @@
-/**
- * Lectura estricta de flags para los CLIs que borran o gastan: un flag que no se
- * entiende corta con error de uso en vez de quedar ignorado y dejar correr otra cosa.
- */
+// Strict flag parsing for the CLIs that delete or spend: an unknown flag aborts with a usage
+// error instead of being ignored while something else runs.
 
-/** EX_USAGE de sysexits.h: distinto del 1 (fallo) y del 2 que usa consolidate para ámbitos fallidos. */
+/** EX_USAGE from sysexits.h: distinct from 1 (failure) and from the 2 consolidate uses for failed scopes. */
 export const EXIT_USAGE = 64;
 
 export class ArgsError extends Error {
   override name = "ArgsError";
 }
 
-/** El valor que sigue a `flag` en `argv[i + 1]`; otro `--flag` no cuenta como valor. */
+/** The value after `flag` at `argv[i + 1]`; another `--flag` does not count as a value. */
 export function flagValue(argv: readonly string[], i: number, flag: string): string {
   const value = argv[i + 1];
-  // Un valor en blanco es un valor ausente: si pasa, el que valida después (`--scope ""`)
-  // falla con exit 1 cuando el contrato del CLI es error de uso.
+  // A blank value is a missing value: if it slipped through, the later validator (`--scope ""`)
+  // would fail with exit 1 where the CLI's contract is a usage error.
   if (value === undefined || value.trim() === "" || value.startsWith("--")) {
     throw new ArgsError(`${flag} necesita un valor`);
   }

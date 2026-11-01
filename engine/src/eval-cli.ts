@@ -1,28 +1,22 @@
 #!/usr/bin/env node
 /**
- * Golden eval — measures recall by kind, domain and globally.
- *
- * The corpus ships with the repository, not in the npm package, so this runs from a
- * checkout (`pnpm eval`) instead of a published binary. The DB lives in memory: the
- * eval never touches `~/.mismem`. Lexical mode forces a null embedder; semantic mode
- * embeds the corpus with the environment config and lets `recallHybrid` decide. `auto`
- * uses semantic only when the embedder answered.
+ * Golden eval CLI: measures recall by kind, domain and globally. See docs/recall.md.
  */
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ArgsError, EXIT_USAGE } from "./cli-args.js";
-import { openDb } from "./db.js";
-import type { EmbedFn } from "./embeddings/provider.js";
-import { embedPendingMemories } from "./embeddings/store.js";
-import { EVAL_DEFAULT_LIMIT, parseEvalArgs, type EvalMode } from "./eval-args.js";
+import { loadEmbeddingConfig, type EmbedFn } from "./embeddings/provider.js";
+import { embedPendingMemories, getEmbeddingIndexStatus } from "./embeddings/store.js";
 import {
-  loadGolden,
-  parseGolden,
-  runGolden,
-  type GoldenReport,
-  type GoldenScore,
-} from "./golden.js";
+  EVAL_DEFAULT_LIMIT,
+  jsonPayload,
+  modeLine,
+  parseEvalArgs,
+  type ModeChoice,
+} from "./eval-args.js";
+import { chooseMode, readCorpus } from "./eval-mode.js";
+import { parseGolden } from "./recall/golden-corpus.js";
+import { loadGolden, runGolden, type GoldenReport, type GoldenScore } from "./recall/golden.js";
+import { openDb } from "./store/db.js";
 
 /** `dist/eval-cli.js` and `src/eval-cli.ts` hang from the same package: `../eval/golden`. */
 const DEFAULT_DIR = fileURLToPath(new URL("../eval/golden/", import.meta.url));
@@ -37,42 +31,9 @@ Corre el eval dorado en castellano: carga los .jsonl de --dir en una base en mem
 mide, por tipo de pregunta, por dominio y en global, los aciertos y el MRR. Las preguntas
 ajenas se informan aparte. Un marcador de ruido devuelto es un fallo.
 
---mode auto (por defecto) usa el semántico si el embedder responde y el léxico si no.
+--mode auto (por defecto) usa el semántico sólo si deja todas las memorias embebidas sin
+un lote fallido, y el léxico en cualquier otro caso.
 Base: en memoria (:memory:), nunca ~/.mismem. No escribe nada fuera del proceso.`);
-}
-
-interface ModeChoice {
-  mode: "lexico" | "semantico";
-  embedded: number;
-  failed: number;
-}
-
-/**
- * `auto` does not guess: it embeds the corpus and stays semantic only when nothing failed.
- * An explicit semantic mode is honoured even with the embedder down; recall degrades to
- * FTS5 on its own and the numbers say so.
- */
-async function chooseMode(db: ReturnType<typeof openDb>, requested: EvalMode): Promise<ModeChoice> {
-  if (requested === "lexico") return { mode: "lexico", embedded: 0, failed: 0 };
-
-  const stats = await embedPendingMemories(db);
-  const embedded = (
-    db.prepare("SELECT COUNT(*) AS n FROM memory_embeddings").get() as { n: number }
-  ).n;
-  const usable = stats.failed === 0 && embedded > 0;
-  if (requested === "semantico" || usable) {
-    return { mode: "semantico", embedded, failed: stats.failed };
-  }
-  return { mode: "lexico", embedded, failed: stats.failed };
-}
-
-function readCorpus(dir: string): Array<{ name: string; text: string }> {
-  if (!existsSync(dir)) throw new Error(`no existe el directorio ${dir}`);
-  const names = readdirSync(dir)
-    .filter((name) => name.endsWith(".jsonl"))
-    .sort();
-  if (names.length === 0) throw new Error(`no hay ficheros .jsonl en ${dir}`);
-  return names.map((name) => ({ name, text: readFileSync(join(dir, name), "utf8") }));
 }
 
 const percent = (score: GoldenScore): string =>
@@ -88,12 +49,7 @@ function line(score: GoldenScore): string {
 
 function printReport(report: GoldenReport, chosen: ModeChoice, dir: string): void {
   console.log(`directorio: ${dir}`);
-  if (chosen.mode === "lexico") {
-    console.log("modo: léxico (sin embeddings)");
-  } else {
-    const failed = chosen.failed > 0 ? `, ${chosen.failed} fallidas` : "";
-    console.log(`modo: semántico (${chosen.embedded} memorias embebidas${failed})`);
-  }
+  console.log(modeLine(chosen));
 
   console.log(`global: ${line(report.global)}`);
   console.log("por tipo:");
@@ -143,12 +99,15 @@ async function main(): Promise<void> {
   try {
     const at = Date.now();
     const ids = loadGolden(db, corpus, at);
-    const chosen = await chooseMode(db, args.mode);
+    const chosen = await chooseMode(args.mode, {
+      embed: () => embedPendingMemories(db),
+      embedded: () => getEmbeddingIndexStatus(db, loadEmbeddingConfig().model).embedded,
+    });
     const embedFn = chosen.mode === "lexico" ? lexicalOnly : undefined;
     const report = await runGolden(db, corpus, ids, { limit: args.limit, embedFn, at });
 
     if (args.json) {
-      console.log(JSON.stringify({ mode: chosen.mode, ...report }, null, 2));
+      console.log(JSON.stringify(jsonPayload(chosen, report), null, 2));
       return;
     }
     printReport(report, chosen, dir);

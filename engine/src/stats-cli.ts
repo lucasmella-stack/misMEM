@@ -1,10 +1,8 @@
 #!/usr/bin/env node
-/**
- * mismem-stats CLI: reporta métricas básicas de la DB en formato texto o JSON.
- *
- * Usado por consumers externos para mostrar el estado de la memoria.
- */
-import { openDefaultDb, defaultDbPath } from "./db.js";
+// mismem-stats: reports basic database metrics as text or JSON, for external consumers that
+// show the state of the memory.
+import { openDefaultDb, defaultDbPath } from "./store/db.js";
+import { statsSummary } from "./queries/stats.js";
 import { ArgsError, EXIT_USAGE } from "./cli-args.js";
 import { parseStatsArgs } from "./stats-args.js";
 
@@ -59,32 +57,7 @@ async function main(): Promise<void> {
 
   const db = openDefaultDb();
   try {
-    const scopeFilter = opts.scope ? `WHERE scope LIKE ?` : "";
-    const scopeParam: unknown[] = opts.scope ? [`${opts.scope}%`] : [];
-
-    const epTotal = db.prepare(`SELECT COUNT(*) AS n FROM episodes ${scopeFilter}`).get(...scopeParam) as { n: number };
-    const epUnc = db
-      .prepare(`SELECT COUNT(*) AS n FROM episodes WHERE consolidated_into IS NULL ${opts.scope ? "AND scope LIKE ?" : ""}`)
-      .get(...scopeParam) as { n: number };
-    const memTotal = db.prepare(`SELECT COUNT(*) AS n FROM memories ${scopeFilter}`).get(...scopeParam) as { n: number };
-    const trTotal = db.prepare(`SELECT COUNT(*) AS n FROM traits ${scopeFilter}`).get(...scopeParam) as { n: number };
-    const scopes = db
-      .prepare(`SELECT scope, COUNT(*) AS count FROM episodes ${scopeFilter} GROUP BY scope ORDER BY count DESC LIMIT 20`)
-      .all(...scopeParam) as { scope: string; count: number }[];
-    const range = db
-      .prepare(`SELECT MIN(created_at) AS min_ts, MAX(created_at) AS max_ts FROM episodes ${scopeFilter}`)
-      .get(...scopeParam) as { min_ts: number | null; max_ts: number | null };
-
-    const stats: Stats = {
-      db_path: defaultDbPath(),
-      episodes_total: epTotal.n,
-      episodes_unconsolidated: epUnc.n,
-      memories_total: memTotal.n,
-      traits_total: trTotal.n,
-      scopes,
-      oldest_episode_ts: range.min_ts,
-      newest_episode_ts: range.max_ts,
-    };
+    const stats: Stats = { db_path: defaultDbPath(), ...statsSummary(db, opts.scope) };
 
     if (opts.json) {
       console.log(JSON.stringify(stats, null, 2));
