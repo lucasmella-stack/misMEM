@@ -10,7 +10,7 @@
 
 - Cada resultado trae `date` legible en UTC, los `details` de una memoria, la `polarity` de un rasgo cuando
   no es neutra y `truncated` si un texto se recortó (2.000 caracteres de `text`, 1.200 de `details`). Las
-  respuestas MCP van sin indentación. Los alias `mem_*`, el visor y su API no cambian.
+  respuestas MCP van sin indentación. Los alias `mem_*` conservan sus campos y también van sin indentación; el visor y su API no cambian.
 
 ### La suite de tests ya no llama al servidor de embeddings de quien la corre, y hay una suite que sí lo prueba
 
