@@ -5,6 +5,7 @@ import { capture } from "../src/memory/capture.js";
 import { consolidate } from "../src/memory/consolidate.js";
 import { crystallize } from "../src/memory/crystallize.js";
 import { recall, recallHybrid } from "../src/recall/recall.js";
+import { saveLayerEmbedding } from "../src/embeddings/layers.js";
 import { embedPendingMemories, saveMemoryEmbedding } from "../src/embeddings/store.js";
 import type { EmbedFn } from "../src/embeddings/provider.js";
 
@@ -520,6 +521,27 @@ describe("recall híbrido: el rescate sólo cuando no hay capa semántica", () =
       { reinforce: false, embeddingModel: "fake" },
     );
 
+    expect(result.hits.map((hit) => hit.id)).toContain(episode);
+  });
+
+  it("sin vectores de memoria, un vector de episodio no apaga el rescate", async () => {
+    // The episode got its vector at capture while the memories were never indexed (the
+    // embeddings were switched on later). With the rescue tied to any layer vector, the
+    // strict query misses the memory and the episode vector has no memory to compare, so
+    // the memory would disappear from the result.
+    const id = memory("dev", "configurar servidor nginx");
+    const episode = capture(db, { scope: "dev", body: "despliegue nocturno del proxy" }).id;
+    saveLayerEmbedding(db, "episode", episode, "fake", Float32Array.from([1, 0]));
+    const embed: EmbedFn = async (texts) => texts.map(() => Float32Array.from([1, 0]));
+
+    const result = await recallHybrid(
+      db,
+      { query: "configurando servidores nginx", limit: 5 },
+      embed,
+      { reinforce: false, embeddingModel: "fake" },
+    );
+
+    expect(result.hits.map((hit) => hit.id)).toContain(id);
     expect(result.hits.map((hit) => hit.id)).toContain(episode);
   });
 

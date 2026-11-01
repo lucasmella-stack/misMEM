@@ -58,10 +58,10 @@ Un rasgo exige 0,06 de margen sobre el corte y un episodio pendiente 0,01, porqu
 parece a cualquier pregunta de su tema. Cuando hay vectores, el resultado se queda con el mejor rasgo y como
 mucho dos episodios por consulta, elegidos por coseno antes de la fusión: una coincidencia exacta de palabras
 no puede adelantar a un rasgo o un episodio que está más cerca por significado. Sin ese tope, los rasgos y los
-episodios desplazaban a la memoria concreta que responde. Si la capa semántica está encendida pero ningún
-vector de esa capa pasa su margen (por ejemplo tras cambiar de modelo, antes de que `mismem-embed` reindexe),
-el tope se queda con los primeros candidatos léxicos de la capa. El modo léxico, sin vectores, no aplica el
-tope.
+episodios desplazaban a la memoria concreta que responde. Si la capa semántica está encendida porque las
+memorias ya tienen vector del modelo activo pero esa capa todavía no (por ejemplo justo después de actualizar,
+antes del primer `mismem-embed`), el tope se queda con los primeros candidatos léxicos de la capa. El modo
+léxico, sin vectores, no aplica el tope.
 Backfill y reindexado: `mismem-embed` (`--status`, `--force`), que recorre memorias, rasgos y episodios
 pendientes. Los vectores se normalizan a norma 1
 al entrar. Un vector con un componente no finito o con norma cero sólo se pierde a sí mismo: sus
