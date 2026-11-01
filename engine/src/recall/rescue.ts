@@ -268,10 +268,10 @@ export function relaxRows<T extends RankedCandidate>(rows: T[], plan: RelaxedPla
   // Both sides use the same deduplicated set, capped alike: words absent everywhere keep
   // their place in the denominator even though they are dropped from the search.
   if (plan.present / plan.wordCount < RELAXED_MIN_PRESENT_RATIO) return [];
-  // A one-word query cannot reach two matches; anything else asks for two. The exception
-  // is the original query having one word, not the plan keeping one term: two forms of the
-  // same word dedupe to a single prefix and must still count as one coincidence, or
-  // "decidir decision" rescues a memory that only says "decision".
+  // A one-word question cannot reach two matches; anything else asks for two. "One word" is
+  // one content word left after the stopwords and rescue fillers ("¿qué podemos hacer con el
+  // despliegue?" has one), not the plan keeping one term: two forms of a word dedupe to one
+  // prefix and still count as two words, or "decidir decision" rescues "decision" alone.
   const singleWord = plan.distinctWords === 1;
   const required = singleWord ? 1 : RELAXED_MIN_INFORMATIVE;
   // A one-word query has only one term to match, so asking for two rare ones would make
