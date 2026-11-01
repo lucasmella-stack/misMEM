@@ -195,6 +195,26 @@ describe("parseGolden", () => {
 });
 
 describe("loadGolden", () => {
+  it("resuelve la evidencia de un rasgo que apunta a otro rasgo listado después", () => {
+    const corpus = parseGolden([
+      {
+        name: "dev.jsonl",
+        text: [
+          JSON.stringify({ type: "memory", key: "m1", scope: "s", gist: "x", days_ago: 1 }),
+          JSON.stringify({ type: "trait", key: "t1", scope: "s", name: "uno", evidence: ["t2"] }),
+          JSON.stringify({ type: "trait", key: "t2", scope: "s", name: "dos", evidence: ["m1"] }),
+        ].join("\n"),
+      },
+    ]);
+
+    const ids = loadGolden(db, corpus, AT);
+
+    const row = db.prepare("SELECT evidence_memory_ids FROM traits WHERE id = ?").get(ids.get("t1")) as {
+      evidence_memory_ids: string;
+    };
+    expect(JSON.parse(row.evidence_memory_ids)).toEqual([ids.get("t2")]);
+  });
+
   it("inserta las memorias con su antigüedad, su saliencia y un episodio consolidado", () => {
     const corpus = parseGolden(FILES);
     const ids = loadGolden(db, corpus, AT);

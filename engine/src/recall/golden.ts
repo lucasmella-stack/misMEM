@@ -69,7 +69,11 @@ export function loadGolden(db: DB, corpus: GoldenCorpus, at: number): Map<string
       }
     }
 
-    // Second pass: evidence may point at a memory from another file.
+    // Second pass: evidence may point at a memory from another file, or at a trait listed later,
+    // so every trait id is known before any evidence is resolved.
+    for (const records of Object.values(corpus.domains)) {
+      for (const record of records) if (record.type === "trait") ids.set(record.key, goldenId(record.key));
+    }
     for (const records of Object.values(corpus.domains)) {
       for (const record of records) {
         if (record.type !== "trait") continue;

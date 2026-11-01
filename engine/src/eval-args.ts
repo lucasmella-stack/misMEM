@@ -1,5 +1,5 @@
 /**
- * Arguments for mismem-eval, kept apart from the CLI because the CLI runs on import.
+ * Arguments for the golden eval CLI (`pnpm eval`), kept apart from the CLI because the CLI runs on import.
  */
 import { ArgsError, flagNumber, flagValue } from "./cli-args.js";
 

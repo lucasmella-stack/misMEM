@@ -74,7 +74,8 @@ quedan fuera (`engine/src/domain/noise.ts`).
 | CLIs | `mismem-http` (el mismo servidor HTTP que `pnpm start:http`), `mismem-ingest` (exports de ChatGPT y transcripts de VS Code), `mismem-consolidate`, `mismem-forget`, `mismem-stats`, `mismem-embed`, `mismem-migrate-engram` (una base de Engram a episodios, con `ingest/engram.ts`), `mismem-bench` (mide el recall con un banco de preguntas propio, sin reforzar), `mismem-obsidian` y los dos hooks, `mismem-inject` y `mismem-used` |
 
 El eval dorado no es un binario: su corpus vive en `engine/eval/golden/` y se corre desde el repositorio con
-`pnpm eval` (léxico) o, tras `pnpm build`, con `node dist/eval-cli.js` (semántico). No viaja en el paquete npm.
+`pnpm eval --mode lexico` o, tras `pnpm build`, con `node dist/eval-cli.js --mode semantico`; sin `--mode`
+elige el semántico en cuanto responde un servidor de embeddings. No viaja en el paquete npm.
 Su validación está en `engine/src/recall/golden-corpus.ts` y su carga y medición en `recall/golden.ts`.
 
 `mismem-obsidian` escribe la memoria como bóveda de Obsidian en `<bóveda>/misMEM/`: una nota por memoria,
