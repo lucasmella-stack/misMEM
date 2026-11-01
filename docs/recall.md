@@ -60,6 +60,22 @@ backfill (`mismem-embed`); cambiar un prefijo no se detecta y exige `mismem-embe
 variables, con sus defaults, están en
 [DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única).
 
+## Qué devuelve
+
+Cada hit lleva `layer`, `id`, `scope`, su `text`, `created_at` tal cual lo guarda la base y, cuando la
+búsqueda los trae, `salience` y `via`. El `recall` por MCP añade además:
+
+- `date`: `created_at` como YYYY-MM-DD en UTC, para que el modelo lea una fecha y no un epoch. Se omite
+  cuando el valor no es finito, cae fuera del rango de `Date` o su año no cabe en cuatro cifras (un epoch
+  en microsegundos, por ejemplo).
+- `details`: el detalle destilado de una memoria. Se omite cuando está vacío.
+- `polarity`: la polaridad de un rasgo, `shadow` o `light`. Se omite cuando es `neutral`, porque la
+  ausencia ya es el caso neutro.
+
+Dos topes, en puntos de código y con los puntos suspensivos dentro del tope: 2.000 en `text` y 1.200 en
+`details`. Cuando alguno se recorta, el hit lleva `truncated: true` sin decir cuál. La copia entera, que no
+se recorta, se lee con `mem_get_observation` y el id del hit.
+
 ## Medirlo
 
 `mismem-bench` informa la posición del acierto (MRR, 1ª, entre las 3), los recuerdos devueltos por

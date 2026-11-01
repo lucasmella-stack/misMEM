@@ -103,6 +103,12 @@
   —`consolidated_into` guarda un id—, así que la primera se lo queda y la segunda busca otra evidencia;
   sin ninguna, se salta con su línea de log y la corrida sigue.
 
+### `recall` por MCP le da al modelo la fecha, los detalles y la polaridad (#153)
+
+- Cada resultado trae `date` legible en UTC, los `details` de una memoria, la `polarity` de un rasgo cuando
+  no es neutra y `truncated` si un texto se recortó (2.000 caracteres de `text`, 1.200 de `details`). Las
+  respuestas MCP van sin indentación. Los alias `mem_*` conservan sus campos y también van sin indentación; el visor y su API no cambian.
+
 ## 0.8.0 — 2026-11-01
 
 ### El README describe el sistema: sin modelos concretos y sin una lista cerrada de clientes
@@ -167,7 +173,6 @@
 - Encontrado empaquetando con `pnpm pack` e instalando en un directorio limpio, que es lo que hace
   cualquiera: dentro del repo el fallo era invisible.
 
-
 ### Salir del visor desde la propia interfaz
 
 - Un botón de icono al lado de *Consolidar ahora*, para poder cerrar la sesión sin borrar cookies a mano
@@ -176,7 +181,6 @@
   ellas el visor es abierto y el botón prometería algo que no existe.
 - No usa un formulario: la CSP del visor fija `form-action 'none'`, así que el botón llama a `POST /logout`
   y luego navega.
-
 
 ### El refuerzo escribía pocos pares, y la capa lateral sólo aprende de pares
 
@@ -317,7 +321,6 @@
   **de 6,0 s a 1,3 s** el caso que fallaba, y de 2,8 s a 0,7 s el otro. Además cada caso recibe el
   mismo presupuesto que ya le concedía a su subproceso, 60 s, en vez de los 5 s por defecto: el
   test se daba a sí mismo doce veces menos tiempo del que le daba al proceso que lanzaba.
-
 
 ## 0.7.0 — 2026-10-31
 
@@ -613,7 +616,6 @@
 ### zod 4
 
 - zod pasa de 3.25.76 a 4.6.7 (versión exacta): `.int()` rechaza enteros fuera del rango seguro de JS (y el `inputSchema` de `forget` lo anuncia), los límites de longitud cuentan *code points* en vez de unidades UTF-16 y cambian los textos de `ZodError`; `tests/tool-schemas.test.ts` compara con `z.toJSONSchema` en vez de leer internos de zod 3.
-
 
 ### Un solo diálogo de confirmación en el detalle
 
@@ -916,7 +918,6 @@
 - El resumen informa `episodes_uncited_pending`.
 - Migración aditiva: `episodes.uncited_count` arranca en 0 para todo lo que ya existe.
 
-
 ### Una preferencia corta ya no se descarta antes del LLM
 
 - El pre-filtro Pareto mandaba a L0 (ruido, sin pasar por el LLM) cualquier texto de menos de 40
@@ -924,7 +925,6 @@
   densidad sólo reconocían código y decisiones.
 - Se agregaron patrones de preferencia (`prefiero`, `uso`, `me gusta`, `dejé de`, `en vez de`,
   `elijo`, `mejor que`…), así que una preferencia breve suma densidad y llega al LLM.
-
 
 ### Los marcadores de ruido ya no compiten en el recall
 
@@ -937,7 +937,6 @@
 - Medido con `mismem-bench` sobre la copia de producción, con el servidor de embeddings arriba:
   `parafrasis` sube de 56/80 (70 %) a 58/80 (73 %), `literal` queda en 78/80 y las ajenas en 0/10.
   Los marcadores que llegaban al tope pasan de 43 a 0: ocupaban lugares que ahora son memorias reales.
-
 
 ### La saliencia puede seguir el uso en vez de la aparición
 
@@ -959,7 +958,6 @@
   dos partieran el texto distinto, un recuerdo se encontraría con unas palabras y se daría por
   usado con otras.
 
-
 ### misMEM puede adelantar recuerdos antes de que el modelo los pida
 
 - El modelo sólo recuerda lo que pide: si no llama a `recall`, no recuerda. `mismem-inject` es un
@@ -972,7 +970,6 @@
   de `MISMEM_HOOK_EXCLUDE_SCOPES`. Un prompt sin dos palabras con sustancia ni gasta la llamada.
 - **Lo inyectado viaja en cada prompt al proveedor del modelo.** `DEPLOY.md` explica cómo excluir
   los ámbitos personales y cómo revisar con `--dry-run`, que imprime ids y ámbitos pero no el texto.
-
 
 ### El bench dice dónde cayó el acierto, no sólo si cayó
 
@@ -997,7 +994,6 @@
 
   Ajenas 0/10 y 4,8 recuerdos devueltos de 5. Lo que el recall@5 no mostraba: con paráfrasis, un
   cliente que muestra 3 recuerdos encuentra 52 de 80 (65 %), no 73 %.
-
 
 ## 0.4.0 — 2026-10-12
 
