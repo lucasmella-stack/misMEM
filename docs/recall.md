@@ -64,9 +64,18 @@ variables, con sus defaults, están en
 
 ## Qué devuelve
 
-Una búsqueda con resultados responde `{ hits }`: los traits primero, después las memories y después los
-episodes, cada uno con su capa, su ámbito, la fecha UTC y `truncated` cuando un texto se recortó (2.000
-caracteres de `text`, 1.200 de `details`). Un hit `truncated` se lee entero con `mem_get_observation` y su id.
+Cada hit lleva `layer`, `id`, `scope`, su `text`, `created_at` tal cual lo guarda la base y, cuando la
+búsqueda los trae, `salience` y `via`. El `recall` por MCP añade además:
+
+- `date`: `created_at` como YYYY-MM-DD en UTC, para que el modelo lea una fecha y no un epoch. Se omite
+  cuando el valor no es finito o cae fuera del rango de `Date`.
+- `details`: el detalle destilado de una memoria. Se omite cuando está vacío.
+- `polarity`: la polaridad de un rasgo, `shadow` o `light`. Se omite cuando es `neutral`, porque la
+  ausencia ya es el caso neutro.
+
+Dos topes, en puntos de código y con los puntos suspensivos dentro del tope: 2.000 en `text` y 1.200 en
+`details`. Cuando alguno se recorta, el hit lleva `truncated: true` sin decir cuál. La copia entera, que no
+se recorta, se lee con `mem_get_observation` y el id del hit.
 
 Una búsqueda sin resultados añade dos campos, tanto en `recall` como en el alias `mem_search`,
 porque un ámbito mal escrito y una memoria vacía se parecen demasiado:

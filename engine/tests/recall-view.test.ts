@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Database as DB } from "better-sqlite3";
 import { openDb } from "../src/store/db.js";
 import {
@@ -57,34 +57,47 @@ const hit = (partial: Partial<RecallHit> & Pick<RecallHit, "layer" | "id">): Rec
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 
 describe("recallForModel", () => {
-  it("adds a UTC date, keeps created_at, via and the order of the hits", () => {
-    const db = openDb(":memory:");
-    insertMemory(db, { id: "m1", gist: "gist", salience: 0.834 });
-    insertTrait(db, "t1", "prefers small PRs", "shadow");
-    insertEpisode(db, { id: "e1", body: "raw note" });
+  describe("in a host zone far from UTC", () => {
+    const hostTz = process.env.TZ;
+    // A host in UTC would pass the date test even with a local-time formatter, so it runs 14
+    // hours ahead, where the fixed clock below falls on the next day.
+    beforeEach(() => {
+      process.env.TZ = "Pacific/Kiritimati";
+    });
+    afterEach(() => {
+      if (hostTz === undefined) delete process.env.TZ;
+      else process.env.TZ = hostTz;
+    });
 
-    const hits: RecallHitView[] = recallForModel(db, [
-      hit({ layer: "memory", id: "m1", salience: 0.834, via: "semantic" }),
-      hit({ layer: "trait", id: "t1", text: "prefers small PRs" }),
-      hit({ layer: "episode", id: "e1", text: "raw note" }),
-    ]);
+    it("adds a UTC date, keeps created_at, via and the order of the hits", () => {
+      const db = openDb(":memory:");
+      insertMemory(db, { id: "m1", gist: "gist", salience: 0.834 });
+      insertTrait(db, "t1", "prefers small PRs", "shadow");
+      insertEpisode(db, { id: "e1", body: "raw note" });
 
-    expect(hits.map((h) => h.id)).toEqual(["m1", "t1", "e1"]);
-    for (const h of hits) {
-      expect(h.date).toBe("2026-10-30");
-      expect(h.created_at).toBe(AT);
-    }
-    expect(hits[0]?.salience).toBe(0.834);
-    expect(hits[0]?.via).toBe("semantic");
-    expect(hits[1]?.salience).toBeUndefined();
-    expect(hits[2]?.salience).toBeUndefined();
-    db.close();
+      const hits: RecallHitView[] = recallForModel(db, [
+        hit({ layer: "memory", id: "m1", salience: 0.834, via: "semantic" }),
+        hit({ layer: "trait", id: "t1", text: "prefers small PRs" }),
+        hit({ layer: "episode", id: "e1", text: "raw note" }),
+      ]);
+
+      expect(hits.map((h) => h.id)).toEqual(["m1", "t1", "e1"]);
+      for (const h of hits) {
+        expect(h.date).toBe("2026-10-30");
+        expect(h.created_at).toBe(AT);
+      }
+      expect(hits[0]?.salience).toBe(0.834);
+      expect(hits[0]?.via).toBe("semantic");
+      expect(hits[1]?.salience).toBeUndefined();
+      expect(hits[2]?.salience).toBeUndefined();
+      db.close();
+    });
   });
 
   it("omits date when created_at is not a usable epoch, without failing the whole recall", () => {
     const db = openDb(":memory:");
     const hits = recallForModel(db, [
-      // Not finite: the historical shape of a row written in seconds by hand or by a third party.
+      // Not finite: what a corrupted row holds, and there is no date to report for it.
       hit({ layer: "episode", id: "nan", created_at: Number.NaN }),
       // Finite but out of Date's range, so toISOString would throw RangeError.
       hit({ layer: "episode", id: "huge", created_at: Number.MAX_VALUE }),
