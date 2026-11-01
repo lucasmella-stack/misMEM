@@ -252,16 +252,22 @@ export function layerIndexStatus(
   };
 }
 
+interface PendingLayerRow extends BatchRow {
+  id: string;
+  text: string;
+}
+
+export interface PendingLayerRows {
+  traits: PendingLayerRow[];
+  episodes: PendingLayerRow[];
+}
+
 /**
- * Embeds the traits and pending episodes without a vector or with a stale model
- * (idempotent). It runs inside the memory backfill, so a caller that backfills memories
- * never leaves the other two layers without vectors.
+ * Reads the traits and pending episodes without a vector or with a stale model, without
+ * embedding anything. The memory backfill calls this before spending its cap so it can
+ * reserve room for them; embedding the rows is the second step.
  */
-export async function embedPendingLayersResolved(
-  db: DB,
-  opts: ResolvedEmbedOptions,
-  maxRows: number,
-): Promise<{ pending: number; embedded: number; failed: number }> {
+export function pendingLayerRows(db: DB, opts: ResolvedEmbedOptions): PendingLayerRows {
   const needsEmbedding = [
     "e.item_id IS NULL",
     "e.model <> @model",
@@ -286,7 +292,7 @@ export async function embedPendingLayersResolved(
        LEFT JOIN layer_embeddings e ON e.layer = 'trait' AND e.item_id = t.id
        WHERE (${staleTrait}) ${opts.scope ? "AND t.scope = @scope" : ""}`,
     )
-    .all(params) as Array<{ id: string; text: string; had_embedding: number }>;
+    .all(params) as PendingLayerRow[];
   const pendingEpisodes = db
     .prepare(
       `SELECT ep.id, ep.body AS text, e.item_id IS NOT NULL AS had_embedding
@@ -295,12 +301,25 @@ export async function embedPendingLayersResolved(
        WHERE ep.consolidated_into IS NULL
          AND (${staleEpisode}) ${opts.scope ? "AND ep.scope = @scope" : ""}`,
     )
-    .all(params) as Array<{ id: string; text: string; had_embedding: number }>;
+    .all(params) as PendingLayerRow[];
 
-  const traitRows = pendingTraits.slice(0, maxRows);
-  const episodeRows = pendingEpisodes.slice(0, Math.max(0, maxRows - traitRows.length));
+  return { traits: pendingTraits, episodes: pendingEpisodes };
+}
+
+/**
+ * Embeds the traits and pending episodes already read, up to `maxRows` (traits first).
+ * Idempotent: the next pass picks up whatever did not fit.
+ */
+export async function embedLayerRowsResolved(
+  db: DB,
+  opts: ResolvedEmbedOptions,
+  pending: PendingLayerRows,
+  maxRows: number,
+): Promise<{ pending: number; embedded: number; failed: number }> {
+  const traitRows = pending.traits.slice(0, maxRows);
+  const episodeRows = pending.episodes.slice(0, Math.max(0, maxRows - traitRows.length));
   const stats: { pending: number; embedded: number; failed: number } = {
-    pending: pendingTraits.length + pendingEpisodes.length,
+    pending: pending.traits.length + pending.episodes.length,
     embedded: 0,
     failed: 0,
   };

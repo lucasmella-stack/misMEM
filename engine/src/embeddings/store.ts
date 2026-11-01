@@ -8,8 +8,9 @@ import {
   type ResolveOptions,
 } from "./batch.js";
 import {
-  embedPendingLayersResolved,
+  embedLayerRowsResolved,
   layerIndexStatus,
+  pendingLayerRows,
   type LayerIndexStatus,
 } from "./layers.js";
 import {
@@ -273,7 +274,16 @@ export async function embedPendingMemories(
           ...pendingRows.filter((row) => priority.has(row.id)),
           ...pendingRows.filter((row) => !priority.has(row.id)),
         ];
-  const selectedRows = orderedRows.slice(0, budget);
+  // Read the other two layers first: a memory backlog at least as long as the cap would
+  // otherwise spend it all every pass and traits and episodes would never get a vector.
+  const pendingLayers = pendingLayerRows(db, resolved);
+  const layerPending = pendingLayers.traits.length + pendingLayers.episodes.length;
+  // Reserve a quarter of the cap for them, never more than they need, and at least one row
+  // for any finite cap; memories take the rest.
+  const reserved = Number.isFinite(budget)
+    ? Math.min(Math.ceil(budget / 4), layerPending)
+    : layerPending;
+  const selectedRows = orderedRows.slice(0, budget - reserved);
   const memories = await embedInBatches(
     selectedRows,
     resolved.embedFn,
@@ -286,8 +296,14 @@ export async function embedPendingMemories(
   );
 
   // Traits and pending episodes follow the same run: a caller that backfills memories
-  // never leaves the other two layers without vectors.
-  const layers = await embedPendingLayersResolved(db, resolved, budget - selectedRows.length);
+  // never leaves the other two layers without vectors. Whatever the memories did not use
+  // (backlog shorter than their share) returns to them here, so the cap is never exceeded.
+  const layers = await embedLayerRowsResolved(
+    db,
+    resolved,
+    pendingLayers,
+    budget - selectedRows.length,
+  );
   return { pending: pendingRows.length, ...memories, layers };
 }
 

@@ -17,7 +17,9 @@
   vectores que describen otro texto: se reembeben solos en el siguiente `mismem-embed`, sin `--force`. Las filas
   anteriores a la columna se reembeben una sola vez, así que conviene correr `mismem-embed` una vez tras
   actualizar. Los backfills que se disparan solos (la herramienta `consolidate`, una edición desde el visor y la
-  consolidación nocturna) procesan como mucho 64 filas por llamada y dejan el resto para la siguiente pasada;
+  consolidación nocturna) procesan como mucho 64 filas por llamada y dejan el resto para la siguiente pasada.
+  Dentro de ese tope reservan hasta una cuarta parte para rasgos y episodios pendientes, de modo que un backlog
+  de memorias no los deje nunca sin vector; si no hay capas pendientes, las memorias gastan el tope entero.
   `mismem-embed` no tiene tope. Cambiar `MISMEM_EMBEDDING_QUERY_PREFIX` no invalida ningún vector guardado.
 - Una edición desde el visor embebe su memoria antes que el resto del backlog, dentro del mismo tope de 64
   filas, y sólo responde `reembedded: true` si el vector existe al terminar. Antes, con más de 64 pendientes,

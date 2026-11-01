@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Database as DB } from "better-sqlite3";
 import { openDb } from "../src/store/db.js";
@@ -88,6 +88,50 @@ describe("acciones sobre memorias", () => {
 
     expect(out).toEqual({ id: memoryId, reembedded: true });
     expect(count("SELECT COUNT(*) AS n FROM memory_embeddings WHERE memory_id = ?", memoryId)).toBe(1);
+  });
+
+  describe("el tope del reembebido automático", () => {
+    const KEYS = [
+      "MISMEM_EMBEDDINGS",
+      "MISMEM_EMBEDDING_URL",
+      "MISMEM_EMBEDDING_MODEL",
+    ] as const;
+    let saved: Record<string, string | undefined>;
+
+    beforeEach(() => {
+      saved = Object.fromEntries(KEYS.map((key) => [key, process.env[key]]));
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      for (const key of KEYS) {
+        if (saved[key] === undefined) delete process.env[key];
+        else process.env[key] = saved[key];
+      }
+    });
+
+    it("la edición desde el visor no deja el reembebido sin tope", async () => {
+      for (let i = 0; i < 70; i++) memoryFrom("a", `pendiente ${i}`, [`p${i}`]);
+      const { memoryId } = memoryFrom("a", "texto viejo", ["e1"]);
+      const sent: string[] = [];
+      // The default path reads the embedder from the environment: stubbing fetch is what
+      // lets the real `editMemory` default see a working server instead of injecting one.
+      vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+        const { input } = JSON.parse(init.body) as { input: string[] };
+        sent.push(...input);
+        const data = input.map((_, index) => ({ index, embedding: [1, 0] }));
+        return new Response(JSON.stringify({ data }));
+      });
+      process.env.MISMEM_EMBEDDINGS = "1";
+      process.env.MISMEM_EMBEDDING_URL = "http://embed.test";
+      process.env.MISMEM_EMBEDDING_MODEL = "fake";
+
+      const out = await editMemory(db, memoryId, { gist: "texto nuevo" });
+
+      expect(out).toEqual({ id: memoryId, reembedded: true });
+      expect(sent).toHaveLength(64);
+      expect(count("SELECT COUNT(*) AS n FROM memory_embeddings")).toBe(64);
+    });
   });
 
   it("con el embedder caído la edición se guarda pero no dice que reembebió", async () => {

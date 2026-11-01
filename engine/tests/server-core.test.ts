@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Database as DB } from "better-sqlite3";
@@ -95,6 +95,45 @@ describe("MCP tool dispatch", () => {
     expect(mem).toEqual({ gist: "distilled gist" });
     const src = db.prepare("SELECT consolidated_into FROM episodes WHERE id = ?").get(ep.id);
     expect(src).toEqual({ consolidated_into: r.memory_id });
+  });
+
+  it("el backfill que sigue a consolidate respeta el tope de 64", async () => {
+    const insert = db.prepare(
+      "INSERT INTO memories (id, scope, gist, source_episode_ids, created_at) VALUES (?, ?, ?, '[]', ?)",
+    );
+    for (let i = 0; i < 70; i++) insert.run(`pending-${i}`, "p/a", `pending ${i}`, Date.now());
+    const ep = await ok<{ id: string }>("capture", { scope: "p/a", body: "raw note" });
+
+    const keys = ["MISMEM_EMBEDDINGS", "MISMEM_EMBEDDING_URL", "MISMEM_EMBEDDING_MODEL"] as const;
+    const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+    const sent: string[] = [];
+    // The tool's trailing backfill takes no embedder argument, so the only way to watch it
+    // is the default path: environment config plus a stubbed HTTP server.
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      const { input } = JSON.parse(init.body) as { input: string[] };
+      sent.push(...input);
+      const data = input.map((_, index) => ({ index, embedding: [1, 0] }));
+      return new Response(JSON.stringify({ data }));
+    });
+    process.env.MISMEM_EMBEDDINGS = "1";
+    process.env.MISMEM_EMBEDDING_URL = "http://embed.test";
+    process.env.MISMEM_EMBEDDING_MODEL = "fake";
+    try {
+      await ok("consolidate", {
+        scope: "p/a",
+        gist: "distilled under a backlog",
+        source_episode_ids: [ep.id],
+      });
+    } finally {
+      vi.unstubAllGlobals();
+      for (const key of keys) {
+        if (saved[key] === undefined) delete process.env[key];
+        else process.env[key] = saved[key];
+      }
+    }
+
+    expect(sent).toHaveLength(64);
+    expect(count("SELECT COUNT(*) AS n FROM memory_embeddings")).toBe(64);
   });
 
   it("reinforce raises the salience of the memory it names", async () => {

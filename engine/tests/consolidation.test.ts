@@ -615,6 +615,24 @@ describe("runConsolidation", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("el backfill de la corrida nocturna respeta el tope de 64", async () => {
+    const insert = db.prepare(
+      "INSERT INTO memories (id, scope, gist, source_episode_ids, created_at) VALUES (?, 's', ?, '[]', ?)",
+    );
+    for (let i = 0; i < 70; i++) insert.run(`pending-${i}`, `pendiente ${i}`, Date.now());
+    const seen: string[] = [];
+    const embedFn = vi.fn(async (texts: string[]) => {
+      seen.push(...texts);
+      return texts.map(() => Float32Array.from([1, 0]));
+    });
+
+    await runConsolidation(db, { llm: llmCfg, embedFn, log: () => {} });
+
+    expect(seen).toHaveLength(64);
+    const stored = db.prepare("SELECT COUNT(*) AS n FROM memory_embeddings").get() as { n: number };
+    expect(stored.n).toBe(64);
+  });
+
   it("respeta el tope de llamadas por corrida y deja el resto para la próxima", async () => {
     const ids: string[] = [];
     for (const scope of ["a", "b", "c"]) {

@@ -358,6 +358,31 @@ describe("embedPendingMemories", () => {
     expect(second.layers).toEqual({ pending: 1, embedded: 1, failed: 0 });
   });
 
+  it("con un backlog de memorias que llena el tope, los rasgos conservan su reserva", async () => {
+    const source = makeMemory("vida", "cashflow fuente");
+    for (let i = 0; i < 99; i++) makeMemory("vida", `cashflow pendiente ${i}`);
+    for (let i = 0; i < 10; i++) {
+      crystallize(db, { scope: "vida", name: `rasgo de dinero ${i}`, evidence_memory_ids: [source] });
+    }
+
+    const r = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake", maxRows: 64 });
+
+    // The reservation is a quarter of the cap, capped by what the layers actually need:
+    // memories keep the other 54 rows, so the run still stops at 64.
+    expect(r).toMatchObject({ pending: 100, embedded: 54 });
+    expect(r.layers).toEqual({ pending: 10, embedded: 10, failed: 0 });
+    expect(r.embedded + r.layers.embedded).toBe(64);
+  });
+
+  it("sin rasgos ni episodios pendientes, las memorias gastan el tope entero", async () => {
+    for (let i = 0; i < 100; i++) makeMemory("vida", `cashflow pendiente ${i}`);
+
+    const r = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake", maxRows: 64 });
+
+    expect(r).toMatchObject({ pending: 100, embedded: 64 });
+    expect(r.layers).toEqual({ pending: 0, embedded: 0, failed: 0 });
+  });
+
   it("permite reindexar explícitamente el mismo modelo con --force", async () => {
     makeMemory("vida", "cashflow del mes");
     await embedPendingMemories(db, {
