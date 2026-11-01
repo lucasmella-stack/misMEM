@@ -71,7 +71,8 @@ al entrar. Un vector con un componente no finito o con norma cero sólo se pierd
 compañeros de lote se guardan igual. En cambio, un vector sin dimensiones o un lote con dimensiones
 mezcladas descarta el lote entero a propósito, como si el servidor no hubiera respondido, en vez de
 guardar vectores que nunca puntuarían. Una tanda entera de vectores inválidos cuenta como fallida, y
-dos seguidas abortan la corrida como si el servidor estuviera caído. El backfill reescribe además los
+dos seguidas cortan esa pasada (memorias, rasgos o episodios) como si el servidor estuviera caído; la pasada
+de la capa siguiente lo vuelve a intentar. El backfill reescribe además los
 vectores inválidos que una versión anterior ya había guardado. `--status` cuenta esos vectores
 inválidos en `invalid`, sin los marcadores de ruido, que el backfill nunca reescribe.
 

@@ -413,7 +413,7 @@ describe("capas semánticas en el recall", () => {
     expect(hits).toEqual([]);
   });
 
-  it("una pregunta ajena no trae rasgos ni episodios", async () => {
+  it("una pregunta sin parecido con nada no trae rasgos ni episodios", async () => {
     const source = capture(db, { scope: "dev", body: "deudas del mes" });
     const memory = consolidate(db, {
       scope: "dev",
