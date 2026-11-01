@@ -1,10 +1,16 @@
 import type { ConnectomeSummary } from "../../api";
-import { THIN_SAMPLE_TURNS, hubGlow } from "../../lib/graph";
+import { PANEL_MAX_HUBS, THIN_SAMPLE_TURNS, hubGlow } from "../../lib/graph";
 
 interface Props {
   summary: ConnectomeSummary;
   /** Label per node id: a hub shown as a ULID tells nobody anything. */
   labels: Map<string, string>;
+  /**
+   * The same reference the canvas normalizes against, and the same set it draws. Measured
+   * once outside: two maxima gave one node a full halo here and a dim dot there.
+   */
+  maxHubStrength: number;
+  drawn: ReadonlySet<string>;
   onSelect: (id: string) => void;
 }
 
@@ -12,9 +18,12 @@ interface Props {
  * The side of the connectome view: how big the sample is and which memories are worth entering
  * through. It leads with the sample because with few turns every figure below it is noise.
  */
-export function ConnectomePanel({ summary, labels, onSelect }: Props) {
-  const thin = summary.turns < THIN_SAMPLE_TURNS;
-  const max = summary.hubs[0]?.strength ?? 0;
+export function ConnectomePanel({ summary, labels, maxHubStrength, drawn, onSelect }: Props) {
+  // Turns alone never dilute the degeneracy: NPMI scores a pair seen once at the maximum no
+  // matter how long the sample runs. What tells evidence from coincidence is a pair repeating.
+  const thin = summary.max_n < 2 || summary.turns < THIN_SAMPLE_TURNS;
+  // Offering a way in that is not on screen sends the camera after a node nobody drew.
+  const visibles = summary.hubs.filter((hub) => drawn.has(hub.id));
 
   return (
     <aside className="absolute top-3 right-3 z-10 flex max-h-[calc(100%-1.5rem)] w-[min(16rem,calc(100%-1.5rem))] flex-col gap-2 overflow-y-auto rounded-lg border border-edge bg-surface-raised/95 px-3 py-2 text-xs shadow-lg backdrop-blur-sm">
@@ -33,18 +42,18 @@ export function ConnectomePanel({ summary, labels, onSelect }: Props) {
 
       {thin && (
         <p className="rounded-md border border-edge px-2 py-1.5 text-ink-muted">
-          Con {summary.turns} {summary.turns === 1 ? "turno medido" : "turnos medidos"} la fuerza
-          todavía no significa nada: dos recuerdos usados una vez, esa vez juntos, dan el máximo.
-          Se separa sola a medida que se usa.
+          {summary.max_n < 2
+            ? "Ningún par se repitió todavía: dos recuerdos usados una vez, esa vez juntos, dan el máximo. La cifra se separa cuando un par vuelve a salir junto, no con los turnos."
+            : `Con ${summary.turns} ${summary.turns === 1 ? "turno medido" : "turnos medidos"} la muestra todavía es corta para comparar unos pares con otros.`}
         </p>
       )}
 
-      {summary.hubs.length > 0 ? (
+      {visibles.length > 0 ? (
         <div className="flex flex-col gap-1">
           <h3 className="font-semibold text-ink-soft">Por dónde entrar</h3>
           <p className="text-ink-muted">Ordenados por asociación acumulada, no por vecinos.</p>
           <ul className="flex flex-col gap-0.5">
-            {summary.hubs.slice(0, 10).map((hub) => (
+            {visibles.slice(0, PANEL_MAX_HUBS).map((hub) => (
               <li key={hub.id}>
                 <button
                   type="button"
@@ -54,7 +63,7 @@ export function ConnectomePanel({ summary, labels, onSelect }: Props) {
                   <span
                     aria-hidden="true"
                     className="size-2 shrink-0 rounded-full bg-brand"
-                    style={{ opacity: 0.25 + 0.75 * hubGlow(hub.strength, max) }}
+                    style={{ opacity: 0.25 + 0.75 * hubGlow(hub.strength, maxHubStrength, hub.support) }}
                   />
                   <span className="min-w-0 flex-1 truncate text-ink-soft">
                     {labels.get(hub.id) ?? hub.id}
@@ -69,8 +78,11 @@ export function ConnectomePanel({ summary, labels, onSelect }: Props) {
         </div>
       ) : (
         <p className="text-ink-muted">
-          Todavía no hay ningún par que supere el soporte mínimo. Baja el soporte o deja que se
-          acumule uso.
+          {summary.pairs === 0
+            ? "Todavía no se midió ningún par: hace falta que un turno use dos recuerdos juntos."
+            : summary.shown === 0
+              ? `Hay ${summary.pairs} ${summary.pairs === 1 ? "par medido" : "pares medidos"}, pero ninguno entre los recuerdos que el grafo dibuja. Busca uno de ellos o quita el ámbito.`
+              : "Ningún par dibujado supera el soporte mínimo. Baja el soporte o deja que se acumule uso."}
         </p>
       )}
     </aside>

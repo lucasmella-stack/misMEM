@@ -1,5 +1,5 @@
 import type { FormEvent, RefObject } from "react";
-import { SearchIcon } from "lucide-react";
+import { LogOutIcon, SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ThemeChoice } from "@/lib/theme";
@@ -13,6 +13,7 @@ export function AppHeader({
   themeChoice,
   onThemeChange,
   onConsolidate,
+  canSignOut,
 }: {
   draft: string;
   onDraftChange: (value: string) => void;
@@ -21,6 +22,8 @@ export function AppHeader({
   themeChoice: ThemeChoice;
   onThemeChange: (choice: ThemeChoice) => void;
   onConsolidate: () => void;
+  /** Only with credentials configured: without them there is no session to end. */
+  canSignOut: boolean;
 }) {
   return (
     <header className="flex flex-wrap items-center gap-2 border-b border-edge px-3 py-2 sm:gap-3 sm:px-4">
@@ -53,6 +56,23 @@ export function AppHeader({
         <Button type="button" variant="outline" size="sm" aria-haspopup="dialog" onClick={onConsolidate}>
           Consolidar ahora
         </Button>
+        {canSignOut && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            title="Salir"
+            aria-label="Salir"
+            onClick={() => {
+              // A form would be blocked: the viewer's CSP sets form-action 'none'.
+              void fetch("/logout", { method: "POST" }).finally(() => {
+                window.location.assign("/login");
+              });
+            }}
+          >
+            <LogOutIcon aria-hidden="true" className="size-4" />
+          </Button>
+        )}
       </div>
     </header>
   );

@@ -16,18 +16,57 @@ export interface GraphFilters {
 }
 
 /**
- * Below this many measured turns the strength is noise by construction: two memories used once,
- * that once together, score 1. The panel says so instead of letting the drawing lie.
+ * Below this many measured turns the sample is too short to compare one pair with another.
+ * It does not cover a pair seen once: that one reads at the maximum however long the run.
  */
 export const THIN_SAMPLE_TURNS = 20;
 
 /**
+ * How many ways in the panel lists. `GRAPH_MAX_HUBS` caps what the server sends and has to
+ * stay at least this high, or the list runs short; `tests/ui-connectome.test.ts` checks it.
+ */
+export const PANEL_MAX_HUBS = 10;
+
+/**
+ * Where the canvas cuts a node label. The server already trimmed to `GRAPH_LABEL_CHARS`, which
+ * has to stay at least this long or this cut becomes dead code without anyone noticing;
+ * `tests/ui-graph.test.ts` fails if it stops.
+ */
+export const CANVAS_LABEL_CHARS = 48;
+
+/**
+ * The floor is what an unmeasured pair gets: drawn, because the pair exists, but saying nothing.
+ * The ceiling is what the strongest measured association earns, and it has to beat the fixed
+ * width of a `related` edge (0.7) so a measured path reads over a similar one.
+ */
+const EDGE_MIN_ALPHA = 0.2;
+const EDGE_MIN_WIDTH = 0.7;
+const EDGE_MAX_WIDTH = 3;
+
+/**
+ * How much of a pair's co-occurrence was repetition, in [0, 1). NPMI reads 1 both for "always
+ * together" and for "once, and that was the only turn either appeared in", so strength alone
+ * cannot tell evidence from coincidence. One sighting repeats nothing and is worth nothing.
+ */
+export function supportConfidence(n: number | undefined): number {
+  if (n === undefined || n <= 1) return 0;
+  return (n - 1) / n;
+}
+
+/**
  * How brightly a lateral edge is drawn. Only a positive association lights up: at zero the pair
  * is indistinguishable from chance and below it they avoid each other, and neither deserves ink.
+ * Weighted by support, so an unrepeated pair falls to the same floor as one nobody measured.
  */
-export function coUseGlow(strength: number | undefined): { alpha: number; width: number } {
-  const lit = Math.min(1, Math.max(0, strength ?? 0));
-  return { alpha: 0.2 + 0.8 * lit, width: 0.7 + 2.3 * lit };
+export function coUseGlow(
+  strength: number | undefined,
+  n?: number,
+): { alpha: number; width: number } {
+  const lit = Math.min(1, Math.max(0, strength ?? 0)) * supportConfidence(n);
+  return {
+    alpha: EDGE_MIN_ALPHA + (1 - EDGE_MIN_ALPHA) * lit,
+    width: EDGE_MIN_WIDTH + (EDGE_MAX_WIDTH - EDGE_MIN_WIDTH) * lit,
+  };
 }
 
 /**
@@ -35,9 +74,33 @@ export function coUseGlow(strength: number | undefined): { alpha: number; width:
  * otherwise read as dark and one of strong associations as burnt, when what matters is who
  * stands out among what is drawn.
  */
-export function hubGlow(strength: number | undefined, max: number): number {
+export function hubGlow(strength: number | undefined, max: number, support?: number): number {
   if (max <= 0 || strength === undefined || strength <= 0) return 0;
-  return Math.min(1, strength / max);
+  return Math.min(1, strength / max) * supportConfidence(support);
+}
+
+/**
+ * What each node contributes to the lateral layer, over the edges given. Mirrors `hubs()` in
+ * `engine/src/store/connectome.ts` on purpose, because the canvas draws a filtered subset the
+ * server never saw; `tests/ui-connectome.test.ts` fails if the two stop agreeing.
+ */
+export function accumulateCoUse(
+  links: ReadonlyArray<{ source: string; target: string; kind: string; n?: number; strength?: number }>,
+): Map<string, { degree: number; strength: number; support: number }> {
+  const acc = new Map<string, { degree: number; strength: number; support: number }>();
+  const bump = (id: string, strength: number, n: number): void => {
+    const current = acc.get(id) ?? { degree: 0, strength: 0, support: 0 };
+    current.degree += 1;
+    if (strength > 0) current.strength += strength * supportConfidence(n);
+    current.support = Math.max(current.support, n);
+    acc.set(id, current);
+  };
+  for (const link of links) {
+    if (link.kind !== "co_use") continue;
+    bump(link.source, link.strength ?? 0, link.n ?? 0);
+    bump(link.target, link.strength ?? 0, link.n ?? 0);
+  }
+  return acc;
 }
 
 /** A link at two moments: fresh from the API and already mutated by force-graph. */
@@ -57,13 +120,17 @@ export function neighborsOf(links: Array<{ source: LinkEnd; target: LinkEnd }>, 
   return neighbors;
 }
 
-/** The library's tooltip is injected as HTML: a label can never carry markup. */
+/**
+ * The library's tooltip is injected as HTML: a label can never carry markup. Quotes are
+ * escaped too, so this stays safe if a caller ever builds an attribute instead of a body.
+ */
 export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 /*
@@ -171,8 +238,16 @@ export function filterGraph(data: GraphData, filters: GraphFilters): GraphData {
   const visible = new Set(nodes.map((node) => node.id));
   links = links.filter((link) => visible.has(link.source) && visible.has(link.target));
 
+  // 6. The server measured over everything it sent; this draws a subset. Keeping its figures
+  //    would put the halo of a hub on a node left with one edge on screen.
+  const own = accumulateCoUse(links);
+
   return {
-    nodes: nodes.map((node) => ({ ...node })),
+    nodes: nodes.map((node) => {
+      const { co_use, ...rest } = node;
+      const mine = own.get(node.id);
+      return mine ? { ...rest, co_use: mine } : rest;
+    }),
     links: links.map((link) => ({ ...link })),
     truncated: { ...data.truncated },
   };

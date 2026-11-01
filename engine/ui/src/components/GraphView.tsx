@@ -32,9 +32,9 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
   // Switching scope never shows the previous scope's graph: it is only kept while the same
   // scope reloads (for example, when episodes are turned on).
   const graphQuery = useQuery({
-    queryKey: ["graph", scope ?? "", settings.episodes, settings.coUse, settings.coUseMinN],
+    queryKey: ["graph", scope ?? "", settings.episodes, settings.related, settings.coUse, settings.coUseMinN],
     queryFn: ({ signal }) =>
-      api.graph(scope, settings.episodes, { enabled: settings.coUse, minN: settings.coUseMinN }, signal),
+      api.graph(scope, settings.episodes, settings.related, { enabled: settings.coUse, minN: settings.coUseMinN }, signal),
     placeholderData: (previous, previousQuery) =>
       previousQuery?.queryKey[1] === (scope ?? "") ? previous : undefined,
   });
@@ -91,6 +91,7 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
     () => graphData.nodes.reduce((top, node) => Math.max(top, node.co_use?.strength ?? 0), 0),
     [graphData.nodes],
   );
+  const drawnIds = useMemo(() => new Set(graphData.nodes.map((node) => node.id)), [graphData.nodes]);
   const labels = useMemo(
     () => new Map((data?.nodes ?? []).map((node) => [node.id, node.label])),
     [data],
@@ -275,6 +276,8 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
         <ConnectomePanel
           summary={data.connectome}
           labels={labels}
+          maxHubStrength={maxHubStrength}
+          drawn={drawnIds}
           onSelect={(id) => onSelect("memory", id)}
         />
       )}

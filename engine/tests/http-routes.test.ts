@@ -4,6 +4,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Database as DB } from "better-sqlite3";
 import { ConsolidationJob } from "../src/consolidation/job.js";
 import { ACTION_MAX_BODY_BYTES, ForgetConfirmations } from "../src/http/viewer/actions.js";
+import { LoginAttempts } from "../src/http/login.js";
 import { createRequestHandler, type HttpRoutesDeps, type RequestHandler } from "../src/http/routes.js";
 import { openDb } from "../src/store/db.js";
 
@@ -82,6 +83,9 @@ function makeHandler(overrides: Partial<HttpRoutesDeps> = {}): RequestHandler {
       res.statusCode = 200;
       res.end("ui");
     },
+    attempts: new LoginAttempts(),
+    loginCss: "body{}",
+    loginAssets: new Map(),
     ...overrides,
   });
 }
@@ -220,5 +224,136 @@ describe("http/routes: error no controlado (500)", () => {
     expect(res.headers).toEqual({});
     expect(res.body).toBe("parcial");
     expect(res.endCount).toBe(2);
+  });
+});
+
+describe("http/routes: el formulario de sesión", () => {
+  const cookieDe = (res: MockResponse): string => {
+    const header = res.headers["set-cookie"] ?? "";
+    return header.slice(0, header.indexOf(";"));
+  };
+
+  it("sin credenciales y sin sesión, el visor manda al formulario en vez del diálogo del navegador", async () => {
+    const res = await request(makeHandler(), "/viewer");
+
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe("/login");
+  });
+
+  it("la API sigue respondiendo 401, que es lo que un script espera", async () => {
+    // A redirect to HTML would turn a clean 401 into a parse error on the other side.
+    const res = await request(makeHandler(), "/api/stats");
+
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("el formulario se sirve sin credenciales, o no habría forma de entrar", async () => {
+    const res = await request(makeHandler(), "/login");
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toContain("text/html");
+  });
+
+  it("con la contraseña correcta deja una cookie y lleva al visor", async () => {
+    const res = await request(makeHandler(), "/login", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: [`usuario=${AUTH.user}&clave=${encodeURIComponent(AUTH.pass)}`],
+    });
+
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe("/viewer");
+    expect(res.headers["set-cookie"]).toContain("HttpOnly");
+    expect(res.headers["set-cookie"]).toContain("SameSite=Strict");
+  });
+
+  it("con la contraseña equivocada no deja cookie y no dice cuál de los dos campos falló", async () => {
+    const res = await request(makeHandler(), "/login", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: ["usuario=brain&clave=la-que-no-es"],
+    });
+
+    // Back to the form with a flag, never saying which of the two fields was wrong.
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe("/login?error=1");
+    expect(res.headers["set-cookie"]).toBeUndefined();
+  });
+
+  it("una sesión válida abre el visor y la API sin volver a pedir la clave", async () => {
+    const handler = makeHandler();
+    const entrada = await request(handler, "/login", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: [`usuario=${AUTH.user}&clave=${encodeURIComponent(AUTH.pass)}`],
+    });
+    const cookie = cookieDe(entrada);
+
+    expect((await request(handler, "/viewer", { headers: { cookie } })).statusCode).toBe(200);
+    expect((await request(handler, "/api/stats", { headers: { cookie } })).statusCode).toBe(200);
+  });
+
+  it("la cookie NO abre /mcp: un cliente MCP manda Basic, y una sesión no es una llave de herramientas", async () => {
+    const handler = makeHandler();
+    const entrada = await request(handler, "/login", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: [`usuario=${AUTH.user}&clave=${encodeURIComponent(AUTH.pass)}`],
+    });
+
+    const res = await request(handler, "/mcp", { headers: { cookie: cookieDe(entrada) } });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("cerrar sesión vence la cookie", async () => {
+    const res = await request(makeHandler(), "/logout", { method: "POST" });
+
+    expect(res.headers["set-cookie"]).toContain("Max-Age=0");
+  });
+
+  it("tras varios intentos fallidos deja de probar la clave y responde 429", async () => {
+    const handler = makeHandler();
+    const intento = () =>
+      request(handler, "/login", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: ["usuario=brain&clave=la-que-no-es"],
+      });
+
+    let ultima = await intento();
+    for (let i = 0; i < 20 && ultima.statusCode !== 429; i++) ultima = await intento();
+
+    expect(ultima.statusCode).toBe(429);
+  });
+
+  it("sin MISMEM_AUTH_* no hay formulario: el visor es abierto y pedir sesión confundiría", async () => {
+    const handler = makeHandler({ auth: null });
+
+    expect((await request(handler, "/viewer")).statusCode).toBe(200);
+    expect((await request(handler, "/login")).statusCode).toBe(404);
+  });
+});
+
+describe("http/routes: salir desde el visor", () => {
+  it("dice si hay una sesión que cerrar", async () => {
+    // Without credentials the viewer is open and a "salir" button would promise something that
+    // does not exist, so the interface has to be able to tell the two apart.
+    const conClave = JSON.parse((await request(makeHandler(), "/api/session", {
+      headers: { authorization: basic(AUTH.user, AUTH.pass) },
+    })).body) as { active?: boolean };
+    const sinClave = JSON.parse((await request(makeHandler({ auth: null }), "/api/session")).body) as {
+      active?: boolean;
+    };
+
+    expect(conClave.active).toBe(true);
+    expect(sinClave.active).toBe(false);
+  });
+
+  it("cerrar sesión vuelve al formulario con la cookie vencida", async () => {
+    const res = await request(makeHandler(), "/logout", { method: "POST" });
+
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe("/login");
+    expect(res.headers["set-cookie"]).toContain("Max-Age=0");
   });
 });

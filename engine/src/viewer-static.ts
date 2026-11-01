@@ -6,8 +6,11 @@ import type { ServerResponse } from "node:http";
 import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** Next to the compiled server-http.js: dist/ui. */
-const DEFAULT_UI_DIR = fileURLToPath(new URL("./ui/", import.meta.url));
+/**
+ * Next to the compiled server-http.js: dist/ui. Anchored to this module and never to the
+ * working directory, which is wherever the person running the command happened to be.
+ */
+export const UI_DIR = fileURLToPath(new URL("./ui/", import.meta.url));
 
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -44,7 +47,7 @@ function send(res: ServerResponse, status: number, type: string, body: string | 
 }
 
 /** `pathname` is the URL's: /, /viewer, /viewer/ or /viewer/assets/... */
-export function serveUi(res: ServerResponse, pathname: string, dir = DEFAULT_UI_DIR): void {
+export function serveUi(res: ServerResponse, pathname: string, dir = UI_DIR): void {
   const root = resolve(dir);
   const relative = pathname.replace(/^\/(viewer\/?)?/, "");
 
@@ -80,4 +83,24 @@ export function serveUi(res: ServerResponse, pathname: string, dir = DEFAULT_UI_
   res.setHeader("content-security-policy", CSP);
   res.setHeader("referrer-policy", "no-referrer");
   send(res, 200, TYPES[".html"] as string, html);
+}
+
+/**
+ * The images the sign-in page needs, by served path. That page cannot reach anything under
+ * /viewer — signing in is exactly what it is for — so the engine hands them over itself.
+ * Missing them only costs the image: a package built without the interface still signs in.
+ */
+export function loginAssets(dir = UI_DIR): Map<string, Buffer> {
+  const assets = new Map<string, Buffer>();
+  for (const [served, file] of [
+    ["/login-logo.webp", "logo.webp"],
+    ["/login-logo-dark.webp", "logo-dark.webp"],
+  ] as const) {
+    try {
+      assets.set(served, readFileSync(join(dir, file)));
+    } catch {
+      // Built without the interface: the page renders without its logo rather than failing.
+    }
+  }
+  return assets;
 }
