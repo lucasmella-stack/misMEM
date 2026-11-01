@@ -5,7 +5,6 @@ import { capture } from "../src/memory/capture.js";
 import { consolidate } from "../src/memory/consolidate.js";
 import { crystallize } from "../src/memory/crystallize.js";
 import { recall, recallHybrid } from "../src/recall/recall.js";
-import { RELAXED_PRESENCE_MAX_TERMS } from "../src/recall/rescue.js";
 import { embedPendingMemories, saveMemoryEmbedding } from "../src/embeddings/store.js";
 import type { EmbedFn } from "../src/embeddings/provider.js";
 
@@ -98,6 +97,18 @@ describe("recall léxico: frases normales", () => {
     ).toEqual([target]);
   });
 
+  it("las formas de una misma palabra cuentan una vez en el 30 %", () => {
+    // The gate counted the numerator after merging prefix-sharing words but divided by
+    // every distinct word: these eight forms reduce to three terms, and the target has two
+    // of them, but 2/8 stayed below the threshold and the rescue was discarded.
+    const target = memory("dev", "trabajando como trabajador en un proyecto");
+    expect(
+      memoryIds(
+        "trabajo trabajar trabajando trabajador proyecto proyectos proyectar configurar",
+      ),
+    ).toEqual([target]);
+  });
+
   it("la puerta mide la consulta entera, no las palabras que caben en el tope de 12", () => {
     // Fifteen content words and four in the record: 4/15 = 27 % on the question, but
     // 4/12 = 33 % if the denominator is the capped rescue query. The cap must not soften
@@ -160,7 +171,7 @@ describe("recall léxico: frases normales", () => {
   it("una pregunta de quinientas palabras no gasta un recuento de presencia por palabra", () => {
     // The inject hook passes the whole prompt and nothing caps RecallInput.query: one
     // prepared FTS count per content word made the gate's cost grow with the prompt. It now
-    // reads at most RELAXED_PRESENCE_MAX_TERMS words and prepares its count once.
+    // reads at most 64 words and prepares its count once.
     const words = [
       "servidor", "teclado", "pantalla", "impresora", "contrato", "factura",
       "recibo", "cliente", "proyecto", "modulo", "funcion", "prueba", "error",
@@ -180,11 +191,14 @@ describe("recall léxico: frases normales", () => {
     const filler = Array.from({ length: 460 }, (_, i) => `z${i.toString(36)}`);
     // What costs is each execution of the count, so the spy watches them: with the bound
     // removed this reaches five hundred and the test fails on the number, not only on the
-    // answer.
+    // answer. The count is 64, not the constant, so raising the bound fails here; and the
+    // count statement is prepared once, so preparing per word fails here too.
     const statement = Object.getPrototypeOf(db.prepare("SELECT 1")) as Statement;
     const get = vi.spyOn(statement, "get");
+    const prepare = vi.spyOn(db, "prepare");
     let hits: string[] = [];
     let counts = 0;
+    let presenceStatements = 0;
     try {
       hits = memoryIds([...words, ...filler].join(" "));
       counts = (get.mock.contexts as Statement[]).filter(
@@ -192,11 +206,17 @@ describe("recall léxico: frases normales", () => {
           context.source.includes("count(*) AS n") &&
           context.source.includes("memories_fts MATCH"),
       ).length;
+      presenceStatements = prepare.mock.calls.filter(
+        ([sql]) =>
+          sql.includes("count(*) AS n") && sql.includes("memories_fts MATCH"),
+      ).length;
     } finally {
       get.mockRestore();
+      prepare.mockRestore();
     }
     expect(hits).toEqual([id]);
-    expect(counts).toBeLessThanOrEqual(RELAXED_PRESENCE_MAX_TERMS);
+    expect(counts).toBe(64);
+    expect(presenceStatements).toBe(1);
   });
 
   it("al relajar, dos términos raros adelantan a tres comunes", () => {

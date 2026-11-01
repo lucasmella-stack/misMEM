@@ -4,20 +4,22 @@
 
 - Sin servidor de embeddings, el recall léxico pasa de 222/432 a 254/432 en el eval dorado (MRR de 0,49 a 0,54),
   con las preguntas largas de 5/36 a 17/36 y las coloquiales de 24/36 a 26/36; ningún tipo baja y las ajenas
-  se quedan en 4/48 (5 recuerdos frente a 6). El rescate ya no exige el 30 % de todas las palabras: descarta las
-  que no aparecen en ninguna memoria de la base ni en ningún candidato, ordena por IDF y pide dos coincidencias
-  con al menos una informativa, así que una pregunta llena de contexto ("oye", "ayer") puede rescatar su memoria.
+  se quedan en 4/48 (5 recuerdos frente a 6). El rescate ya no exige el 30 % de todas las palabras: mide la
+  puerta sobre las palabras de contenido de la pregunta, contando una vez las que comparten prefijo, y del
+  rastreo y de la puntuación descarta las que no aparecen en ninguna memoria de la base ni en ningún candidato;
+  ordena por IDF y pide dos coincidencias con al menos una informativa, así que una pregunta llena de contexto
+  ("oye", "ayer") puede rescatar su memoria.
   Ignora además un relleno
   coloquial propio ("podemos", "antes", "cada", "todo"...), en una lista aparte de la compartida: esa sigue
   mandando en la consulta estricta y en la medida de sustancia del prefiltro Pareto, que con las palabras nuevas
-  descartaba hechos cortos como ruido. La puerta del 30 % se mide sobre la consulta entera y no sobre las
+  descartaba hechos cortos como ruido. La puerta del 30 % se mide sobre la pregunta entera y no sobre las
   palabras que caben en el tope de doce, y el suelo de dos coincidencias ya no finge crecer con la pregunta. La
   puerta lee como mucho las primeras 64 palabras de contenido y prepara su recuento una vez, así que un prompt
   entero no dispara un recuento por palabra. El suelo de `engine/eval/golden/floor.json` sube por tipo (rasgo,
   de 9/24 a 10/24).
-  Tests nuevos en `engine/tests/recall-relaxed.test.ts` (pregunta larga, puerta del 30 % a ambos lados y tope de
-  doce), `engine/tests/terms.test.ts` y `engine/tests/pareto.test.ts`; la línea base nueva está en
-  `docs/recall.md`.
+  Tests nuevos en `engine/tests/recall-relaxed.test.ts` (pregunta larga, formas de una misma palabra y puerta del
+  30 % a ambos lados, y tope de 64), `engine/tests/terms.test.ts` y `engine/tests/pareto.test.ts`; la línea base
+  nueva está en `docs/recall.md`.
 - Con EmbeddingGemma 2 y sin `MISMEM_EMBEDDING_MIN_SCORE`, el corte por defecto pasa de 0,5 a 0,65: en el
   golden eval, las preguntas ajenas que traen algo bajan de 48/48 a 11/48 sin perder ningún acierto (#158).
   Vale para cualquier id de la familia (`google/embeddinggemma-300m`, una ruta GGUF). Tests en

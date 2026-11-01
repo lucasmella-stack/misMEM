@@ -49,7 +49,7 @@ const RELAXED_MAX_TERMS = 12;
 // question, so the count stays bounded while the gate still sees all of a long one. Both
 // sides of the ratio stop at this same bound, or the denominator would grow past what the
 // numerator can ever reach.
-export const RELAXED_PRESENCE_MAX_TERMS = 64;
+const RELAXED_PRESENCE_MAX_TERMS = 64;
 
 export interface RelaxedTerm {
   word: string;
@@ -63,9 +63,8 @@ export interface RelaxedQuery {
   /** Every rescue term before the term cap: the presence gate reads the first
    * RELAXED_PRESENCE_MAX_TERMS of them. */
   allTerms: RelaxedTerm[];
-  /** Distinct words before merging prefixes and before the term cap: it says whether the
-   * query has a single word, and it is the denominator of the presence gate, which reads
-   * the whole question up to RELAXED_PRESENCE_MAX_TERMS and not what the rescue searches. */
+  /** Distinct words before merging prefixes: it says whether the query has a single word,
+   * which the gate cannot ask by its own count, since two forms of one word merge to one. */
   wordCount: number;
 }
 
@@ -169,17 +168,20 @@ interface PlannedTerm {
 }
 
 /**
- * What the rescue may demand: `present` and `wordCount` stop at the same
- * RELAXED_PRESENCE_MAX_TERMS words, so the gate compares like with like; `terms` is the
+ * What the rescue may demand: `present` and `wordCount` stop at the same deduplicated
+ * RELAXED_PRESENCE_MAX_TERMS set, so the gate compares like with like; `terms` is the
  * capped set a candidate is scored against, without the words no record has.
  */
 export interface RelaxedPlan {
   terms: PlannedTerm[];
   /** Question words found in some memory of the base or in a candidate, over the gated set. */
   present: number;
-  /** Content words of the question, up to RELAXED_PRESENCE_MAX_TERMS; it also tells a
-   * one-word query. */
+  /** Deduplicated content words of the question, up to RELAXED_PRESENCE_MAX_TERMS: the
+   * gate's denominator. */
   wordCount: number;
+  /** Distinct words before merging prefixes; it tells a one-word query, which the
+   * deduplicated count would not ("decidir decision" is one word, not two). */
+  distinctWords: number;
 }
 
 /**
@@ -226,7 +228,8 @@ export function planTerms(
   return {
     terms: planned,
     present,
-    wordCount: Math.min(wordCount, RELAXED_PRESENCE_MAX_TERMS),
+    wordCount: Math.min(allTerms.length, RELAXED_PRESENCE_MAX_TERMS),
+    distinctWords: wordCount,
   };
 }
 
@@ -262,14 +265,14 @@ export function relaxRows<T extends RankedCandidate>(rows: T[], plan: RelaxedPla
   // If most of the question is about things no record contains, the few words that do
   // exist are not evidence; this keeps a long off-topic question from being rescued by two
   // generic words while a real long question still passes with most of its words present.
-  // Both sides stop at the same bound: only the candidate query is capped at twelve terms,
-  // and the gate reads at most RELAXED_PRESENCE_MAX_TERMS words.
+  // Both sides use the same deduplicated set, capped alike: words absent everywhere keep
+  // their place in the denominator even though they are dropped from the search.
   if (plan.present / plan.wordCount < RELAXED_MIN_PRESENT_RATIO) return [];
   // A one-word query cannot reach two matches; anything else asks for two. The exception
   // is the original query having one word, not the plan keeping one term: two forms of the
   // same word dedupe to a single prefix and must still count as one coincidence, or
   // "decidir decision" rescues a memory that only says "decision".
-  const singleWord = plan.wordCount === 1;
+  const singleWord = plan.distinctWords === 1;
   const required = singleWord ? 1 : RELAXED_MIN_INFORMATIVE;
   // A one-word query has only one term to match, so asking for two rare ones would make
   // the rescue unreachable ("deudas" against "la deuda").

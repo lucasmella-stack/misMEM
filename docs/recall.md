@@ -17,15 +17,18 @@ si todas son vacías, conserva las largas para no quedarse sin consulta.
 Si esa consulta estricta no devuelve nada y no hay capa semántica, `recall` reintenta con una consulta OR
 sobre las mismas palabras menos un relleno más amplio: la estricta conserva las palabras de función que un
 recuerdo puede contener, y el rescate ignora además verbos y adverbios coloquiales ("podemos", "antes", "cada",
-"todo"). Antes de puntuar descarta las palabras que no aparecen en ninguna memoria de la base ni en
-ningún candidato: en una pregunta larga suelen ser contexto ("ayer", "oye") y antes contaban para exigir el
-30 % de la frase entera. La presencia se mide sobre las memorias sin mirar el ámbito y con el prefijo del
-rescate, así que una palabra cuenta aunque el candidato luego no la puntúe. Conserva los
-candidatos que comparten al menos dos términos, uno de ellos informativo (los que aparecen en el 5 % de memorias
-más raras, con un mínimo de tres, o en todas); cuando tras quitar ese relleno queda una sola palabra de contenido, basta una. Si las palabras
-presentes no llegan al 30 % de las palabras de contenido de la consulta entera, antes del tope de doce términos
-del rescate, no hay rescate: la pregunta habla de otra cosa. La puerta compara como mucho las primeras 64
-palabras de contenido, para que el prompt entero de un hook no gaste un recuento por palabra. Los candidatos
+"todo"). Del rastreo y de la puntuación descarta las palabras que no aparecen en ninguna memoria de la base
+ni en ningún candidato: en una pregunta larga suelen ser contexto ("ayer", "oye"), y buscar por ellas sólo
+añadía candidatos flojos. No las quita del denominador: el 30 % se mide sobre las palabras de contenido de la
+pregunta, contando una vez las que comparten prefijo, aparezcan o no en la base. La presencia se mide sobre las
+memorias sin mirar el ámbito y con el prefijo del rescate, así que una palabra cuenta aunque el candidato luego
+no la puntúe. Conserva los candidatos que comparten al menos dos términos, uno de ellos informativo (los que
+aparecen en el 5 % de memorias más raras, con un mínimo de tres, o en todas; también el que no aparece en
+ninguna memoria pero sí en un episodio o rasgo candidato); cuando tras quitar ese relleno queda una sola
+palabra de contenido, basta una. Si las palabras presentes no llegan al 30 % de las palabras de contenido de
+la consulta entera (sin repetir las que comparten prefijo y como mucho las primeras 64), no hay rescate: la
+pregunta habla de otra cosa. Ese tope de 64 acota también los recuentos, para que el prompt entero de un hook
+no gaste uno por palabra. Los candidatos
 se ordenan por la suma de IDF de los términos que comparten, y después por términos informativos y coincidencias.
 Devuelve hasta 3 por capa. El rescate alcanza a rasgos, episodios y memorias, y no altera una búsqueda que ya
 encontró algo.
