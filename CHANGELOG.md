@@ -12,6 +12,13 @@
   acumulados, 380 MB. Se borran en el `afterEach`, como pide
   [docs/standards/tests.md](docs/standards/tests.md).
 
+### El log de la consolidación deja de llevar el texto de una memoria
+
+- Al descartar una memoria destilada por quedarse sin evidencia, el log imprimía sesenta caracteres
+  de su `gist`. Ese log sale por `console.log` desde el CLI y es el `job.log` que el visor pinta, así
+  que era dato del usuario en un log, que `AGENTS.md` prohíbe sin matices. Ahora lleva el ámbito y
+  cuántos episodios había citado, que es lo que hace falta para distinguir un descarte de un fallo.
+
 ### El README dice lo mismo con menos palabras
 
 - El párrafo del instalador eran ciento setenta palabras en un bloque, con detalles que ya están en su
