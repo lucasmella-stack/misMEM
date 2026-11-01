@@ -172,6 +172,31 @@ describe("viewer-api: /api/embeddings", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("la respuesta no lleva la configuración del proveedor, que puede traer credenciales", () => {
+    setEmbedEnv({ MISMEM_EMBEDDINGS: "off", MISMEM_EMBEDDING_MODEL: "embeddinggemma-2" });
+
+    const body = call((res) => handleEmbeddings(db, res)).body as unknown as Record<string, unknown>;
+
+    // toMatchObject passes with extra keys, so it would not notice the whole config spread into
+    // the body. `MISMEM_EMBEDDING_URL` can carry credentials in its userinfo: the key set is the
+    // assertion, and a field added to the status has to be added here on purpose.
+    expect(Object.keys(body).sort()).toEqual([
+      "active_dims",
+      "compatible",
+      "embedded",
+      "enabled",
+      "invalid",
+      "layers",
+      "memories",
+      "missing",
+      "model",
+      "models",
+      "outdated",
+      "stale_dims",
+      "stale_model",
+    ]);
+  });
+
   it("con el índice al día, el ruido no cuenta como sin vector", () => {
     setEmbedEnv({ MISMEM_EMBEDDING_MODEL: "embeddinggemma-2" });
     const { memoryId } = memoryFrom("a", "una memoria", ["e1"]);
