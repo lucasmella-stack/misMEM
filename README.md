@@ -69,7 +69,8 @@ Instala misMEM desde el repo clonado, pregunta dónde guardar la memoria y con q
 (DeepSeek, OpenRouter, OpenAI, un servidor compatible o ninguno), guarda la clave en
 `~/.config/mismem/env` con permisos 600 y configura los clientes MCP que encuentra en la máquina (en Claude
 Code, también los hooks de inyección y refuerzo; `--help` da la lista). Para la búsqueda por significado
-deja montado un servidor de embeddings local si hay `llama-server`; otro servidor u otro modelo se eligen
+ofrece montar un servidor de embeddings local con `llama-server` (baja el modelo y deja un servicio de
+systemd si se acepta); otro servidor u otro modelo se eligen
 con `MISMEM_EMBEDDING_URL` y `MISMEM_EMBEDDING_MODEL` ([cómo](docs/recall.md#por-significado-opcional)). Si se quiere, deja la consolidación nocturna como timer de
 systemd. Los clientes llaman a
 `~/.local/bin/mismem-run`, así que ninguna clave queda en su configuración. Volver a ejecutarlo actualiza
