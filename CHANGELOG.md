@@ -13,8 +13,11 @@
   y con 0,5. Quien configuró EmbeddingGemma a mano sin prefijos tiene que reindexar con `mismem-embed --force`.
 - **El instalador** monta sólo EmbeddingGemma 2: `--embeddings gemma|off`. Una instalación con nomic pasa a
   EmbeddingGemma 2 al re-ejecutarlo; una configuración propia con otro modelo se conserva.
-- **Rompe** a quien tenga nomic o el proveedor `ollama` configurado a mano: la búsqueda queda por palabras hasta
-  que apunte `MISMEM_EMBEDDING_URL` a su servidor (Ollama: `http://127.0.0.1:11434`) o re-ejecute el instalador.
+- **Rompe** a quien tenga nomic o el proveedor `ollama` configurado a mano: sin `MISMEM_EMBEDDING_PROVIDER` ni
+  `MISMEM_OLLAMA_URL`, la URL pasa a `http://127.0.0.1:8080` y el modelo a EmbeddingGemma 2. Para conservar lo
+  que tenía, que escriba `MISMEM_EMBEDDING_URL=http://127.0.0.1:11434`,
+  `MISMEM_EMBEDDING_MODEL=nomic-embed-text` y `MISMEM_EMBEDDING_MIN_SCORE=0.65`; para pasarse a EmbeddingGemma 2,
+  que re-ejecute el instalador.
 - El comentario del umbral de aristas `related` del grafo se rehace con EmbeddingGemma 2 medido sobre una base
   real: el par mediano da 0,673 y el vecino más cercano 0,822; el 0,75 se mantiene.
 

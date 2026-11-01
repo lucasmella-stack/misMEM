@@ -16,7 +16,8 @@
 # MISMEM_INSTALL_MODEL, MISMEM_INSTALL_BASE_URL y MISMEM_INSTALL_HOOKS (yes|no).
 # Con llama-server en el PATH, --embeddings gemma monta EmbeddingGemma 2 (baja el modelo si
 # falta; MISMEM_INSTALL_GEMMA_GGUF apunta a un GGUF que ya tengas). Sin esa opción, --yes
-# conserva el modelo de embeddings que hubiera y, si no hay ninguno, monta EmbeddingGemma 2.
+# conserva el modelo de embeddings que hubiera, salvo nomic-embed-text, que pasa a
+# EmbeddingGemma 2; si no hay ninguno, monta EmbeddingGemma 2.
 # La clave nunca va por argumento: quedaría en el historial y en `ps`.
 #
 # Re-ejecutarlo actualiza en vez de duplicar.
@@ -163,6 +164,13 @@ fi
 prev() {
   [ -f "$ENV_FILE" ] || return 0
   (set -a; . "$ENV_FILE"; eval "printf '%s' \"\${$1:-}\"")
+}
+
+# defined VAR: si ENV_FILE la declara, aunque esté vacía. Un valor vacío es una elección (un prefijo
+# vacío apaga el de EmbeddingGemma que ahora viene por defecto), así que prev no basta para verlo.
+defined() {
+  [ -f "$ENV_FILE" ] || return 1
+  (set -a; . "$ENV_FILE"; eval "[ \"\${$1+x}\" = x ]")
 }
 
 step "Configuración"
@@ -315,14 +323,26 @@ CAN_GEMMA=""
 # otra cosa (otro modelo, otro servidor, otra URL) es del usuario y no se toca sin que lo pida.
 PREV_EMBED="$(prev MISMEM_EMBEDDING_MODEL)"
 PREV_URL="$(prev MISMEM_EMBEDDING_URL)"
+PREV_PROVIDER_EMBED="$(prev MISMEM_EMBEDDING_PROVIDER)"
+PREV_OLLAMA_URL="$(prev MISMEM_OLLAMA_URL)"
 PREV_KIND=""
-if [ -n "$PREV_EMBED$PREV_URL$(prev MISMEM_EMBEDDING_PROVIDER)$(prev MISMEM_OLLAMA_URL)" ]; then
+if [ -n "$PREV_EMBED$PREV_URL$PREV_PROVIDER_EMBED$PREV_OLLAMA_URL" ]; then
   PREV_KIND=custom
   case "$PREV_EMBED" in
     embeddinggemma-2) if [ "${PREV_URL:-$GEMMA_URL}" = "$GEMMA_URL" ]; then PREV_KIND=gemma; fi ;;
     nomic-embed-text*) PREV_KIND=nomic ;;
+    "")
+      # Sin modelo, el motor usaba nomic-embed-text: una instalación de Ollama, o con su URL, es nomic
+      # y se migra como las demás; no es una configuración propia que haya que conservar.
+      if [ "$PREV_PROVIDER_EMBED" = ollama ] || [ -n "$PREV_OLLAMA_URL" ]; then PREV_KIND=nomic; fi
+      ;;
   esac
 fi
+# La URL que el motor anterior resolvía sin MISMEM_EMBEDDING_URL: Ollama y su 11434, salvo con el proveedor
+# openai (el 8080 de llama-server). El código nuevo ya no conoce MISMEM_OLLAMA_URL, así que al conservar una
+# configuración propia hay que dejarle la URL escrita o cambiaría de servidor.
+PREV_RESOLVED_URL="$GEMMA_URL"
+if [ "$PREV_PROVIDER_EMBED" != openai ]; then PREV_RESOLVED_URL="${PREV_OLLAMA_URL:-http://127.0.0.1:11434}"; fi
 # Variables que se conservan tal cual cuando no se elige otro modelo.
 EMBED_VARS="MISMEM_EMBEDDING_URL MISMEM_EMBEDDING_MODEL MISMEM_EMBEDDING_QUERY_PREFIX MISMEM_EMBEDDING_DOC_PREFIX
   MISMEM_EMBEDDING_MIN_SCORE MISMEM_EMBEDDING_MAX_CHARS MISMEM_EMBEDDING_TIMEOUT_MS"
@@ -335,7 +355,7 @@ if [ -n "$EMBED_FLAG" ]; then
     say "--embeddings gemma necesita llama-server en el PATH (o un servidor de embeddings en $GEMMA_URL)."
     exit 1
   fi
-elif [ "$PREV_KIND" = custom ] && ! confirm "  Ya tienes embeddings configurados (${PREV_EMBED:-sin modelo}, ${PREV_URL:-URL por defecto}). ¿Conservarlos?" y; then
+elif [ "$PREV_KIND" = custom ] && ! confirm "  Ya tienes embeddings configurados (${PREV_EMBED:-sin modelo}, ${PREV_URL:-$PREV_RESOLVED_URL}). ¿Conservarlos?" y; then
   EMBED_CHOICE=gemma
 fi
 if [ "$EMBED_CHOICE" = nomic ]; then
@@ -360,7 +380,7 @@ if [ "$EMBED_CHOICE" = off ] && grep -qs 'Generado por scripts/install.sh' "$GEM
 fi
 
 if [ "$EMBED_CHOICE" = custom ]; then
-  say "  Conservo los embeddings que ya tenías (${PREV_EMBED:-sin modelo}, ${PREV_URL:-URL por defecto})."
+  say "  Conservo los embeddings que ya tenías (${PREV_EMBED:-sin modelo}, ${PREV_URL:-$PREV_RESOLVED_URL})."
   [ "$(prev MISMEM_EMBEDDINGS)" = off ] && EMBEDDINGS_OFF=1
 elif [ "$EMBED_CHOICE" = gemma ]; then
   # Sin MISMEM_EMBEDDINGS=off: con el servidor parado la búsqueda ya degrada a palabras, y así no queda
@@ -390,10 +410,19 @@ mkdir -p "$CONF_DIR" "$BIN_DIR" "$(dirname "$DB")"
     say "# Generado por scripts/install.sh de misMEM. Lo lee $RUN."
     printf 'MISMEM_DB=%q\n' "$DB"
     if [ -n "$EMBED_KEEP" ]; then
-      # Lo que ya había se copia tal cual: el instalador sólo reescribe esto cuando se elige algo.
+      # Lo que ya había se copia tal cual: el instalador sólo reescribe esto cuando se elige algo. Una
+      # variable definida pero vacía se copia vacía: omitirla la devolvería al defecto nuevo (el prefijo
+      # de EmbeddingGemma), que no es lo que había.
       for v in $EMBED_VARS; do
         val="$(prev "$v")"
-        [ -z "$val" ] || printf '%s=%q\n' "$v" "$val"
+        if [ -n "$val" ]; then
+          printf '%s=%q\n' "$v" "$val"
+        elif defined "$v"; then
+          printf '%s=\n' "$v"
+        elif [ "$v" = MISMEM_EMBEDDING_URL ] && [ "$PREV_KIND" = custom ]; then
+          # Sin URL propia, el motor resolvía una por su cuenta; se deja escrita para no cambiar de servidor.
+          printf '%s=%q\n' "$v" "$PREV_RESOLVED_URL"
+        fi
       done
     elif [ "$EMBED_CHOICE" = gemma ]; then
       # Prefijos y corte son los medidos para este modelo (issue #72, README).
