@@ -22,7 +22,7 @@
   toca el vector. Guardar un vector de capa comprueba, dentro de la misma transacción, que el item sigue vivo,
   que el episodio sigue pendiente y que el texto es el que se embebió, así que una carrera con un renombrado o
   una consolidación no deja un vector obsoleto.
-- `docs/recall.md` y `docs/architecture.md` describen el ranking nuevo y la línea base del 2026-10-30. El test
+- `docs/recall.md` y `docs/architecture.md` describen el ranking nuevo y la línea base del 2026-11-01. El test
   de `fin-q35` recorre las capas reales por `recallHybrid` y comprueba que el hook recibe `fin-t1`. Tests en
   `engine/tests/hybrid-layers.test.ts`, `engine/tests/inject.test.ts` y `engine/tests/recall-relaxed.test.ts`.
 - Corrige los hallazgos de revisión del PR: `mismem-embed` y `consolidate` cuentan también los fallos del
