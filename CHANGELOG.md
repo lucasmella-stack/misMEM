@@ -2,6 +2,13 @@
 
 ## Sin publicar
 
+### La cámara del grafo vuelve a encuadrar al cambiar de ámbito
+
+- El encuadre se hacía una sola vez por montaje y la pestaña del grafo está `forceMount`, así que
+  nunca se desmonta: sólo el **primer** grafo de la sesión quedaba encuadrado. Pasar de un ámbito de
+  cuatrocientos nodos a uno de tres dejaba la cámara en el encuadre viejo, con el dibujo nuevo fuera
+  de vista. El ref pasa a guardar **qué** ámbito se encuadró, en vez de que se encuadró algo.
+
 ### El README dice lo mismo con menos palabras
 
 - El párrafo del instalador eran ciento setenta palabras en un bloque, con detalles que ya están en su
