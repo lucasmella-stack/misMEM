@@ -2,6 +2,16 @@
 
 ## Sin publicar
 
+### El visor vuelve a avisar de un vector que ya no coincide con su texto
+
+- El motor cuenta en `outdated` los vectores del modelo y el ancho activos cuya huella dejó de
+  coincidir con el texto, que es lo que pasa al editar el gist de una memoria. El tipo que declara la
+  interfaz no tenía ese campo, así que `embeddingWarning` sólo miraba `missing`, `stale_model` y
+  `stale_dims`: los tres quedaban en cero y **el visor decía que el índice estaba al día** mientras
+  `mismem-embed --status` sí lo contaba.
+- Un contador que el servidor dejara de mandar producía «El índice semántico no está al día: .», con la
+  lista vacía. Ahora, sin nada que enumerar, no hay aviso.
+
 ### El README dice lo mismo con menos palabras
 
 - El párrafo del instalador eran ciento setenta palabras en un bloque, con detalles que ya están en su
