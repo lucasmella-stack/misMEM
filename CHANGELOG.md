@@ -2,6 +2,21 @@
 
 ## Sin publicar
 
+### Una pestaña de temas: qué recuerdos hablan de lo mismo, aunque vivan en ámbitos distintos
+
+- El conectoma mide **qué se usó junto**, y hace falta uso acumulado para que diga algo. Encima de las
+  mismas memorias hay un segundo grafo que ya está lleno: **el de los vectores**, que mide qué se
+  parece a qué. *Temas* lo muestra como islas.
+- Cada isla trae su tamaño, **de qué ámbitos sale** y la memoria más saliente como puerta de entrada.
+  Lo que no se ve navegando por ámbito es justo eso: un tema que cruza tres.
+- El corte es **0,85**, medido sobre 3.652 memorias reales: a 0,80 un solo bloque se come el 66 % de
+  todo y a 0,88 la isla mayor baja a 17. A 0,85 se parten en 409 islas con la mayor al 6 %.
+- El coste es un coseno por par, o sea cuadrático, así que mira **las 1.500 memorias más salientes**:
+  1,8 s sobre una base real. Sin tope, una petición se quedaría colgada calculando un mapa que nadie
+  pidió exhaustivo.
+- `GET /api/topics`, con `scope` y `min_score` opcionales; un `min_score` ilegible o fuera de (0,1)
+  cae al valor por defecto en vez de devolver una lista vacía sin explicación.
+
 ### El tamaño de un nodo dice cuántas conexiones tiene, no cuántos días lleva (#217)
 
 - El radio salía de la saliencia, que nace en la confianza del LLM y decae con una vida media de 90

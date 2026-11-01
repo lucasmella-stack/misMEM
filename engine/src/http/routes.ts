@@ -10,7 +10,15 @@ import { handleLogin, type LoginAttempts } from "./login.js";
 import { SESSION_COOKIE, readCookie, verifySession } from "./session.js";
 import { hostAllowed } from "./host.js";
 import { json, jsonBare, jsonPlain, methodNotAllowed, notFound, payloadTooLarge, unauthorized } from "./respond.js";
-import { handleGraph, handleMemories, handleMemory, handleScopes, handleTrait, parseDetailPath } from "./viewer/api.js";
+import {
+  handleGraph,
+  handleMemories,
+  handleMemory,
+  handleScopes,
+  handleTopics,
+  handleTrait,
+  parseDetailPath,
+} from "./viewer/api.js";
 import {
   ACTION_MAX_BODY_BYTES,
   type ForgetConfirmations,
@@ -176,6 +184,7 @@ export function createRequestHandler(deps: HttpRoutesDeps): RequestHandler {
         }
         if (url.pathname === "/api/memories") return handleMemories(db, res, url);
         if (url.pathname === "/api/graph") return handleGraph(db, res, url);
+        if (url.pathname === "/api/topics") return handleTopics(db, res, url);
         const detail = parseDetailPath(url.pathname);
         if (detail === "bad") return json(res, 400, { error: "id mal codificado" });
         if (detail) {
