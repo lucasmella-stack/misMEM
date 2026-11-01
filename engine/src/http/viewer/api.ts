@@ -5,6 +5,7 @@ import type { ServerResponse } from "node:http";
 import type { Database as DB } from "better-sqlite3";
 import { getEmbeddingIndexStatus } from "../../embeddings/store.js";
 import { loadEmbeddingConfig } from "../../embeddings/provider.js";
+import { topics } from "../../queries/topics.js";
 import { graphData, type GraphCaps } from "../../queries/graph.js";
 import { listMemories, memoryDetail } from "../../queries/memories.js";
 import { scopeCounts } from "../../queries/scopes.js";
@@ -40,6 +41,21 @@ export function handleEmbeddings(db: DB, res: ServerResponse): void {
   const cfg = loadEmbeddingConfig();
   const status = getEmbeddingIndexStatus(db, cfg.model);
   json(res, 200, { enabled: cfg.enabled, model: cfg.model, ...status });
+}
+
+/** Out of (0,1) or unreadable falls back to the default: a cut of 9 would answer nothing. */
+function parseMinScore(raw: string | null): number | undefined {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 && n < 1 ? n : undefined;
+}
+
+export function handleTopics(db: DB, res: ServerResponse, url: URL): void {
+  json(res, 200, {
+    ...topics(db, {
+      scope: url.searchParams.get("scope") ?? undefined,
+      minScore: parseMinScore(url.searchParams.get("min_score")),
+    }),
+  });
 }
 
 export function handleScopes(db: DB, res: ServerResponse): void {

@@ -6,7 +6,19 @@ acordarse de pedir nada. Son opcionales; `scripts/install.sh` los configura si s
 | Hook | Evento | Qué hace |
 |---|---|---|
 | `mismem-inject` | `UserPromptSubmit` | Busca con el prompt y adelanta unos pocos recuerdos. Busca con `reinforce: false`: lo que el usuario no pidió no es uso. Se mantiene dormido hasta comprobar que el servidor expone `reinforce`, así que se puede configurar antes de desplegar |
-| `mismem-used` | `Stop` | Mira el último turno (lo que el modelo pidió con `recall` y lo que la inyección le puso delante) y refuerza sólo aquello cuyas palabras distintivas reaparecen en la respuesta. Es una aproximación: falla hacia no reforzar |
+| `mismem-used` | `Stop` | Mira el último turno (lo que el modelo pidió con `recall` y lo que la inyección le puso delante) y refuerza sólo aquello cuyas palabras distintivas reaparecen en la respuesta. Es una aproximación: falla hacia no reforzar, salvo con un gist recortado por `recall` (ver abajo) |
+
+Dos matices sobre esa aproximación:
+
+- Con `MISMEM_HOOK_URL`, la inyección recibe de `recall` el `text` ya recortado a 2.000 puntos de código
+  (`MAX_TEXT_CHARS`). Sin servidor remoto lee la base y recibe el texto entero. El presupuesto del hook
+  (`MISMEM_HOOK_MAX_CHARS`, 1.200 por defecto) cuenta unidades UTF-16, no puntos de código: con el valor por
+  defecto un recuerdo de ese tamaño no se inyecta por ningún camino, y con un presupuesto alto un recuerdo
+  largo puede caber recortado por el camino remoto y no caber entero por el local.
+- `mismem-used` mide el solapamiento sólo sobre el `text` del hit, recortado cuando vino de un `recall` por
+  MCP: los `details` no cuentan como señal, aunque el modelo también los recibe: el refuerzo depende sólo de
+  que la respuesta repita palabras del gist. El recorte puede quitar palabras que la respuesta no repetía, así que para un gist por
+  encima del tope el error ya no cae siempre del lado de no reforzar.
 
 ## Qué sale de la máquina
 

@@ -12,6 +12,7 @@ import { MemoryList } from "./components/list/MemoryList";
 import { PendingList } from "./components/list/PendingList";
 import { SearchResults } from "./components/list/SearchResults";
 import { TraitList } from "./components/list/TraitList";
+import { TopicList } from "./components/list/TopicList";
 import { PickedBar } from "./components/PickedBar";
 import { Scopes } from "./components/Scopes";
 import { useDebounced } from "./hooks/use-debounced";
@@ -26,6 +27,7 @@ const GraphView = lazy(() => import("./components/GraphView"));
 const VIEWS: Array<{ id: View; label: string; short: string }> = [
   { id: "memories", label: "Memorias", short: "Memorias" },
   { id: "traits", label: "Rasgos", short: "Rasgos" },
+  { id: "topics", label: "Temas", short: "Temas" },
   { id: "pending", label: "Sin consolidar", short: "Pendientes" },
   { id: "results", label: "Resultados", short: "Buscar" },
   { id: "graph", label: "Grafo", short: "Grafo" },
@@ -83,7 +85,7 @@ export function App() {
     // Lists do not filter by text: entering one clears the box, because a visible text that
     // filters nothing is misleading. The graph does use it as a local filter, so entering it
     // keeps the query.
-    if (next === "memories" || next === "traits" || next === "pending") {
+    if (next === "memories" || next === "traits" || next === "topics" || next === "pending") {
       setDraft("");
       setQuery("");
     }
@@ -200,6 +202,9 @@ export function App() {
               </TabsContent>
               <TabsContent value="traits" className="m-0">
                 <TraitList scope={scope} selected={selected} onSelect={setSelected} />
+              </TabsContent>
+              <TabsContent value="topics" className="m-0">
+                <TopicList scope={scope} selected={selected} onSelect={setSelected} />
               </TabsContent>
               <TabsContent value="pending" className="m-0">
                 <PendingList scope={scope} selected={selected} onSelect={setSelected} />

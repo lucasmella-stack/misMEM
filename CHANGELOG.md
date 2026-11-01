@@ -2,6 +2,119 @@
 
 ## Sin publicar
 
+### El grafo se puede pintar por tema, no sólo por ámbito
+
+- *Ajustes del grafo* cambia **Color por ámbito** por una elección de tres: **ámbito, tema o ninguno**.
+  Por tema, cada nodo toma el color de la isla semántica a la que pertenece, y la leyenda los nombra
+  con la memoria más saliente de cada una.
+- La paleta se reparte entre **los temas que están dibujados**, no entre los más grandes del total.
+  Es la misma regla que ya seguía la de ámbitos: la paleta es corta y gastarla en temas que casi no
+  salen en pantalla deja un dibujo donde no se pinta casi nada. Medido sobre una base real, pasa de
+  74 a 85 nodos pintados de los 600 que se dibujan.
+- Los temas se piden sólo cuando pintan, y con la misma clave de consulta que la pestaña *Temas*:
+  llegando desde ahí, los colores ya están en mano.
+- Un rasgo conserva su color de marca pinte quien pinte: es la capa que organiza a las demás.
+- Las filas del panel (interruptores, deslizadores, secciones y la elección nueva) pasan a
+  `components/graph/PanelRows.tsx`: el panel se había comido el trinquete de 400 líneas.
+
+### Los marcadores de ruido dejan de ocupar un vector
+
+- Un marcador (`[noise] ...`, `[pareto:l0] ...`) no compite en el recall ni gasta un embedding, pero
+  las bases anteriores a esa regla todavía arrastraban los suyos. Al abrir, se borran: son dato
+  derivado y no cuesta nada regenerar lo que haga falta.
+- Medido en una base real: **235 de 3.887 vectores (el 6 %) eran marcadores**. Ensuciaban cualquier
+  lectura que fuera a la tabla de vectores directamente — agrupando las memorias por parecido, la
+  segunda isla más grande eran 235 avisos de «episodios sin señal» pareciéndose entre sí.
+- El camino que escribe vectores ya los excluía, así que no vuelven a aparecer.
+
+### Una pestaña de temas: qué recuerdos hablan de lo mismo, aunque vivan en ámbitos distintos
+
+- El conectoma mide **qué se usó junto**, y hace falta uso acumulado para que diga algo. Encima de las
+  mismas memorias hay un segundo grafo que ya está lleno: **el de los vectores**, que mide qué se
+  parece a qué. *Temas* lo muestra como islas.
+- Cada isla trae su tamaño, **de qué ámbitos sale** y la memoria más saliente como puerta de entrada.
+  Lo que no se ve navegando por ámbito es justo eso: un tema que cruza tres.
+- El corte es **0,85**, medido sobre 3.652 memorias reales: a 0,80 un solo bloque se come el 66 % de
+  todo y a 0,88 la isla mayor baja a 17. A 0,85 se parten en 409 islas con la mayor al 6 %.
+- El coste es un coseno por par, o sea cuadrático, así que mira **las 1.500 memorias más salientes**:
+  1,8 s sobre una base real. Sin tope, una petición se quedaría colgada calculando un mapa que nadie
+  pidió exhaustivo.
+- `GET /api/topics`, con `scope` y `min_score` opcionales; un `min_score` ilegible o fuera de (0,1)
+  cae al valor por defecto en vez de devolver una lista vacía sin explicación.
+
+### El tamaño de un nodo dice cuántas conexiones tiene, no cuántos días lleva (#217)
+
+- El radio salía de la saliencia, que nace en la confianza del LLM y decae con una vida media de 90
+  días: en la práctica el dibujo decía sobre todo la antigüedad, y entre 2,2 px y 4,1 px todos los
+  nodos medían casi lo mismo. Ahora sale del **número de aristas visibles** de cada nodo, contadas en
+  el cliente con los filtros puestos, así que apagar una capa redimensiona el grafo con ella.
+- El radio no pasa de **tres veces el mínimo**: el peso crece hasta 9× y los píxeles salen de su raíz
+  cuadrada, así que un nodo muy conectado destaca sin tapar a sus vecinos. Como el peso también
+  alimenta la simulación, los centros ganan espacio, que es lo que se busca.
+- Por conexiones todas las capas miden igual: un rasgo fijo en 5 y un episodio en una saliencia de 0,5
+  no decían nada de cuál organiza a los demás.
+- **El área para pinchar** deja de ser siempre de 7 px: ese es su mínimo y crece con el nodo.
+- *Ajustes del grafo* trae el selector: **Tamaño por conexiones**, encendido por defecto; apagándolo
+  vuelve el dibujo por saliencia de antes.
+
+### El instalador ya no se queda sin búsqueda semántica porque el 8080 esté ocupado
+
+- El puerto de `llama-server` estaba fijo en 8080, donde viven igual de a menudo un panel de Traefik, un
+  Jenkins o un Tomcat. Con el puerto tomado por algo que no sirve embeddings, el instalador bajaba 296 MB de
+  modelo, escribía `MISMEM_EMBEDDING_URL` apuntando ahí y dejaba la búsqueda sólo por palabras. Ahora se
+  mueve al primer puerto libre y lo dice; un servidor de embeddings que ya responda en el puerto se sigue
+  reutilizando, y el puerto que escribió una instalación anterior manda, así que re-ejecutarlo no mueve un
+  servidor que ya anda. `MISMEM_INSTALL_GEMMA_PORT` fija el puerto preferido.
+- **`install.sh` desde el repo exige pnpm** y lo dice en una línea: el repo sólo trae `pnpm-lock.yaml`, así
+  que la alternativa `npm ci` no podía funcionar nunca y fallaba con un volcado de npm de veinte líneas.
+- `engine/tests/installer.test.ts` corre el instalador de verdad contra un `HOME` temporal, con
+  `llama-server` y `systemctl` simulados: es lo único que prueba sus decisiones, porque hasta ahora de
+  `scripts/` sólo se comprobaban la sintaxis y shellcheck.
+
+### El conectoma deja de ser un panel aparte que tapaba los ajustes (#209)
+
+- **Los dos paneles del grafo se tapaban por debajo de 34rem.** A 375 px el del conectoma cubría
+  entero el de ajustes, y entre lo que tapaba estaba el único interruptor que apaga la capa: desde el
+  teléfono se entraba y no se salía. La lectura del conectoma pasa a ser el cuerpo de su propia
+  sección dentro de *Ajustes del grafo*, así que el solapamiento desaparece por construcción.
+- **El deslizador de soporte mínimo pedía el grafo entero en cada paso**, y cada petición recalcula el
+  NPMI de toda la tabla `co_use`: cinco pulsaciones de flecha eran cinco `GET /api/graph`, cuatro
+  abortadas. Ahora el número se mueve al instante y el valor viaja una sola vez, cuando se deja de
+  mover.
+- **El halo tiene su propio token** (`--color-graph-halo`) en los dos temas: el rosa de marca
+  resplandece sobre una superficie oscura, pero en claro el mismo tono a baja opacidad leía como un
+  cerco gris sucio.
+- **Los deslizadores no tenían nombre accesible**: `aria-labelledby` iba al contenedor y el
+  `role="slider"` lo tiene el pulgar, así que ninguno se anunciaba. La etiqueta llega ahora al pulgar.
+- Los tests de interfaz pueden renderizar componentes (`jsdom` y testing-library, con versión exacta):
+  hasta ahora sólo probaban lógica pura, y nada de esto se puede ver sin montar el panel.
+
+### `consolidate` ya no le roba episodios a otra memoria ni crea memorias sin origen (#233)
+
+- La herramienta MCP marcaba sus episodios con `UPDATE episodes SET consolidated_into = ?` **sin
+  comprobar que estuvieran pendientes**, así que un episodio que ya pertenecía a otra memoria pasaba a
+  la nueva y dejaba a la anterior con un `source_episode_ids` que ya no apuntaba a nada. Y si ninguno de
+  los ids existía o era de otro ámbito, la memoria se insertaba igual, sin un solo episodio detrás.
+- Ahora sólo toma episodios pendientes del ámbito pedido, como la consolidación nocturna, y si no queda
+  ninguno falla con un error que dice qué pasó en vez de insertar una memoria huérfana. La excepción
+  deshace el `INSERT` porque todo ocurre en la misma transacción.
+- **La consolidación nocturna**, que llama a esa misma herramienta, habría empezado a fallar la corrida
+  entera cuando el LLM cita el mismo episodio en dos memorias. Un episodio pertenece a una sola memoria
+  —`consolidated_into` guarda un id—, así que la primera se lo queda y la segunda busca otra evidencia;
+  sin ninguna, se salta con su línea de log y la corrida sigue.
+
+### El servidor MCP dice cuándo usar cada herramienta y cómo recuperarse de un fallo
+
+- El servidor MCP le dice al modelo cuándo usar cada herramienta y qué hacer cuando algo falla. Al inicializar anuncia unas `instructions` de menos de 1.500 caracteres con las tres capas, el formato del ámbito (`<persona o equipo>/<proyecto>`, el mismo al guardar y al buscar), cuándo capturar (una decisión con su porqué, la causa raíz de un fallo, una corrección del usuario, una idea por llamada, nunca secretos ni datos de terceros), buscar antes de preguntar al usuario algo que quizá ya esté guardado, reforzar con los ids que de verdad se usaron y leer entero con `mem_get_observation` un hit `truncated`. Las seis descripciones dicen en una frase "Use when"; un `recall` o un `mem_search` sin resultados añaden `scopes` (los ámbitos que tienen contenido, 20 como mucho) y, si se pidió un `scope`, un `hint` que lo nombra; y un `ZodError` llega como una línea por campo (`Error en capture: body: se esperaba un texto`) en vez del JSON de Zod, con el entero dicho como entero y el mínimo exclusivo como "tiene que ser mayor que 0".
+
+### `recall` por MCP le da al modelo la fecha, los detalles y la polaridad (#153)
+
+- Cada resultado trae `date` legible en UTC, los `details` de una memoria, la `polarity` de un rasgo cuando
+  no es neutra y `truncated` si un texto se recortó (2.000 caracteres de `text`, 1.200 de `details`). Las
+  respuestas MCP van sin indentación. Los alias `mem_*` conservan sus campos y también van sin indentación (salvo `mem_search`, que ante un vacío añade `scopes` y `hint`, como `recall`); el visor y su API no cambian.
+
+## 0.8.0 — 2026-11-01
+
 ### La búsqueda avisa del tope y la lista de rasgos pagina (#180)
 
 - El visor ya no esconde resultados sin decirlo: la búsqueda avisa cuando se queda en el tope de 50 («N resultados, puede haber más: afina la consulta o elige un ámbito») y la lista de rasgos pagina con «cargar más» y su total real, en vez de cortar en 200 con un «N de M» que no se podía completar.
@@ -84,7 +197,6 @@
 - Encontrado empaquetando con `pnpm pack` e instalando en un directorio limpio, que es lo que hace
   cualquiera: dentro del repo el fallo era invisible.
 
-
 ### Salir del visor desde la propia interfaz
 
 - Un botón de icono al lado de *Consolidar ahora*, para poder cerrar la sesión sin borrar cookies a mano
@@ -93,7 +205,6 @@
   ellas el visor es abierto y el botón prometería algo que no existe.
 - No usa un formulario: la CSP del visor fija `form-action 'none'`, así que el botón llama a `POST /logout`
   y luego navega.
-
 
 ### El refuerzo escribía pocos pares, y la capa lateral sólo aprende de pares
 
@@ -208,6 +319,7 @@
   conserva su copia y `tests/support.test.ts` falla si las dos dejan de coincidir.
 - De paso, `queries/graph.ts` deja de reimplementar el acumulador de `store/connectome.ts`: el halo
   del lienzo y la lista del panel responden ya a una sola definición de hub.
+
 ### El logo oficial encabeza el README
 
 - `docs/assets/logo.webp` y `logo-dark.webp`, el mismo logo con el fondo blanco quitado y la tinta en
@@ -233,7 +345,6 @@
   **de 6,0 s a 1,3 s** el caso que fallaba, y de 2,8 s a 0,7 s el otro. Además cada caso recibe el
   mismo presupuesto que ya le concedía a su subproceso, 60 s, en vez de los 5 s por defecto: el
   test se daba a sí mismo doce veces menos tiempo del que le daba al proceso que lanzaba.
-
 
 ## 0.7.0 — 2026-10-31
 
@@ -529,7 +640,6 @@
 ### zod 4
 
 - zod pasa de 3.25.76 a 4.6.7 (versión exacta): `.int()` rechaza enteros fuera del rango seguro de JS (y el `inputSchema` de `forget` lo anuncia), los límites de longitud cuentan *code points* en vez de unidades UTF-16 y cambian los textos de `ZodError`; `tests/tool-schemas.test.ts` compara con `z.toJSONSchema` en vez de leer internos de zod 3.
-
 
 ### Un solo diálogo de confirmación en el detalle
 
@@ -832,7 +942,6 @@
 - El resumen informa `episodes_uncited_pending`.
 - Migración aditiva: `episodes.uncited_count` arranca en 0 para todo lo que ya existe.
 
-
 ### Una preferencia corta ya no se descarta antes del LLM
 
 - El pre-filtro Pareto mandaba a L0 (ruido, sin pasar por el LLM) cualquier texto de menos de 40
@@ -840,7 +949,6 @@
   densidad sólo reconocían código y decisiones.
 - Se agregaron patrones de preferencia (`prefiero`, `uso`, `me gusta`, `dejé de`, `en vez de`,
   `elijo`, `mejor que`…), así que una preferencia breve suma densidad y llega al LLM.
-
 
 ### Los marcadores de ruido ya no compiten en el recall
 
@@ -853,7 +961,6 @@
 - Medido con `mismem-bench` sobre la copia de producción, con el servidor de embeddings arriba:
   `parafrasis` sube de 56/80 (70 %) a 58/80 (73 %), `literal` queda en 78/80 y las ajenas en 0/10.
   Los marcadores que llegaban al tope pasan de 43 a 0: ocupaban lugares que ahora son memorias reales.
-
 
 ### La saliencia puede seguir el uso en vez de la aparición
 
@@ -875,7 +982,6 @@
   dos partieran el texto distinto, un recuerdo se encontraría con unas palabras y se daría por
   usado con otras.
 
-
 ### misMEM puede adelantar recuerdos antes de que el modelo los pida
 
 - El modelo sólo recuerda lo que pide: si no llama a `recall`, no recuerda. `mismem-inject` es un
@@ -888,7 +994,6 @@
   de `MISMEM_HOOK_EXCLUDE_SCOPES`. Un prompt sin dos palabras con sustancia ni gasta la llamada.
 - **Lo inyectado viaja en cada prompt al proveedor del modelo.** `DEPLOY.md` explica cómo excluir
   los ámbitos personales y cómo revisar con `--dry-run`, que imprime ids y ámbitos pero no el texto.
-
 
 ### El bench dice dónde cayó el acierto, no sólo si cayó
 
@@ -913,7 +1018,6 @@
 
   Ajenas 0/10 y 4,8 recuerdos devueltos de 5. Lo que el recall@5 no mostraba: con paráfrasis, un
   cliente que muestra 3 recuerdos encuentra 52 de 80 (65 %), no 73 %.
-
 
 ## 0.4.0 — 2026-10-12
 
