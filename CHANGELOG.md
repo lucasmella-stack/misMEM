@@ -2,6 +2,10 @@
 
 ## Sin publicar
 
+### La búsqueda avisa del tope y la lista de rasgos pagina (#180)
+
+- El visor ya no esconde resultados sin decirlo: la búsqueda avisa cuando se queda en el tope de 50 («N resultados, puede haber más: afina la consulta o elige un ámbito») y la lista de rasgos pagina con «cargar más» y su total real, en vez de cortar en 200 con un «N de M» que no se podía completar.
+
 ### El visor enseña el estado del índice semántico (#159)
 
 - El visor avisa cuando el índice semántico tiene memorias sin vector, con vectores de otro modelo o con
