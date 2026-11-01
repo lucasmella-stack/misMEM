@@ -168,6 +168,14 @@ prev() {
 
 # defined VAR: si ENV_FILE la declara, aunque esté vacía. Un valor vacío es una elección (un prefijo
 # vacío apaga el de EmbeddingGemma que ahora viene por defecto), así que prev no basta para verlo.
+# engine_number VALOR: si el motor lo lee como número no negativo (env.ts usa Number() sobre el valor
+# recortado). Lo que no, el motor lo trata como sin definir.
+engine_number() {
+  [ -n "$(printf '%s' "$1" | tr -d ' \t')" ] || return 1
+  printf '%s\n' "$1" | awk '{ v = $0; gsub(/^[ \t]+|[ \t]+$/, "", v)
+    exit !(v ~ /^[+]?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][-+]?[0-9]+)?$/ && v + 0 >= 0) }'
+}
+
 defined() {
   [ -f "$ENV_FILE" ] || return 1
   (set -a; . "$ENV_FILE"; eval "[ \"\${$1+x}\" = x ]")
@@ -449,8 +457,8 @@ mkdir -p "$CONF_DIR" "$BIN_DIR" "$(dirname "$DB")"
       case "$(printf '%s' "$PREV_EMBED" | tr '[:upper:]' '[:lower:]')" in *embeddinggemma*) PREV_GEMMA_FAMILY=1 ;; esac
       for v in $EMBED_VARS; do
         val="$(prev "$v")"
-        if [ "$v" = MISMEM_EMBEDDING_MIN_SCORE ] && ! printf '%s' "$val" | grep -Eq '^[0-9]+([.][0-9]+)?$' &&
-          { [ -n "$PREV_GEMMA_FAMILY" ] || { [ "$PREV_KIND" = custom ] && [ -n "$PREV_NOMIC" ]; }; }; then
+        if [ "$v" = MISMEM_EMBEDDING_MIN_SCORE ] && ! engine_number "$val" &&
+          { [ -n "$PREV_GEMMA_FAMILY" ] || { [ "$PREV_KIND" != gemma ] && [ -n "$PREV_NOMIC" ]; }; }; then
           # Sin corte válido, el motor anterior daba 0,65 a nomic y 0,5 al resto; el nuevo da 0,65 a la
           # familia EmbeddingGemma y 0,5 al resto.
           if [ -n "$PREV_GEMMA_FAMILY" ]; then printf '%s=0.5\n' "$v"; else printf '%s=0.65\n' "$v"; fi
@@ -463,10 +471,10 @@ mkdir -p "$CONF_DIR" "$BIN_DIR" "$(dirname "$DB")"
           { [ "$v" = MISMEM_EMBEDDING_QUERY_PREFIX ] || [ "$v" = MISMEM_EMBEDDING_DOC_PREFIX ]; }; then
           # EmbeddingGemma configurado a mano sin prefijos se indexó sin ellos; el defecto nuevo los pondría.
           printf '%s=\n' "$v"
-        elif [ "$v" = MISMEM_EMBEDDING_URL ] && [ "$PREV_KIND" = custom ]; then
+        elif [ "$v" = MISMEM_EMBEDDING_URL ] && [ "$PREV_KIND" != gemma ]; then
           # Sin URL propia, el motor resolvía una por su cuenta; se deja escrita para no cambiar de servidor.
           printf '%s=%q\n' "$v" "$PREV_RESOLVED_URL"
-        elif [ "$v" = MISMEM_EMBEDDING_MODEL ] && [ "$PREV_KIND" = custom ]; then
+        elif [ "$v" = MISMEM_EMBEDDING_MODEL ] && [ "$PREV_KIND" != gemma ]; then
           # Sin modelo, el motor anterior usaba nomic-embed-text; el nuevo pondría EmbeddingGemma 2, que ese
           # servidor no tiene.
           printf '%s=%q\n' "$v" nomic-embed-text
