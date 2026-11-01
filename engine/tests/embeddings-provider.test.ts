@@ -157,7 +157,7 @@ describe("embedTexts con un servidor compatible con OpenAI", () => {
       model: "embeddinggemma-2",
       input: ["task: search result | query: a", "task: search result | query: b"],
     });
-    expect(vecs?.map((v) => Array.from(v))).toEqual([[1, 0], [0, 1]]);
+    expect(vecs?.map((v) => (v ? Array.from(v) : null))).toEqual([[1, 0], [0, 1]]);
   });
 
   it("a los documentos les pone el prefijo de documento", async () => {
@@ -176,6 +176,34 @@ describe("embedTexts con un servidor compatible con OpenAI", () => {
     setEnv(GEMMA_ENV);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("boom", { status: 500 })));
     expect(await embedTexts(["a"], loadEmbeddingConfig(), "query")).toBeNull();
+  });
+
+  it("normaliza lo que devuelve el servidor", async () => {
+    setEnv(GEMMA_ENV);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(openAiResponse([[3, 4]])));
+
+    const vecs = await embedTexts(["a"], loadEmbeddingConfig(), "query");
+
+    expect(vecs?.[0]?.[0]).toBeCloseTo(0.6);
+    expect(vecs?.[0]?.[1]).toBeCloseTo(0.8);
+  });
+
+  it.each([
+    { label: "norma cero", vector: [0, 0] },
+    // 1e39 overflows Float32Array into Infinity: JSON cannot carry NaN itself.
+    { label: "un componente no finito", vector: [1e39, 1] },
+    { label: "un componente null", vector: [1, null, 2] },
+  ])("un vector con $label es null, pero no arrastra al resto del lote", async ({ vector }) => {
+    setEnv(GEMMA_ENV);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(openAiResponse([[1, 0, 0], vector as unknown as number[]])),
+    );
+
+    const vecs = await embedTexts(["a", "b"], loadEmbeddingConfig(), "query");
+
+    expect(vecs?.[0]?.length).toBe(3);
+    expect(vecs?.[1]).toBeNull();
   });
 });
 

@@ -26,7 +26,8 @@ function storedModel(memoryId: string): string | undefined {
 
 beforeAll(async () => {
   const probe = await embedTexts(["ping"], cfg, "query");
-  if (!probe) {
+  // A server that answers with an invalid vector is as unusable as one that does not answer.
+  if (!probe?.[0]) {
     throw new Error(
       `El servidor de embeddings no responde en ${cfg.url} con ${cfg.model}: arrancarlo o fijar MISMEM_EMBEDDING_URL.`,
     );
@@ -43,11 +44,13 @@ describe("el servidor de embeddings real", () => {
 
     expect(vecs).toHaveLength(2);
     const [a, b] = vecs!;
+    expect(a).not.toBeNull();
+    expect(b).not.toBeNull();
     expect(a!.length).toBeGreaterThan(0);
     expect(b!.length).toBe(a!.length);
     for (const v of vecs!) {
-      expect(v.every(Number.isFinite)).toBe(true);
-      expect(v.some((x) => x !== 0)).toBe(true);
+      expect(v!.every(Number.isFinite)).toBe(true);
+      expect(v!.some((x) => x !== 0)).toBe(true);
     }
   });
 

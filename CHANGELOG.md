@@ -2,6 +2,17 @@
 
 ## Sin publicar
 
+### Un vector inválido ya no esconde una memoria de la búsqueda (#155)
+
+- Cada vector se valida y se normaliza a norma 1 al entrar, venga del servidor de embeddings o de un
+  `embedFn` inyectado: `NaN`, `Infinity`, un componente nulo o no numérico y la norma cero dejan de
+  guardarse. Un vector malo sólo se pierde a sí mismo, sin arrastrar a sus compañeros de lote; un lote con
+  menos vectores que textos o con dimensiones mezcladas cuenta como fallido.
+- El backfill reescribe los vectores que una versión anterior guardó inválidos, y `mismem-embed --status`
+  los cuenta en `invalid`. La consulta degrada a búsqueda por palabras cuando su propio vector no es válido.
+- `--status` no cuenta los marcadores de ruido, que el backfill nunca reescribe, y una tanda entera de
+  vectores inválidos cuenta como fallida: dos seguidas abortan la corrida como si el servidor estuviera caído.
+
 ### La suite de tests ya no llama al servidor de embeddings de quien la corre, y hay una suite que sí lo prueba
 
 - Tras consolidar, `runConsolidation` rellena los vectores con la configuración real, así que cada corrida de
