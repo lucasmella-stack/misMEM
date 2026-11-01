@@ -1,0 +1,67 @@
+{"type": "memory", "key": "eq-01", "scope": "cierzo/equipo", "gist": "La daily de Cierzo es a las 9:30, dura 15 minutos y los martes incluye una demo.", "days_ago": 200, "details": "Se hace en pie y solo se habla de bloqueos. Los detalles se dejan para después."}
+{"type": "memory", "key": "eq-02", "scope": "cierzo/equipo", "gist": "Las revisiones de código tienen un plazo de respuesta de 24 horas laborables.", "days_ago": 180, "details": "El plazo empieza cuando el autor pide revisión, no cuando abre el pull request. Si alguien está de vacaciones, se avisa en el canal."}
+{"type": "memory", "key": "eq-03", "scope": "cierzo/equipo", "gist": "Ningún pull request puede superar las 400 líneas cambiadas salvo los de dependencias.", "days_ago": 180}
+{"type": "memory", "key": "eq-04", "scope": "cierzo/equipo", "gist": "El equipo trabaja con trunk-based development y ramas de menos de tres días.", "days_ago": 220, "details": "Si una rama crece más, se parte en cambios pequeños. Nada de ramas de larga vida."}
+{"type": "memory", "key": "eq-05", "scope": "cierzo/equipo", "gist": "Los despliegues a producción salen los jueves a las 11:00, nunca un viernes.", "days_ago": 150}
+{"type": "memory", "key": "eq-06", "scope": "cierzo/equipo", "gist": "La guardia rota cada semana y el traspaso es el lunes a las 10:00.", "days_ago": 120, "details": "El traspaso incluye revisar las alertas abiertas y los incidentes de la semana."}
+{"type": "memory", "key": "eq-07", "scope": "cierzo/equipo", "gist": "Todo incidente grave tiene un postmortem sin culpables en las 48 horas siguientes.", "days_ago": 100, "details": "El documento cuenta qué pasó, cómo se detectó y qué se cambia. Nunca se pone el nombre de quien ejecutó el cambio."}
+{"type": "memory", "key": "eq-08", "scope": "cierzo/equipo", "gist": "El equipo gestiona el trabajo en Linear, con un proyecto por trimestre.", "days_ago": 90}
+{"type": "memory", "key": "eq-09", "scope": "cierzo/equipo", "gist": "La documentación vive en Notion y cada decisión tiene su página con fecha.", "days_ago": 160}
+{"type": "memory", "key": "eq-10", "scope": "cierzo/equipo", "gist": "Los viernes por la tarde se reservan para aprender, sin reuniones ni tareas urgentes.", "days_ago": 240, "details": "No es obligatorio hacer un curso: vale leer, probar una librería o escribir documentación."}
+{"type": "memory", "key": "eq-11", "scope": "cierzo/equipo", "gist": "El equipo son seis personas: Lucía, Marta, Iván, Sofía, Diego y Nerea.", "days_ago": 60, "details": "Marta lleva producto, Iván e infraestructura, Sofía empieza y Diego y Nerea están en backend."}
+{"type": "memory", "key": "eq-12", "scope": "lucia/dev", "gist": "Lucía mentoriza a Sofía, la nueva, todos los miércoles durante una hora.", "days_ago": 65, "details": "Empezaron en septiembre con el estilo de código y ahora repasan diseño de APIs. Sofía prepara preguntas durante la semana."}
+{"type": "memory", "key": "eq-13", "scope": "cierzo/equipo", "gist": "La retrospectiva del equipo es cada dos viernes por la mañana y dura 45 minutos.", "days_ago": 210}
+{"type": "memory", "key": "eq-14", "scope": "cierzo/equipo", "gist": "La definición de terminado exige tests, changelog y una revisión de seguridad.", "days_ago": 130, "details": "Un cambio sin tests no se mergea. El changelog se escribe en la misma rama."}
+{"type": "memory", "key": "eq-15", "scope": "lucia/dev", "gist": "Lucía es la referente técnica de facturación dentro del equipo desde enero.", "days_ago": 300}
+{"type": "memory", "key": "eq-16", "scope": "cierzo/equipo", "gist": "Las mañanas hasta las 12:00 no tienen reuniones, salvo la daily de las 9:30, para dejar tiempo de concentración.", "days_ago": 6, "details": "Las reuniones se concentran después de comer. Las urgencias se avisan por el canal de guardia."}
+{"type": "memory", "key": "eq-17", "scope": "cierzo/equipo", "gist": "La revisión salarial se hace en enero y se comunica antes del día 20.", "days_ago": 280}
+{"type": "memory", "key": "eq-18", "scope": "cierzo/equipo", "gist": "El modelo de trabajo es tres días de teletrabajo y dos presenciales en la oficina.", "days_ago": 110, "details": "No hay días fijos salvo el miércoles. Cada persona organiza el resto como quiere."}
+{"type": "memory", "key": "eq-19", "scope": "cierzo/equipo", "gist": "El miércoles es el día obligatorio de oficina para todo el equipo.", "days_ago": 110}
+{"type": "memory", "key": "eq-20", "scope": "lucia/dev", "gist": "Lucía rechazó en junio el puesto de tech lead porque prefería seguir escribiendo código.", "days_ago": 150, "details": "Le ofrecieron el puesto en junio y lo habló con Andrés antes de decir que no."}
+{"type": "memory", "key": "eq-n1", "scope": "cierzo/equipo", "gist": "[noise] charla sobre la reunión y el equipo", "days_ago": 2}
+{"type": "memory", "key": "eq-n2", "scope": "cierzo/equipo", "gist": "[pareto:l0] saludo y repaso del sprint", "days_ago": 3}
+{"type": "trait", "key": "eq-t1", "scope": "cierzo/equipo", "name": "Prefiere dejar por escrito las decisiones y los acuerdos antes que fiarlo todo a la memoria del equipo.", "evidence": ["eq-07", "eq-09", "eq-14"]}
+{"type": "trait", "key": "eq-t2", "scope": "cierzo/equipo", "name": "Nunca deja una revisión de código ajena sin respuesta más de un día laborable.", "evidence": ["eq-02", "eq-03"]}
+{"type": "episode", "key": "eq-e1", "scope": "cierzo/equipo", "body": "Hoy ha empezado Hugo, el becario nuevo. Es de Huesca y viene dos días por semana hasta junio. Marta le ha enseñado el Linear y yo le he explicado cómo montar el entorno, aunque ha tardado porque no encontraba la versión de Node.", "days_ago": 1}
+{"type": "episode", "key": "eq-e2", "scope": "cierzo/equipo", "body": "Comida de equipo el viernes en un griego del centro. Ha venido casi todo el mundo menos Iván, que estaba con una incidencia. Hemos hablado de cambiar la retrospectiva a los jueves, pero no hemos decidido nada.", "days_ago": 2}
+{"type": "episode", "key": "eq-e3", "scope": "lucia/dev", "body": "He estado toda la mañana con Sofía repasando su primer PR grande. Le he pedido que lo parta en tres porque no hay quien lo revise así. Al final lo hemos dejado en dos y ha quedado contenta. Pablo me ha llamado para preguntar por Nube.", "days_ago": 4}
+{"type": "query", "id": "eq-q01", "kind": "literal", "query": "¿A qué hora es la daily y cuánto dura?", "expect": ["eq-01"]}
+{"type": "query", "id": "eq-q02", "kind": "literal", "query": "¿Cuántas líneas puede tener como máximo un pull request?", "expect": ["eq-03"]}
+{"type": "query", "id": "eq-q03", "kind": "literal", "query": "¿Quiénes forman el equipo de Cierzo?", "expect": ["eq-11"]}
+{"type": "query", "id": "eq-q04", "kind": "literal", "query": "¿Cuándo se hace la revisión salarial y cuándo se comunica?", "expect": ["eq-17"]}
+{"type": "query", "id": "eq-q05", "kind": "parafrasis", "query": "¿Cuánto puede tardar una persona en contestar a un cambio propuesto?", "expect": ["eq-02"]}
+{"type": "query", "id": "eq-q06", "kind": "parafrasis", "query": "¿Cómo organizan el trabajo en git para integrar a diario y no acumular desvíos?", "expect": ["eq-04"]}
+{"type": "query", "id": "eq-q07", "kind": "parafrasis", "query": "¿Qué se hace después de un fallo serio y en cuánto tiempo?", "expect": ["eq-07"]}
+{"type": "query", "id": "eq-q08", "kind": "parafrasis", "query": "¿Dónde se guardan las resoluciones del grupo con su día?", "expect": ["eq-09"]}
+{"type": "query", "id": "eq-q09", "kind": "parafrasis", "query": "¿A quién acompaña cada siete días para que aprenda el oficio?", "expect": ["eq-12"]}
+{"type": "query", "id": "eq-q10", "kind": "parafrasis", "query": "¿Cuántas jornadas se queda en casa y cuántas acude al puesto?", "expect": ["eq-18"]}
+{"type": "query", "id": "eq-q11", "kind": "sinonimo", "query": "¿Qué día de la semana se publica en producción y a qué hora?", "expect": ["eq-05"]}
+{"type": "query", "id": "eq-q12", "kind": "sinonimo", "query": "¿Cada cuánto cambia el turno de guardia y cuándo se hace el relevo?", "expect": ["eq-06"]}
+{"type": "query", "id": "eq-q13", "kind": "sinonimo", "query": "¿Con qué herramienta se planifica el trabajo por trimestres?", "expect": ["eq-08"]}
+{"type": "query", "id": "eq-q14", "kind": "sinonimo", "query": "¿Qué tres cosas se exigen para considerar una tarea acabada?", "expect": ["eq-14"]}
+{"type": "query", "id": "eq-q15", "kind": "coloquial", "query": "¿Qué se hace los viernes por la tarde en la oficina?", "expect": ["eq-10"]}
+{"type": "query", "id": "eq-q16", "kind": "coloquial", "query": "¿Cada cuánto os sentáis a mirar qué va mal?", "expect": ["eq-13"]}
+{"type": "query", "id": "eq-q17", "kind": "coloquial", "query": "¿Se puede trabajar tranquilo por la mañana o hay reuniones?", "expect": ["eq-16"]}
+{"type": "query", "id": "eq-q18", "kind": "sin_tildes", "query": "de que es referente lucia dentro del equipo", "expect": ["eq-15"]}
+{"type": "query", "id": "eq-q19", "kind": "sin_tildes", "query": "que dia hay que ir obligatoriamente a la oficina", "expect": ["eq-19"]}
+{"type": "query", "id": "eq-q20", "kind": "sin_tildes", "query": "que puesto rechazo lucia en junio y por que", "expect": ["eq-20"]}
+{"type": "query", "id": "eq-q21", "kind": "errata", "query": "¿A que hora es la daili y cuanto dura?", "expect": ["eq-01"]}
+{"type": "query", "id": "eq-q22", "kind": "errata", "query": "¿Cuanto tiempo hay para responder a una revision de codgio?", "expect": ["eq-02"]}
+{"type": "query", "id": "eq-q23", "kind": "errata", "query": "¿Cuantas personas forman el eqipo de Cierzo?", "expect": ["eq-11"]}
+{"type": "query", "id": "eq-q24", "kind": "ingles", "query": "How does the team keep branches short and integrate every day?", "expect": ["eq-04"]}
+{"type": "query", "id": "eq-q25", "kind": "ingles", "query": "Where are team decisions documented?", "expect": ["eq-09"]}
+{"type": "query", "id": "eq-q26", "kind": "larga", "query": "Cuando alguien entra de guardia necesita saber con quién habla, cuándo empieza su turno y cuándo se hace el cambio con la persona anterior, porque la última vez se enteró de casualidad.", "expect": ["eq-06"]}
+{"type": "query", "id": "eq-q27", "kind": "larga", "query": "Lucía quiere reservar un hueco fijo en su agenda para acompañar a la persona que acaba de entrar en el equipo, y no recuerda qué día lo tenía ni cuánto duraba.", "expect": ["eq-12"]}
+{"type": "query", "id": "eq-q28", "kind": "larga", "query": "Para hablar con recursos humanos quiere saber en qué mes se revisan los sueldos y antes de qué fecha suelen comunicar la decisión, porque el año pasado se enteró tarde.", "expect": ["eq-17"]}
+{"type": "query", "id": "eq-q29", "kind": "clave", "query": "Linear", "expect": ["eq-08"]}
+{"type": "query", "id": "eq-q30", "kind": "clave", "query": "Notion", "expect": ["eq-09"]}
+{"type": "query", "id": "eq-q31", "kind": "ambito", "query": "¿Quién es el becario nuevo del equipo?", "expect": ["eq-e1"], "scope": "cierzo/equipo"}
+{"type": "query", "id": "eq-q32", "kind": "ambito", "query": "¿Qué puesto rechazó en junio?", "expect": ["eq-20"], "scope": "lucia/dev"}
+{"type": "query", "id": "eq-q33", "kind": "episodio", "query": "¿Quién ha empezado hoy y de dónde viene?", "expect": ["eq-e1"]}
+{"type": "query", "id": "eq-q34", "kind": "episodio", "query": "¿Dónde es la comida de equipo y quién no fue?", "expect": ["eq-e2"]}
+{"type": "query", "id": "eq-q35", "kind": "rasgo", "query": "¿Cómo prefiere que queden las decisiones del equipo?", "expect": ["eq-t1"]}
+{"type": "query", "id": "eq-q36", "kind": "rasgo", "query": "¿Qué compromiso tiene con las revisiones de los demás?", "expect": ["eq-t2"]}
+{"type": "query", "id": "eq-q37", "kind": "ajena", "query": "¿Cuál es la diferencia entre un eclipse solar y uno lunar?", "expect": []}
+{"type": "query", "id": "eq-q38", "kind": "ajena", "query": "¿Cómo castigó Poseidón a Ulises en la Odisea?", "expect": []}
+{"type": "query", "id": "eq-q39", "kind": "ajena", "query": "¿Cómo se extrae la miel de un panal sin dañar a la reina?", "expect": []}
+{"type": "query", "id": "eq-q40", "kind": "ajena", "query": "¿Cómo se anota una captura al paso en notación algebraica?", "expect": []}

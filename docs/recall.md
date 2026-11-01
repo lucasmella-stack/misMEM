@@ -93,3 +93,49 @@ Con resultados la respuesta no cambia: no lleva `scopes` ni `hint`.
 pregunta y `noiseHits` (marcadores que se escaparon: tiene que ser 0). Se corre antes y después de tocar
 `recall/` o `embeddings/`. El banco de preguntas es privado y sale de la propia memoria.
 Cómo usarlo en un servidor: [DEPLOY.md](../DEPLOY.md#medir-el-recall).
+
+El eval dorado (`pnpm eval`) mide lo mismo sobre un corpus sintético y público en castellano: una persona ficticia en doce
+dominios. Sirve para comparar entre máquinas y para subir el suelo en CI. Desde `engine/`:
+
+```bash
+pnpm eval --mode lexico
+node dist/eval-cli.js --mode semantico
+```
+
+El segundo exige `pnpm build` y las variables `MISMEM_EMBEDDING_*` del servidor de embeddings
+([DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única)); `--mode auto` usa el semántico sólo si
+el embedder deja todas las memorias embebidas sin un solo lote fallido. Si alguna se queda sin vector,
+mide en léxico y la línea `modo:` lo dice. Los datos viven en `engine/eval/golden/`, un `.jsonl` por
+dominio; su validación está en `engine/src/recall/golden-corpus.ts` y su carga y medición en
+`engine/src/recall/golden.ts`. La puerta de CI
+(`engine/tests/golden.test.ts`) exige que el modo léxico no baje del suelo por tipo de `floor.json` ni supere
+`lexico_ajenas_max`, y que ningún marcador de ruido llegue al resultado. También comprueba el reparto del
+corpus (doce dominios, 40 preguntas por dominio y los tipos esperados) y que `expect` o `evidence` no nombren
+un id de pregunta; si el corpus no está, el test falla. Quien mejora el recall sube el suelo en el mismo PR.
+El corpus no viaja en el paquete npm (el ejecutor sí, en `dist/`): se corre desde el repositorio.
+
+Línea base del 2026-11-01 (tope 5, aciertos dentro del tope; caduca cuando cambia el corpus):
+
+| Modo | Global | MRR | Paráfrasis | Episodio | Rasgo | Ajenas con algo | Recuerdos por pregunta |
+|---|---|---|---|---|---|---|---|
+| Léxico | 222/432 | 0,48 | 1/72 | 20/24 | 9/24 | 4/48 | 0,9 |
+| Semántico (`embeddinggemma-2`, corte 0,65) | 368/432 | 0,80 | 64/72 | 0/24 | 0/24 | 12/48 | 4,8 |
+
+Los dos ceros del semántico son el issue #154.
+
+### El corpus dorado
+
+Un objeto JSON por línea, en `engine/eval/golden/<dominio>.jsonl`:
+
+```json
+{"type":"memory","key":"dev-01","scope":"lucia/dev","gist":"…","details":"…","days_ago":12,"salience":0.8}
+{"type":"trait","key":"dev-t1","scope":"lucia/dev","name":"…","evidence":["dev-01"]}
+{"type":"episode","key":"dev-e1","scope":"lucia/dev","body":"…","days_ago":1}
+{"type":"query","id":"dev-q01","kind":"parafrasis","query":"…","expect":["dev-01"],"scope":"…"}
+```
+
+`details`, `salience` y el `scope` de una pregunta son opcionales. Las claves son únicas entre ficheros;
+`expect` nombra cualquiera de ellas y sólo está vacío en `ajena`, una pregunta que no debe traer nada. Un
+`gist` que empieza por `[noise] ` o `[pareto:l0] ` es un marcador de ruido: se carga y nunca se devuelve, así que
+ninguna pregunta del corpus lo espera (el validador no lo impide: una pregunta así fallaría siempre). Los tipos de pregunta son `literal`, `parafrasis`, `sinonimo`, `coloquial`, `sin_tildes`,
+`errata`, `ingles`, `larga`, `clave`, `ambito`, `episodio`, `rasgo` y `ajena`.

@@ -1,0 +1,67 @@
+{"type": "memory", "key": "dev-01", "scope": "proyecto/facturacion", "gist": "Eligió PostgreSQL 16 para la base de datos de facturación por las transacciones y la auditoría de cada cambio.", "days_ago": 120, "details": "Descartó MySQL porque las migraciones con claves foráneas le parecían más frágiles. La auditoría se resuelve con una tabla de eventos y disparadores."}
+{"type": "memory", "key": "dev-02", "scope": "proyecto/app-movil", "gist": "La app móvil guarda la caché offline en SQLite y la sincroniza con el servidor al recuperar cobertura.", "days_ago": 60}
+{"type": "memory", "key": "dev-03", "scope": "proyecto/facturacion", "gist": "Usa Drizzle ORM en facturación porque genera SQL legible y las migraciones se revisan a mano.", "days_ago": 90, "details": "Probó Prisma antes, pero prefería ver el SQL exacto en la revisión. Drizzle le deja escribir migraciones SQL a mano."}
+{"type": "memory", "key": "dev-04", "scope": "proyecto/app-movil", "gist": "En la app móvil prefiere Kysely: quiere controlar el SQL que se envía y evitar una capa mágica.", "days_ago": 150}
+{"type": "memory", "key": "dev-05", "scope": "lucia/dev", "gist": "Guardó las sesiones de usuario en Redis 7 con expiración de 30 minutos y persistencia desactivada.", "days_ago": 200, "details": "La persistencia estaba apagada a propósito: si el proceso se reiniciaba, todas las sesiones caducaban y nadie reutilizaba un token viejo."}
+{"type": "memory", "key": "dev-06", "scope": "lucia/dev", "gist": "Puso Memcached delante de la API de facturación para cachear respuestas de solo lectura durante 60 segundos.", "days_ago": 210}
+{"type": "memory", "key": "dev-07", "scope": "proyecto/facturacion", "gist": "La integración continua de facturación corre en GitHub Actions con pnpm y tarda unos 6 minutos.", "days_ago": 75, "details": "El flujo ejecuta typecheck, tests y build antes de publicar la imagen. La caché de pnpm reduce la espera."}
+{"type": "memory", "key": "dev-08", "scope": "proyecto/app-movil", "gist": "Los builds de la app móvil se lanzan en Bitrise porque necesita compilar para iOS y Android.", "days_ago": 110}
+{"type": "memory", "key": "dev-09", "scope": "lucia/dev", "gist": "Actualizó los servicios a Node 22 LTS en marzo y dejó de usar la versión 20.", "days_ago": 240, "details": "La migración duró una tarde porque dos dependencias nativas no tenían binario para esa versión."}
+{"type": "memory", "key": "dev-10", "scope": "lucia/dev", "gist": "Organizó el monorepo con pnpm workspaces: tres paquetes y un paquete compartido de tipos.", "days_ago": 300, "details": "Los paquetes son api, web y shared. La idea era evitar imports cruzados con rutas relativas largas."}
+{"type": "memory", "key": "dev-11", "scope": "proyecto/facturacion", "gist": "Valida con Zod los cuerpos de las peticiones y las respuestas del proveedor de pagos antes de guardarlas.", "days_ago": 180, "details": "Un proveedor cambió un campo de número a cadena sin avisar. Desde entonces, la respuesta se valida antes de tocar la base."}
+{"type": "memory", "key": "dev-12", "scope": "proyecto/app-movil", "gist": "Migró la app a React Native 0.81 con la New Architecture y notó mejoras al arrancar.", "days_ago": 25, "details": "El arranque en frío bajó de 2,1 a 1,4 segundos en su móvil de prueba."}
+{"type": "memory", "key": "dev-13", "scope": "lucia/dev", "gist": "Cambió Jest por Vitest en todos los proyectos porque comparte configuración con Vite.", "days_ago": 260}
+{"type": "memory", "key": "dev-14", "scope": "proyecto/facturacion", "gist": "Los flujos de alta de factura se prueban con Playwright en un navegador real.", "days_ago": 150}
+{"type": "memory", "key": "dev-15", "scope": "lucia/dev", "gist": "Mantiene TypeScript en modo estricto y prohíbe los any con una regla de Biome.", "days_ago": 350, "details": "La regla se aplica también en los tests. Un any nuevo rompe la integración continua."}
+{"type": "memory", "key": "dev-16", "scope": "proyecto/app-movil", "gist": "Usa TanStack Query para las peticiones de la app y así evita escribir estados de carga a mano.", "days_ago": 80}
+{"type": "memory", "key": "dev-17", "scope": "lucia/dev", "gist": "Escribe los logs con pino en JSON y les añade el identificador de petición en cada línea.", "days_ago": 190, "details": "El identificador se genera en un middleware y viaja en todas las llamadas internas."}
+{"type": "memory", "key": "dev-18", "scope": "proyecto/facturacion", "gist": "Genera las facturas en PDF con pdf-lib desde el servidor, sin lanzar un navegador headless.", "days_ago": 220, "details": "La plantilla está en HTML y se rellena con los datos de la factura. Evita Chromium para no inflar la imagen de Docker."}
+{"type": "memory", "key": "dev-19", "scope": "proyecto/app-movil", "gist": "Exporta los recibos de la app a PDF con expo-print, que reutiliza las vistas nativas.", "days_ago": 130}
+{"type": "memory", "key": "dev-20", "scope": "lucia/dev", "gist": "Adoptó Biome como linter y formateador único tras compararlo con ESLint y Prettier.", "days_ago": 9, "details": "La configuración vive en un único biome.json en la raíz del monorepo."}
+{"type": "memory", "key": "dev-n1", "scope": "lucia/dev", "gist": "[noise] saludo y charla sobre el despliegue del viernes", "days_ago": 2}
+{"type": "memory", "key": "dev-n2", "scope": "proyecto/facturacion", "gist": "[pareto:l0] repaso rápido de la base de datos y el ORM", "days_ago": 3}
+{"type": "trait", "key": "dev-t1", "scope": "lucia/dev", "name": "Prefiere TypeScript estricto y validar con Zod toda entrada y salida de los bordes.", "evidence": ["dev-11", "dev-15"]}
+{"type": "trait", "key": "dev-t2", "scope": "lucia/dev", "name": "Nunca adopta una herramienta de datos sin revisar el SQL que genera y sus migraciones.", "evidence": ["dev-03", "dev-04"]}
+{"type": "episode", "key": "dev-e1", "scope": "lucia/dev", "body": "Hoy he empezado un curso de Rust los martes por la tarde. Andrés dice que me va a durar dos semanas, como el de piano. De momento he hecho un lector de CSV y me ha costado menos de lo que pensaba. Nube se ha dormido encima del teclado mientras compilaba.", "days_ago": 1}
+{"type": "episode", "key": "dev-e2", "scope": "proyecto/facturacion", "body": "Reunión con producto: quieren adelantar la demo de facturación al 14 de noviembre y enseñar la conciliación bancaria. He dicho que sí, pero necesito cerrar antes el tema de los recibos duplicados. Diego me ha pasado una lista de casos raros que encontró en soporte.", "days_ago": 2}
+{"type": "episode", "key": "dev-e3", "scope": "lucia/dev", "body": "Se me cayó café encima del teclado y he pedido uno nuevo por la web de la tienda del barrio. Mientras llega estoy con el portátil viejo, que tiene la batería muerta y hace un ruido horrible. He aprovechado para borrar carpetas de node_modules y liberar 8 GB.", "days_ago": 4}
+{"type": "query", "id": "dev-q01", "kind": "literal", "query": "¿Por qué eligió PostgreSQL 16 para la base de datos de facturación?", "expect": ["dev-01"]}
+{"type": "query", "id": "dev-q02", "kind": "literal", "query": "¿Dónde corre la integración continua de facturación y cuánto tarda?", "expect": ["dev-07"]}
+{"type": "query", "id": "dev-q03", "kind": "literal", "query": "¿A qué versión de React Native migró la app móvil?", "expect": ["dev-12"]}
+{"type": "query", "id": "dev-q04", "kind": "literal", "query": "¿Con qué herramienta escribe los logs en JSON?", "expect": ["dev-17"]}
+{"type": "query", "id": "dev-q05", "kind": "parafrasis", "query": "¿Qué motor local permite consultar información sin conexión en el teléfono?", "expect": ["dev-02"]}
+{"type": "query", "id": "dev-q06", "kind": "parafrasis", "query": "¿Qué biblioteca de persistencia usa en el proyecto de las facturas para leer las sentencias y controlarlas?", "expect": ["dev-03"]}
+{"type": "query", "id": "dev-q07", "kind": "parafrasis", "query": "¿Dónde viven los tokens de acceso que caducan a la media hora y no se escriben en disco?", "expect": ["dev-05"]}
+{"type": "query", "id": "dev-q08", "kind": "parafrasis", "query": "¿Cómo estructuró el repositorio único para separar la interfaz, el servidor y lo común?", "expect": ["dev-10"]}
+{"type": "query", "id": "dev-q09", "kind": "parafrasis", "query": "¿Con qué corredor de tests reemplazó la herramienta anterior y así aprovecha el mismo archivo del compilador?", "expect": ["dev-13"]}
+{"type": "query", "id": "dev-q10", "kind": "parafrasis", "query": "¿Cómo produce los documentos de cobro sin abrir un Chrome oculto?", "expect": ["dev-18"]}
+{"type": "query", "id": "dev-q11", "kind": "sinonimo", "query": "¿Qué caché delante de la API guarda respuestas de lectura durante sesenta segundos?", "expect": ["dev-06"]}
+{"type": "query", "id": "dev-q12", "kind": "sinonimo", "query": "¿Qué versión LTS de Node adoptó en primavera?", "expect": ["dev-09"]}
+{"type": "query", "id": "dev-q13", "kind": "sinonimo", "query": "¿Con qué herramienta automatiza las pruebas de extremo a extremo en un navegador?", "expect": ["dev-14"]}
+{"type": "query", "id": "dev-q14", "kind": "sinonimo", "query": "¿Qué librería gestiona el estado remoto y el caché de peticiones en la app?", "expect": ["dev-16"]}
+{"type": "query", "id": "dev-q15", "kind": "coloquial", "query": "Oye, ¿con qué montamos las consultas en la app del móvil, que no me acuerdo?", "expect": ["dev-04"]}
+{"type": "query", "id": "dev-q16", "kind": "coloquial", "query": "¿Qué usamos para comprobar lo que nos llega del proveedor de pagos antes de meterlo en la base?", "expect": ["dev-11"]}
+{"type": "query", "id": "dev-q17", "kind": "coloquial", "query": "¿Cómo sacamos los recibos en PDF desde la app sin montar un navegador?", "expect": ["dev-19"]}
+{"type": "query", "id": "dev-q18", "kind": "sin_tildes", "query": "donde se compilan las versiones de la app para iOS y Android", "expect": ["dev-08"]}
+{"type": "query", "id": "dev-q19", "kind": "sin_tildes", "query": "que configuracion de TypeScript exige declarar los tipos y no deja usar any", "expect": ["dev-15"]}
+{"type": "query", "id": "dev-q20", "kind": "sin_tildes", "query": "que herramienta unica revisa y formatea el codigo en todos los paquetes", "expect": ["dev-20"]}
+{"type": "query", "id": "dev-q21", "kind": "errata", "query": "¿Que base de datso eligio para facturación?", "expect": ["dev-01"]}
+{"type": "query", "id": "dev-q22", "kind": "errata", "query": "¿Con que herrmienta escribe los lgos en JSON?", "expect": ["dev-17"]}
+{"type": "query", "id": "dev-q23", "kind": "errata", "query": "¿A que version de React Natvie migro la app?", "expect": ["dev-12"]}
+{"type": "query", "id": "dev-q24", "kind": "ingles", "query": "Which data access library did she choose for invoicing and why?", "expect": ["dev-03"]}
+{"type": "query", "id": "dev-q25", "kind": "ingles", "query": "How is the single repository split into packages?", "expect": ["dev-10"]}
+{"type": "query", "id": "dev-q26", "kind": "larga", "query": "Estoy mirando la aplicación del teléfono y no recuerdo qué componente se encarga de que los datos sigan disponibles cuando Lucía entra en el metro y pierde la señal, ¿me lo puedes decir?", "expect": ["dev-02"]}
+{"type": "query", "id": "dev-q27", "kind": "larga", "query": "Lucía me ha pedido que revise por qué la canalización del proyecto de facturación tarda tanto, y antes de tocar nada quiero saber en qué servicio está montada y cuánto tarda una ejecución normal.", "expect": ["dev-07"]}
+{"type": "query", "id": "dev-q28", "kind": "larga", "query": "Para la aplicación móvil necesito saber qué biblioteca se encarga de pedir los datos al servidor y de mantener el estado, porque voy a añadir una pantalla nueva y no quiero inventarme el patrón.", "expect": ["dev-16"]}
+{"type": "query", "id": "dev-q29", "kind": "clave", "query": "Vitest", "expect": ["dev-13"]}
+{"type": "query", "id": "dev-q30", "kind": "clave", "query": "pdf-lib", "expect": ["dev-18"]}
+{"type": "query", "id": "dev-q31", "kind": "ambito", "query": "¿Qué ORM se usa para las migraciones?", "expect": ["dev-03"], "scope": "proyecto/facturacion"}
+{"type": "query", "id": "dev-q32", "kind": "ambito", "query": "¿Qué herramienta lanza las compilaciones para iOS y Android?", "expect": ["dev-08"], "scope": "proyecto/app-movil"}
+{"type": "query", "id": "dev-q33", "kind": "episodio", "query": "¿Qué curso ha empezado Lucía los martes por la tarde?", "expect": ["dev-e1"]}
+{"type": "query", "id": "dev-q34", "kind": "episodio", "query": "¿Qué le pasó al teclado y qué hizo?", "expect": ["dev-e3"]}
+{"type": "query", "id": "dev-q35", "kind": "rasgo", "query": "¿Qué patrón sigue con el tipado y la validación de datos?", "expect": ["dev-t1"]}
+{"type": "query", "id": "dev-q36", "kind": "rasgo", "query": "¿Qué comprueba antes de adoptar una herramienta que toca la base de datos?", "expect": ["dev-t2"]}
+{"type": "query", "id": "dev-q37", "kind": "ajena", "query": "¿Cuánto tarda la luz del Sol en llegar a la Tierra?", "expect": []}
+{"type": "query", "id": "dev-q38", "kind": "ajena", "query": "¿Quién era el padre de Zeus en la mitología griega?", "expect": []}
+{"type": "query", "id": "dev-q39", "kind": "ajena", "query": "¿Cada cuánto hay que revisar una colmena para evitar la enjambrazón?", "expect": []}
+{"type": "query", "id": "dev-q40", "kind": "ajena", "query": "¿Qué es el enroque corto en ajedrez?", "expect": []}

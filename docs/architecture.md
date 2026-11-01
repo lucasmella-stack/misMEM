@@ -74,6 +74,13 @@ quedan fuera (`engine/src/domain/noise.ts`).
 | Consolidación con LLM | Cron nocturno que destila episodios en memorias con DeepSeek, OpenRouter, OpenAI o cualquier servidor compatible, con prefiltro Pareto para descartar ruido. Ver [su README](../engine/src/consolidation/README.md) |
 | CLIs | `mismem-http` (el mismo servidor HTTP que `pnpm start:http`), `mismem-ingest` (exports de ChatGPT y transcripts de VS Code), `mismem-consolidate`, `mismem-forget`, `mismem-stats`, `mismem-embed`, `mismem-migrate-engram` (una base de Engram a episodios, con `ingest/engram.ts`), `mismem-bench` (mide el recall con un banco de preguntas propio, sin reforzar), `mismem-obsidian` y los dos hooks, `mismem-inject` y `mismem-used` |
 
+El eval dorado no es un binario: su corpus vive en `engine/eval/golden/` y se corre desde el repositorio con
+`pnpm eval --mode lexico` o, tras `pnpm build`, con `node dist/eval-cli.js --mode semantico`; sin `--mode`
+elige el semántico sólo si el servidor de embeddings deja todas las memorias embebidas sin lotes fallidos;
+si alguna se queda sin vector, mide en léxico y la línea `modo:` lo declara. El corpus no viaja en el
+paquete npm.
+Su validación está en `engine/src/recall/golden-corpus.ts` y su carga y medición en `recall/golden.ts`.
+
 `mismem-obsidian` escribe la memoria como bóveda de Obsidian en `<bóveda>/misMEM/`: una nota por memoria,
 rasgo y ámbito, enlazadas por origen y por parecido. `engine/src/export/obsidian.ts` orquesta; sus lecturas
 viven en `queries/export.ts`, el formato puro de cada nota en `export/notes.ts` y el manifiesto y la escritura

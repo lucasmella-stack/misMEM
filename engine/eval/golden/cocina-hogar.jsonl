@@ -1,0 +1,67 @@
+{"type": "memory", "key": "hog-01", "scope": "lucia/hogar", "gist": "Compró una olla a presión rápida de 6 litros en septiembre y hace los garbanzos en 25 minutos.", "days_ago": 55, "details": "Antes tardaba hora y media con la olla normal. La pagó en una ferretería del barrio por 89 euros y la usa casi a diario."}
+{"type": "memory", "key": "hog-02", "scope": "lucia/hogar", "gist": "Hace el pan de centeno los domingos con la panificadora Moulinex, en el programa 3 durante cuatro horas.", "days_ago": 210, "details": "La compró de segunda mano a una vecina. El pan sale denso y aguanta tres días en una bolsa de tela."}
+{"type": "memory", "key": "hog-03", "scope": "lucia/hogar", "gist": "Cuando hace pan en el horno lo deja 35 minutos a 220 grados con un vaso de agua para la corteza.", "days_ago": 320}
+{"type": "memory", "key": "hog-04", "scope": "lucia/hogar", "gist": "Prepara el café de los fines de semana en una cafetera italiana Bialetti de tres tazas.", "days_ago": 380, "details": "La heredó de su abuela y solo la usa el sábado y el domingo, después de desayunar."}
+{"type": "memory", "key": "hog-05", "scope": "lucia/hogar", "gist": "Después de comer se toma un solo café de cápsulas de la máquina De'Longhi que hay en la cocina.", "days_ago": 120}
+{"type": "memory", "key": "hog-06", "scope": "lucia/hogar", "gist": "Tiene la nevera a 4 grados y el congelador a 18 bajo cero, y lo comprueba con un termómetro.", "days_ago": 150}
+{"type": "memory", "key": "hog-07", "scope": "lucia/hogar", "gist": "Fija el termostato del salón a 20 grados entre las siete de la mañana y las once de la noche.", "days_ago": 90}
+{"type": "memory", "key": "hog-08", "scope": "lucia/hogar", "gist": "Riega el poto del salón todos los domingos con medio litro de agua templada.", "days_ago": 240, "details": "Lo tiene desde que se mudó al piso. En verano le da un poco más porque la ventana da al sur."}
+{"type": "memory", "key": "hog-09", "scope": "lucia/hogar", "gist": "El ficus del pasillo necesita agua cada cuatro días, unos 300 mililitros, y no tolera el sol directo.", "days_ago": 60, "details": "Perdió dos hojas al principio por regarlo de más. Ahora espera a que la tierra esté seca."}
+{"type": "memory", "key": "hog-10", "scope": "lucia/hogar", "gist": "Lava la ropa de deporte con el programa rápido de 30 grados, que dura 15 minutos.", "days_ago": 30}
+{"type": "memory", "key": "hog-11", "scope": "lucia/hogar", "gist": "El lavavajillas gasta una pastilla Finish por ciclo, sal cada mes y abrillantador cada dos.", "days_ago": 200, "details": "Con el agua de Zaragoza la sal es imprescindible. Si se la salta, los vasos salen con velo."}
+{"type": "memory", "key": "hog-12", "scope": "lucia/hogar", "gist": "Va al mercado central los sábados por la mañana y gasta unos 40 euros en verdura de temporada.", "days_ago": 15, "details": "Le gusta elegir la fruta a mano y hablar con los puestos. La compra le dura toda la semana."}
+{"type": "memory", "key": "hog-13", "scope": "lucia/hogar", "gist": "El cuadro eléctrico del piso salta si enciende el horno y el aire acondicionado a la vez.", "days_ago": 75}
+{"type": "memory", "key": "hog-14", "scope": "lucia/hogar", "gist": "Limpia el baño con vinagre y bicarbonato, y nunca mezcla lejía con amoniaco.", "days_ago": 300, "details": "Lo aprendió en un taller del barrio. Deja los botes separados en el armario del pasillo, cada uno en su caja."}
+{"type": "memory", "key": "hog-15", "scope": "lucia/hogar", "gist": "Puso un humidificador en el dormitorio ajustado al 45 % para dormir mejor en invierno.", "days_ago": 20}
+{"type": "memory", "key": "hog-16", "scope": "lucia/hogar", "gist": "Tiene un deshumidificador en el sótano al 55 % porque la pared del fondo acumula humedad.", "days_ago": 25, "details": "Lo enciende solo por la noche, cuando la tarifa es más barata, y vacía el depósito cada dos días."}
+{"type": "memory", "key": "hog-17", "scope": "lucia/hogar", "gist": "Le da a Nube pienso de pavo sin cereales, dos raciones de 120 gramos al día.", "days_ago": 45, "details": "Se lo recomendó la veterinaria por las digestiones. El saco de 12 kilos le dura mes y medio."}
+{"type": "memory", "key": "hog-18", "scope": "lucia/hogar", "gist": "Las lentejas le salen en 40 minutos con chorizo y una cucharada de pimentón, como se las enseñó su madre.", "days_ago": 350, "details": "El pimentón lo echa fuera del fuego para que no amargue. Congela dos raciones cada vez que cocina."}
+{"type": "memory", "key": "hog-19", "scope": "lucia/hogar", "gist": "Cura las sartenes de acero al carbono con aceite de linaza y las seca siempre a mano.", "days_ago": 270, "details": "Las compró en una tienda de menaje de Pamplona. Si se quedan húmedas salen manchas de óxido."}
+{"type": "memory", "key": "hog-20", "scope": "lucia/hogar", "gist": "Cambió todas las bombillas del salón por LED de 2700 kelvin para tener una luz cálida.", "days_ago": 110}
+{"type": "memory", "key": "hog-n1", "scope": "lucia/hogar", "gist": "[noise] saludo y charla sobre la compra del súper y el precio de la verdura", "days_ago": 3}
+{"type": "memory", "key": "hog-n2", "scope": "lucia/hogar", "gist": "[pareto:l0] repaso rápido de la cocina, la limpieza y el termostato", "days_ago": 6}
+{"type": "trait", "key": "hog-t1", "scope": "lucia/hogar", "name": "Prefiere cocinar por lotes con la olla rápida y congelar raciones para no cocinar a diario.", "evidence": ["hog-01", "hog-18"]}
+{"type": "trait", "key": "hog-t2", "scope": "lucia/hogar", "name": "Nunca mezcla productos de limpieza agresivos y guarda cada bote en su caja.", "evidence": ["hog-14", "hog-11"]}
+{"type": "episode", "key": "hog-e1", "scope": "lucia/hogar", "body": "Se ha roto la cisterna del baño y el fontanero no puede venir hasta el jueves. Mientras tanto lleno un cubo por la mañana y otro por la noche, y he dejado una nota en la puerta para que Andrés se acuerde de cerrar la llave de paso antes de salir.", "days_ago": 1}
+{"type": "episode", "key": "hog-e2", "scope": "lucia/hogar", "body": "Ayer hice croquetas con Andrés y se me quemaron las primeras doce. Nube se comió una que cayó al suelo antes de que pudiera recogerla, así que hoy la he tenido a arroz hervido y vigilancia. La cocina aún huele a fritanga.", "days_ago": 3}
+{"type": "episode", "key": "hog-e3", "scope": "lucia/hogar", "body": "Compré un aspirador sin cable en una oferta de 149 euros y lo he devuelto esta mañana: la batería no aguanta ni diez minutos en el modo fuerte. En la tienda me han dicho que el reembolso tarda una semana y que guarde el ticket.", "days_ago": 5}
+{"type": "query", "id": "hog-q01", "kind": "literal", "query": "¿Cuántos minutos tarda en hacer los garbanzos con la olla rápida?", "expect": ["hog-01"]}
+{"type": "query", "id": "hog-q02", "kind": "literal", "query": "¿A qué temperatura tiene la nevera y el congelador?", "expect": ["hog-06"]}
+{"type": "query", "id": "hog-q03", "kind": "literal", "query": "¿Cuándo riega el poto del salón y cuánta agua le echa?", "expect": ["hog-08"]}
+{"type": "query", "id": "hog-q04", "kind": "literal", "query": "¿Qué programa de lavadora usa para la ropa de deporte?", "expect": ["hog-10"]}
+{"type": "query", "id": "hog-q05", "kind": "parafrasis", "query": "¿Con qué electrodoméstico prepara el bollo de harina integral cada fin de semana?", "expect": ["hog-02"]}
+{"type": "query", "id": "hog-q06", "kind": "parafrasis", "query": "¿Qué temperatura pone en el cuarto de estar durante el día y cuál deja de madrugada?", "expect": ["hog-07"]}
+{"type": "query", "id": "hog-q07", "kind": "parafrasis", "query": "¿Dónde adquiere los productos frescos y cuánto se deja cada siete días?", "expect": ["hog-12"]}
+{"type": "query", "id": "hog-q08", "kind": "parafrasis", "query": "¿Qué comida sirve a la perra y en qué cantidad?", "expect": ["hog-17"]}
+{"type": "query", "id": "hog-q09", "kind": "parafrasis", "query": "¿Cómo mantiene las herramientas de cocina metálicas que usa para freír?", "expect": ["hog-19"]}
+{"type": "query", "id": "hog-q10", "kind": "parafrasis", "query": "¿Qué iluminación puso en el cuarto de estar y con qué tono?", "expect": ["hog-20"]}
+{"type": "query", "id": "hog-q11", "kind": "sinonimo", "query": "¿Qué cafetera italiana usa los fines de semana?", "expect": ["hog-04"]}
+{"type": "query", "id": "hog-q12", "kind": "sinonimo", "query": "¿Qué productos necesita el lavaplatos y cada cuánto los repone?", "expect": ["hog-11"]}
+{"type": "query", "id": "hog-q13", "kind": "sinonimo", "query": "¿Con qué mezclas caseras desinfecta el cuarto de baño?", "expect": ["hog-14"]}
+{"type": "query", "id": "hog-q14", "kind": "sinonimo", "query": "¿Qué aparato seca el aire de la parte baja de la casa?", "expect": ["hog-16"]}
+{"type": "query", "id": "hog-q15", "kind": "coloquial", "query": "¿Y las lentejas, cómo las hace que salen tan buenas?", "expect": ["hog-18"]}
+{"type": "query", "id": "hog-q16", "kind": "coloquial", "query": "Oye, ¿cada cuánto hay que darle agua al ficus del pasillo?", "expect": ["hog-09"]}
+{"type": "query", "id": "hog-q17", "kind": "coloquial", "query": "¿Qué usa para el cafelito de después de comer?", "expect": ["hog-05"]}
+{"type": "query", "id": "hog-q18", "kind": "sin_tildes", "query": "como hace el pan en el horno para que salga crujiente", "expect": ["hog-03"]}
+{"type": "query", "id": "hog-q19", "kind": "sin_tildes", "query": "que pasa si enchufa el horno y el aire a la vez", "expect": ["hog-13"]}
+{"type": "query", "id": "hog-q20", "kind": "sin_tildes", "query": "cuanto tarda con la olla rapida en hacer garbanzos", "expect": ["hog-01"]}
+{"type": "query", "id": "hog-q21", "kind": "errata", "query": "¿A que humedad tiene el umidificador del dormitorio?", "expect": ["hog-15"]}
+{"type": "query", "id": "hog-q22", "kind": "errata", "query": "¿Cunado riega el poto y cuanta agua le hecha?", "expect": ["hog-08"]}
+{"type": "query", "id": "hog-q23", "kind": "errata", "query": "¿Como cura las sartenes de acero al carbno?", "expect": ["hog-19"]}
+{"type": "query", "id": "hog-q24", "kind": "ingles", "query": "What food does she give her dog and how much per day?", "expect": ["hog-17"]}
+{"type": "query", "id": "hog-q25", "kind": "ingles", "query": "Which washing machine cycle does she use for sportswear?", "expect": ["hog-10"]}
+{"type": "query", "id": "hog-q26", "kind": "larga", "query": "Lucía ha invitado a Andrés y a Pablo a comer el domingo y quiere repetir el guiso de legumbres que le enseñó su madre; necesita recordar cuánto tiempo lleva y qué ingrediente le da el toque de sabor.", "expect": ["hog-18"]}
+{"type": "query", "id": "hog-q27", "kind": "larga", "query": "Estoy revisando el consumo de la casa y quiero comprobar si los electrodomésticos están bien ajustados: necesito saber a qué temperatura tiene configuradas la nevera y el congelador.", "expect": ["hog-06"]}
+{"type": "query", "id": "hog-q28", "kind": "larga", "query": "En el sótano aparecieron manchas en la pared y la vecina dice que es humedad; quiero saber qué aparato tiene puesto allí y en qué nivel lo dejó configurado.", "expect": ["hog-16"]}
+{"type": "query", "id": "hog-q29", "kind": "clave", "query": "Bialetti", "expect": ["hog-04"]}
+{"type": "query", "id": "hog-q30", "kind": "clave", "query": "2700 K", "expect": ["hog-20"]}
+{"type": "query", "id": "hog-q31", "kind": "ambito", "query": "¿Qué aparatos no puede encender a la vez sin que salte el diferencial?", "expect": ["hog-13"], "scope": "lucia/hogar"}
+{"type": "query", "id": "hog-q32", "kind": "ambito", "query": "¿Dónde guarda los productos de limpieza y cómo los organiza?", "expect": ["hog-14"], "scope": "lucia/hogar"}
+{"type": "query", "id": "hog-q33", "kind": "episodio", "query": "¿Qué se le rompió en el baño y cuándo viene el fontanero?", "expect": ["hog-e1"]}
+{"type": "query", "id": "hog-q34", "kind": "episodio", "query": "¿Qué pasó con las croquetas y con Nube?", "expect": ["hog-e2"]}
+{"type": "query", "id": "hog-q35", "kind": "rasgo", "query": "¿Cómo organiza la comida de la semana para no cocinar cada día?", "expect": ["hog-t1"]}
+{"type": "query", "id": "hog-q36", "kind": "rasgo", "query": "¿Qué evita al limpiar la casa y dónde guarda los botes?", "expect": ["hog-t2"]}
+{"type": "query", "id": "hog-q37", "kind": "ajena", "query": "¿Cómo se reproduce la monstera deliciosa en su hábitat natural?", "expect": []}
+{"type": "query", "id": "hog-q38", "kind": "ajena", "query": "¿Cómo migran las tortugas marinas?", "expect": []}
+{"type": "query", "id": "hog-q39", "kind": "ajena", "query": "¿Qué pigmento colorea la lavanda?", "expect": []}
+{"type": "query", "id": "hog-q40", "kind": "ajena", "query": "¿Qué reyes gobernaron en la península durante el siglo XIII?", "expect": []}

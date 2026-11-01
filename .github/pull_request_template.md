@@ -36,5 +36,5 @@ Desde `engine/`:
 - [ ] `pnpm build`
 - [ ] Línea añadida en `CHANGELOG.md`, bajo "Sin publicar"
 - [ ] Documentación actualizada en este mismo PR (la tabla de `DEPLOY.md` si cambia una variable)
-- [ ] `mismem-bench` antes y después, con las cifras abajo, si cambia el ranking del recall (`recall/`, `embeddings/`)
+- [ ] `mismem-bench` y `pnpm eval --mode lexico` antes y después, con las cifras abajo, si cambia el ranking del recall (`recall/`, `embeddings/`)
 - [ ] Sin cambios en `engine/src/store/db.ts` sin plan de migración

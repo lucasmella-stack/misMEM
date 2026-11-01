@@ -1,0 +1,67 @@
+{"type": "memory", "key": "ia-01", "scope": "lucia/ia", "gist": "Ejecuta qwen2.5-coder:7b en Ollama sobre la RTX 4060 para programar sin conexión.", "days_ago": 90, "details": "Lo usa con 8 GB de VRAM y contexto de 8k. La calidad le basta para autocompletar y explicar errores."}
+{"type": "memory", "key": "ia-02", "scope": "lucia/ia", "gist": "Para conversación general prefiere llama3.1:8b, que responde mejor en castellano que el modelo de código.", "days_ago": 140}
+{"type": "memory", "key": "ia-03", "scope": "lucia/ia", "gist": "Montó el RAG de sus PDFs con FAISS y embeddings nomic-embed-text en local.", "days_ago": 200, "details": "La base tiene unos 3.000 fragmentos de manuales y artículos. Todo el proceso corre en el portátil."}
+{"type": "memory", "key": "ia-04", "scope": "proyecto/app-movil", "gist": "El buscador de la app móvil usa ChromaDB con embeddings bge-m3 servidos por una API pequeña.", "days_ago": 110, "details": "La API corre en el mismo servidor que la app. El índice se reconstruye cuando cambia el catálogo."}
+{"type": "memory", "key": "ia-05", "scope": "lucia/ia", "gist": "Trocea los PDFs en fragmentos de 800 tokens con 100 de solapamiento.", "days_ago": 170, "details": "Probó 400 y perdía contexto en las tablas. Con 1.200 el recuperador devolvía párrafos enteros sin foco."}
+{"type": "memory", "key": "ia-06", "scope": "lucia/ia", "gist": "Añadió un reranker bge-reranker-v2-m3 que reordena los 20 candidatos y deja los 5 mejores.", "days_ago": 70, "details": "Sin reranker, el acierto bajaba en preguntas con nombres parecidos. El corte deja cinco fragmentos."}
+{"type": "memory", "key": "ia-07", "scope": "lucia/ia", "gist": "Mide el RAG con un banco de 60 preguntas y obtuvo un MRR de 0,71 en la última prueba.", "days_ago": 5, "details": "El banco cubre preguntas de manuales, recibos y artículos. La última cifra está apuntada en el repositorio."}
+{"type": "memory", "key": "ia-08", "scope": "proyecto/app-movil", "gist": "En la app, los documentos se cortan en bloques de 400 tokens con 50 de solapamiento.", "days_ago": 130, "details": "La app necesita respuestas rápidas y los documentos son más cortos que los manuales."}
+{"type": "memory", "key": "ia-09", "scope": "lucia/ia", "gist": "Genera datos sintéticos de prueba con Faker y semillas fijas para que los tests sean reproducibles.", "days_ago": 160}
+{"type": "memory", "key": "ia-10", "scope": "lucia/ia", "gist": "Entrenó un LoRA con Unsloth sobre 800 ejemplos y rango 16 para clasificar incidencias.", "days_ago": 250, "details": "El conjunto tenía incidencias de tres categorías. El modelo base era un 7B y el entrenamiento cupo en la GPU."}
+{"type": "memory", "key": "ia-11", "scope": "lucia/ia", "gist": "Cuantiza los modelos de 7B a Q4_K_M para que quepan en los 8 GB de VRAM.", "days_ago": 300, "details": "La pérdida de calidad es pequeña y gana velocidad. Los modelos grandes los deja en FP16."}
+{"type": "memory", "key": "ia-12", "scope": "lucia/ia", "gist": "Fija la ventana de contexto en 8.192 tokens para no disparar el uso de memoria.", "days_ago": 320}
+{"type": "memory", "key": "ia-13", "scope": "lucia/ia", "gist": "Usa temperatura 0,2 para extraer campos de facturas y temperatura 0,8 solo para redactar.", "days_ago": 210, "details": "Para extraer campos quiere respuestas repetibles. La temperatura alta solo la usa al redactar correos."}
+{"type": "memory", "key": "ia-14", "scope": "lucia/ia", "gist": "Analiza los Parquet de experimentos con DuckDB desde un cuaderno, sin levantar un servidor.", "days_ago": 180}
+{"type": "memory", "key": "ia-15", "scope": "proyecto/app-movil", "gist": "Los eventos de la app se guardan en PostgreSQL y se consultan con SQL directo.", "days_ago": 95}
+{"type": "memory", "key": "ia-16", "scope": "lucia/ia", "gist": "Cuenta tokens con el tokenizador de HuggingFace del propio modelo antes de enviar el prompt.", "days_ago": 185}
+{"type": "memory", "key": "ia-17", "scope": "lucia/ia", "gist": "Versiona los conjuntos de datos con DVC y guarda los ficheros grandes en un remoto de Backblaze.", "days_ago": 230, "details": "El remoto está cifrado y solo guarda las versiones. Los datos originales no salen del portátil."}
+{"type": "memory", "key": "ia-18", "scope": "lucia/ia", "gist": "Etiqueta las muestras de clasificación con Label Studio en un contenedor local.", "days_ago": 260}
+{"type": "memory", "key": "ia-19", "scope": "lucia/ia", "gist": "No manda documentos de clientes a APIs externas: todo el pipeline funciona en su máquina.", "days_ago": 50, "details": "Ni siquiera usa la API de embeddings de un proveedor. Todo se ejecuta con modelos descargados."}
+{"type": "memory", "key": "ia-20", "scope": "proyecto/app-movil", "gist": "Los embeddings de la app se sirven desde un servicio FastAPI con dos workers en el mismo host.", "days_ago": 65}
+{"type": "memory", "key": "ia-n1", "scope": "lucia/ia", "gist": "[noise] charla sobre el modelo y los datos de prueba", "days_ago": 2}
+{"type": "memory", "key": "ia-n2", "scope": "proyecto/app-movil", "gist": "[pareto:l0] saludo y repaso rápido del RAG", "days_ago": 4}
+{"type": "trait", "key": "ia-t1", "scope": "lucia/ia", "name": "Prefiere ejecutar los modelos en su propia máquina antes que enviar datos a un proveedor externo.", "evidence": ["ia-01", "ia-11", "ia-19"]}
+{"type": "trait", "key": "ia-t2", "scope": "lucia/ia", "name": "Nunca cambia el recuperador sin volver a pasar el banco de preguntas y comparar el MRR.", "evidence": ["ia-06", "ia-07"]}
+{"type": "episode", "key": "ia-e1", "scope": "lucia/ia", "body": "Ayer descargué mistral-small:22b para probarlo y no cabe ni de lejos en la VRAM. Se queda en el disco hasta que me acuerde de borrarlo. Nube se asustó con el ruido de los ventiladores y se escondió debajo del sofá.", "days_ago": 1}
+{"type": "episode", "key": "ia-e2", "scope": "proyecto/app-movil", "body": "Andrés me pasó un CSV de 40.000 filas con reseñas para probar el clasificador. La mitad vienen vacías y hay texto en catalán. Voy a filtrar antes de etiquetar nada, que si no es una pérdida de tiempo.", "days_ago": 3}
+{"type": "episode", "key": "ia-e3", "scope": "lucia/ia", "body": "Me pasé la tarde limpiando duplicados del banco de preguntas y encontré 312 repetidos casi iguales. Los he quitado y he dejado una nota en el README para no volver a generarlos con la misma semilla.", "days_ago": 4}
+{"type": "query", "id": "ia-q01", "kind": "literal", "query": "¿Qué modelo de código ejecuta en Ollama sobre la RTX 4060?", "expect": ["ia-01"]}
+{"type": "query", "id": "ia-q02", "kind": "literal", "query": "¿En cuántos tokens trocea los PDFs y con cuánto solapamiento?", "expect": ["ia-05"]}
+{"type": "query", "id": "ia-q03", "kind": "literal", "query": "¿Con qué entrenó el LoRA para clasificar incidencias?", "expect": ["ia-10"]}
+{"type": "query", "id": "ia-q04", "kind": "literal", "query": "¿Con qué versiona los conjuntos de datos y dónde guarda los ficheros grandes?", "expect": ["ia-17"]}
+{"type": "query", "id": "ia-q05", "kind": "parafrasis", "query": "¿Qué red neuronal emplea al charlar y por qué la nota más natural en español?", "expect": ["ia-02"]}
+{"type": "query", "id": "ia-q06", "kind": "parafrasis", "query": "¿Cómo busca dentro de sus documentos técnicos sin salir de su ordenador?", "expect": ["ia-03"]}
+{"type": "query", "id": "ia-q07", "kind": "parafrasis", "query": "¿Con cuántos casos de evaluación comprobó la calidad y qué puntuación alcanzó?", "expect": ["ia-07"]}
+{"type": "query", "id": "ia-q08", "kind": "parafrasis", "query": "¿Con qué formato reducido consigue meter sus redes de lenguaje en la tarjeta gráfica?", "expect": ["ia-11"]}
+{"type": "query", "id": "ia-q09", "kind": "parafrasis", "query": "¿Qué motor consulta sus ficheros tabulares dentro del portátil sin montar una base?", "expect": ["ia-14"]}
+{"type": "query", "id": "ia-q10", "kind": "parafrasis", "query": "¿Con qué aplicación anota a mano los ejemplos que luego usa el clasificador?", "expect": ["ia-18"]}
+{"type": "query", "id": "ia-q11", "kind": "sinonimo", "query": "¿Qué almacén vectorial emplea el buscador del teléfono y qué modelo de representación lo alimenta?", "expect": ["ia-04"]}
+{"type": "query", "id": "ia-q12", "kind": "sinonimo", "query": "¿Qué segundo modelo reordena los resultados recuperados antes de enseñarlos?", "expect": ["ia-06"]}
+{"type": "query", "id": "ia-q13", "kind": "sinonimo", "query": "¿De qué tamaño son los bloques que usa el buscador del teléfono?", "expect": ["ia-08"]}
+{"type": "query", "id": "ia-q14", "kind": "sinonimo", "query": "¿Qué grado de creatividad fija para extraer campos y cuál deja para redactar?", "expect": ["ia-13"]}
+{"type": "query", "id": "ia-q15", "kind": "coloquial", "query": "¿Cómo se inventa datos de prueba que salgan siempre igual?", "expect": ["ia-09"]}
+{"type": "query", "id": "ia-q16", "kind": "coloquial", "query": "¿Cuánto texto puede meter de golpe en el modelo sin que se quede sin memoria?", "expect": ["ia-12"]}
+{"type": "query", "id": "ia-q17", "kind": "coloquial", "query": "¿Y el servicio que calcula los vectores de la app, cuántos procesos tiene?", "expect": ["ia-20"]}
+{"type": "query", "id": "ia-q18", "kind": "sin_tildes", "query": "donde se guardan los eventos de la app y como se consultan", "expect": ["ia-15"]}
+{"type": "query", "id": "ia-q19", "kind": "sin_tildes", "query": "con que tokenizador cuenta las piezas antes de mandar el prompt", "expect": ["ia-16"]}
+{"type": "query", "id": "ia-q20", "kind": "sin_tildes", "query": "que hace con los documentos de clientes para no mandarlos fuera", "expect": ["ia-19"]}
+{"type": "query", "id": "ia-q21", "kind": "errata", "query": "¿Que moedlo de codigo ejecuta en Ollama sobre la RTX?", "expect": ["ia-01"]}
+{"type": "query", "id": "ia-q22", "kind": "errata", "query": "¿Cuantas prgeuntas tiene el banco de evaluacion del RAG?", "expect": ["ia-07"]}
+{"type": "query", "id": "ia-q23", "kind": "errata", "query": "¿Donde guarda los ficheros grandes de los datossets?", "expect": ["ia-17"]}
+{"type": "query", "id": "ia-q24", "kind": "ingles", "query": "How does she index her technical PDFs without leaving her laptop?", "expect": ["ia-03"]}
+{"type": "query", "id": "ia-q25", "kind": "ingles", "query": "What did she train to classify incidents and with how many examples?", "expect": ["ia-10"]}
+{"type": "query", "id": "ia-q26", "kind": "larga", "query": "Lucía quiere explicarle a su hermano Pablo por qué no usa el mismo modelo para todo: necesita recordar cuál emplea cuando solo quiere hablar de cualquier cosa y qué razón dio para elegirlo por encima del otro.", "expect": ["ia-02"]}
+{"type": "query", "id": "ia-q27", "kind": "larga", "query": "Estoy revisando la calidad del buscador y me han dicho que hay una segunda fase después de la recuperación inicial; necesito saber qué modelo la hace y cuántos resultados deja al final.", "expect": ["ia-06"]}
+{"type": "query", "id": "ia-q28", "kind": "larga", "query": "Para replicar el buscador de la aplicación en otro entorno necesito localizar el componente que convierte el texto en vectores, saber en qué framework está escrito y cuántos procesos levanta.", "expect": ["ia-20"]}
+{"type": "query", "id": "ia-q29", "kind": "clave", "query": "FAISS", "expect": ["ia-03"]}
+{"type": "query", "id": "ia-q30", "kind": "clave", "query": "Q4_K_M", "expect": ["ia-11"]}
+{"type": "query", "id": "ia-q31", "kind": "ambito", "query": "¿Qué base vectorial usa?", "expect": ["ia-04"], "scope": "proyecto/app-movil"}
+{"type": "query", "id": "ia-q32", "kind": "ambito", "query": "¿Cuántos tokens tiene cada fragmento?", "expect": ["ia-05"], "scope": "lucia/ia"}
+{"type": "query", "id": "ia-q33", "kind": "episodio", "query": "¿Qué CSV le pasó Andrés y qué problema tenía?", "expect": ["ia-e2"]}
+{"type": "query", "id": "ia-q34", "kind": "episodio", "query": "¿Cuántos duplicados encontró en el banco de preguntas?", "expect": ["ia-e3"]}
+{"type": "query", "id": "ia-q35", "kind": "rasgo", "query": "¿Qué principio sigue con los datos de clientes y los proveedores externos?", "expect": ["ia-t1"]}
+{"type": "query", "id": "ia-q36", "kind": "rasgo", "query": "¿Qué hace antes de dar por buena una mejora en la búsqueda?", "expect": ["ia-t2"]}
+{"type": "query", "id": "ia-q37", "kind": "ajena", "query": "¿Cómo se forma un agujero negro supermasivo?", "expect": []}
+{"type": "query", "id": "ia-q38", "kind": "ajena", "query": "¿Qué diosa griega protegía la sabiduría y la guerra estratégica?", "expect": []}
+{"type": "query", "id": "ia-q39", "kind": "ajena", "query": "¿A qué temperatura se mantiene la miel dentro de la colmena?", "expect": []}
+{"type": "query", "id": "ia-q40", "kind": "ajena", "query": "¿Qué pieza del ajedrez vale más, el alfil o la torre?", "expect": []}

@@ -1,0 +1,67 @@
+{"type": "memory", "key": "tra-01", "scope": "lucia/tramites", "gist": "Renovó el DNI en la comisaría del Actur en mayo y el nuevo caduca en 2031.", "days_ago": 160, "details": "Pidió cita por internet y estuvo menos de media hora. Guardó el resguardo en la carpeta de papeles del piso."}
+{"type": "memory", "key": "tra-02", "scope": "lucia/tramites", "gist": "Tiene cita para el pasaporte en la oficina de Correos de Gran Vía el 12 de noviembre.", "days_ago": 200}
+{"type": "memory", "key": "tra-03", "scope": "lucia/tramites", "gist": "Está empadronada en el piso de la calle Delicias desde 2022 y pidió el certificado en junio.", "days_ago": 90}
+{"type": "memory", "key": "tra-04", "scope": "lucia/tramites", "gist": "Pasó la ITV del Corsa en abril con un defecto leve en las luces y la repitió en mayo.", "days_ago": 170}
+{"type": "memory", "key": "tra-05", "scope": "lucia/finanzas", "gist": "Tiene el seguro del coche a terceros ampliado con la correduría San Jorge por 380 euros al año.", "days_ago": 220, "details": "Lo renovó sin siniestros y le mantuvieron la bonificación. La grúa está incluida en la póliza."}
+{"type": "memory", "key": "tra-06", "scope": "lucia/tramites", "gist": "Renovó el certificado digital de la FNMT en febrero y lo guardó en una copia cifrada.", "days_ago": 260, "details": "Lo usa para la declaración y para el certificado de convivencia. Tiene la copia en un disco aparte."}
+{"type": "memory", "key": "tra-07", "scope": "lucia/tramites", "gist": "Antes de comprar el piso, pagaba 750 euros al mes de alquiler y dejó dos mensualidades de fianza.", "days_ago": 300}
+{"type": "memory", "key": "tra-08", "scope": "lucia/finanzas", "gist": "Paga 65 euros al mes de comunidad y la derrama del ascensor son 300 euros en dos plazos.", "days_ago": 60, "details": "El primer plazo lo pagó en septiembre y el segundo vence en diciembre. La administradora avisa por correo."}
+{"type": "memory", "key": "tra-09", "scope": "lucia/finanzas", "gist": "Tiene el abono anual del cine Lumière: 60 euros por 24 entradas, y caduca en diciembre.", "days_ago": 130}
+{"type": "memory", "key": "tra-10", "scope": "lucia/finanzas", "gist": "Cobra 2.150 euros netos al mes en Cierzo Software, con dos pagas extras de 1.400 euros.", "days_ago": 240, "details": "La nómina llega el día 25. Tiene una retención del 18 % en el IRPF."}
+{"type": "memory", "key": "tra-11", "scope": "lucia/finanzas", "gist": "Aparta 3.000 euros en una cuenta de ahorro para reparaciones de la casa, separada de la del día a día.", "days_ago": 100}
+{"type": "memory", "key": "tra-12", "scope": "lucia/finanzas", "gist": "Pidió un préstamo personal de 6.000 euros al 6,5 % para cambiar la caldera y las ventanas.", "days_ago": 350, "details": "Lo devuelve en 24 cuotas de 268 euros, sin comisión de apertura. Le quedan ocho pagos."}
+{"type": "memory", "key": "tra-13", "scope": "lucia/finanzas", "gist": "Subió la potencia contratada a 4,6 kW en junio por el aire acondicionado y paga 62 euros al mes de luz.", "days_ago": 75, "details": "El cambio lo pidió en junio. Ahora paga unos 14 euros más que antes, pero deja de saltar el diferencial."}
+{"type": "memory", "key": "tra-14", "scope": "lucia/finanzas", "gist": "Presentó la declaración de la renta en abril y le salió a devolver 340 euros.", "days_ago": 185, "details": "La hizo con la gestoría del barrio, que le cobra 60 euros. El dinero le llegó en junio."}
+{"type": "memory", "key": "tra-15", "scope": "lucia/finanzas", "gist": "Cambió de banco en enero porque la cuenta nueva no cobra comisiones y le dan 2 % de intereses.", "days_ago": 280, "details": "Se llevó la nómina y los recibos. Del anterior se fue por una comisión de mantenimiento de 90 euros al año."}
+{"type": "memory", "key": "tra-16", "scope": "lucia/tramites", "gist": "Recogió la tarjeta sanitaria nueva en el centro de salud de Delicias el mismo día del trámite.", "days_ago": 40, "details": "Se la dieron en ventanilla sin cita. Le asignaron médico de cabecera en el mismo centro."}
+{"type": "memory", "key": "tra-17", "scope": "lucia/tramites", "gist": "Pagó una multa de aparcamiento de 90 euros con el descuento del 50 % por pronto pago.", "days_ago": 30}
+{"type": "memory", "key": "tra-18", "scope": "lucia/finanzas", "gist": "Hasta febrero tuvo el seguro del hogar con la correduría San Jorge por 210 euros al año.", "days_ago": 210}
+{"type": "memory", "key": "tra-19", "scope": "lucia/tramites", "gist": "Tiene cita en el registro civil el 4 de noviembre para un trámite del libro de familia.", "days_ago": 10, "details": "Va con Pablo, que necesita una copia literal. Le han dicho que lleve el DNI de los dos."}
+{"type": "memory", "key": "tra-20", "scope": "lucia/finanzas", "gist": "El contrato de la luz está a su nombre desde 2022 con la comercializadora Eléctrica del Ebro.", "days_ago": 320, "details": "La tarifa es de precio fijo y no tiene permanencia. El contador es digital y lo revisan cada año."}
+{"type": "memory", "key": "tra-n1", "scope": "lucia/tramites", "gist": "[noise] saludo y charla sobre la cita, el DNI y los papeles del piso", "days_ago": 2}
+{"type": "memory", "key": "tra-n2", "scope": "lucia/finanzas", "gist": "[pareto:l0] repaso rápido de los recibos y del seguro", "days_ago": 8}
+{"type": "trait", "key": "tra-t1", "scope": "lucia/tramites", "name": "Prefiere tener los papeles en regla con antelación antes que improvisar en la ventanilla.", "evidence": ["tra-03", "tra-06", "tra-19"]}
+{"type": "trait", "key": "tra-t2", "scope": "lucia/finanzas", "name": "Nunca deja pasar un trimestre sin comparar los recibos fijos de la casa.", "evidence": ["tra-08", "tra-13", "tra-20"]}
+{"type": "episode", "key": "tra-e1", "scope": "lucia/tramites", "body": "Esta mañana he estado hora y media en la oficina de la Seguridad Social para pedir la vida laboral y resulta que se pide entera por internet. La chica de la ventanilla me lo ha explicado con una paciencia que yo no tenía a esas horas. Mañana lo intento desde casa.", "days_ago": 1}
+{"type": "episode", "key": "tra-e2", "scope": "lucia/finanzas", "body": "Me han cobrado doce euros de comisión por una transferencia urgente que hice el viernes y no me avisaron en ningún momento. He puesto una reclamación en la oficina y me han dado un número de expediente. Dicen que contestan en quince días.", "days_ago": 3}
+{"type": "episode", "key": "tra-e3", "scope": "lucia/tramites", "body": "Andrés y yo hemos estado revisando papeles del piso y hemos encontrado el contrato de la hipoteca sin la copia que pide el banco. Habrá que pedirla antes de enero, que si no luego hay líos para la revisión.", "days_ago": 4}
+{"type": "query", "id": "tra-q01", "kind": "literal", "query": "¿Dónde renovó el DNI y hasta cuándo le vale?", "expect": ["tra-01"]}
+{"type": "query", "id": "tra-q02", "kind": "literal", "query": "¿Cuánto cobra al mes en Cierzo y cuántas pagas extras tiene?", "expect": ["tra-10"]}
+{"type": "query", "id": "tra-q03", "kind": "literal", "query": "¿Cuánto pagó por la multa de aparcamiento?", "expect": ["tra-17"]}
+{"type": "query", "id": "tra-q04", "kind": "literal", "query": "¿Para qué tiene cita en el registro civil y cuándo?", "expect": ["tra-19"]}
+{"type": "query", "id": "tra-q05", "kind": "parafrasis", "query": "¿Qué le encontraron al coche en la revisión oficial y cuándo tuvo que volver?", "expect": ["tra-04"]}
+{"type": "query", "id": "tra-q06", "kind": "parafrasis", "query": "¿Qué dinero solicitó al banco y cómo lo está pagando?", "expect": ["tra-12"]}
+{"type": "query", "id": "tra-q07", "kind": "parafrasis", "query": "¿Qué credencial de identificación electrónica actualizó y dónde la conserva?", "expect": ["tra-06"]}
+{"type": "query", "id": "tra-q08", "kind": "parafrasis", "query": "¿Dónde le entregaron el documento para la asistencia médica?", "expect": ["tra-16"]}
+{"type": "query", "id": "tra-q09", "kind": "parafrasis", "query": "¿Cuánto aporta a los gastos del edificio y qué obra le han cobrado aparte?", "expect": ["tra-08"]}
+{"type": "query", "id": "tra-q10", "kind": "parafrasis", "query": "¿Cómo le fue con Hacienda esta primavera?", "expect": ["tra-14"]}
+{"type": "query", "id": "tra-q11", "kind": "sinonimo", "query": "¿Cuánto abona por la póliza del vehículo y con quién la tiene?", "expect": ["tra-05"]}
+{"type": "query", "id": "tra-q12", "kind": "sinonimo", "query": "¿Cuánto dinero tiene apartado para reparaciones de la casa?", "expect": ["tra-11"]}
+{"type": "query", "id": "tra-q13", "kind": "sinonimo", "query": "¿Cuánto pagaba de alquiler antes de comprar el piso y cuántas mensualidades dejó de fianza?", "expect": ["tra-07"]}
+{"type": "query", "id": "tra-q14", "kind": "sinonimo", "query": "¿Con qué compañía eléctrica tiene el suministro a su nombre?", "expect": ["tra-20"]}
+{"type": "query", "id": "tra-q15", "kind": "coloquial", "query": "¿Y el pasaporte, para cuándo lo tiene?", "expect": ["tra-02"]}
+{"type": "query", "id": "tra-q16", "kind": "coloquial", "query": "¿Por qué se cambió de banco?", "expect": ["tra-15"]}
+{"type": "query", "id": "tra-q17", "kind": "coloquial", "query": "¿Cuánto pagaba al año por el seguro de la casa antes de cambiarlo?", "expect": ["tra-18"]}
+{"type": "query", "id": "tra-q18", "kind": "sin_tildes", "query": "desde cuando esta empadronada en delicias", "expect": ["tra-03"]}
+{"type": "query", "id": "tra-q19", "kind": "sin_tildes", "query": "cuanto pidio de prestamo al banco", "expect": ["tra-12"]}
+{"type": "query", "id": "tra-q20", "kind": "sin_tildes", "query": "cuanto cuesta el abono anual del cine", "expect": ["tra-09"]}
+{"type": "query", "id": "tra-q21", "kind": "errata", "query": "¿Cuando tiene cita en el registro civl?", "expect": ["tra-19"]}
+{"type": "query", "id": "tra-q22", "kind": "errata", "query": "¿Cuanto paga por el seguro del cohce?", "expect": ["tra-05"]}
+{"type": "query", "id": "tra-q23", "kind": "errata", "query": "¿Cuanto paga de comundad y de derrama?", "expect": ["tra-08"], "scope": "lucia/finanzas"}
+{"type": "query", "id": "tra-q24", "kind": "ingles", "query": "How much does she earn per month and how many extra payments does she get?", "expect": ["tra-10"]}
+{"type": "query", "id": "tra-q25", "kind": "ingles", "query": "What loan did she take out and on what terms?", "expect": ["tra-12"]}
+{"type": "query", "id": "tra-q26", "kind": "larga", "query": "Lucía quiere comprobar si puede permitirse cambiar el coche sin tocar lo que tiene apartado para reparaciones de la casa; necesita saber cuánto dinero guarda y en qué cuenta lo tiene.", "expect": ["tra-11"]}
+{"type": "query", "id": "tra-q27", "kind": "larga", "query": "Están revisando los recibos de casa y Andrés dice que la luz ha subido desde que pusieron el aire; quiero saber qué potencia contrató y cuánto paga ahora.", "expect": ["tra-13"]}
+{"type": "query", "id": "tra-q28", "kind": "larga", "query": "Le han ofrecido una cuenta nueva en otra entidad y está valorando volver a cambiar sus ingresos; necesito recordar por qué se marchó del banco anterior y qué le ofrecieron.", "expect": ["tra-15"]}
+{"type": "query", "id": "tra-q29", "kind": "clave", "query": "6,5 %", "expect": ["tra-12"]}
+{"type": "query", "id": "tra-q30", "kind": "clave", "query": "4,6 kW", "expect": ["tra-13"]}
+{"type": "query", "id": "tra-q31", "kind": "ambito", "query": "¿Cuánta potencia eléctrica tiene contratada y cuánto paga al mes?", "expect": ["tra-13"], "scope": "lucia/finanzas"}
+{"type": "query", "id": "tra-q32", "kind": "ambito", "query": "¿Hasta cuándo le vale el documento de identidad?", "expect": ["tra-01"], "scope": "lucia/tramites"}
+{"type": "query", "id": "tra-q33", "kind": "episodio", "query": "¿Qué fue a pedir a la Seguridad Social y qué le dijeron?", "expect": ["tra-e1"]}
+{"type": "query", "id": "tra-q34", "kind": "episodio", "query": "¿Por qué puso una reclamación en el banco?", "expect": ["tra-e2"]}
+{"type": "query", "id": "tra-q35", "kind": "rasgo", "query": "¿Cómo se organiza con las citas y los documentos?", "expect": ["tra-t1"]}
+{"type": "query", "id": "tra-q36", "kind": "rasgo", "query": "¿Qué hace cada poco con las facturas de casa?", "expect": ["tra-t2"]}
+{"type": "query", "id": "tra-q37", "kind": "ajena", "query": "¿Qué obligaciones tenía un vasallo con su señor en el siglo XII?", "expect": []}
+{"type": "query", "id": "tra-q38", "kind": "ajena", "query": "¿Cuántos satélites tenía Saturno en 2020?", "expect": []}
+{"type": "query", "id": "tra-q39", "kind": "ajena", "query": "¿Qué técnica usaban los canteros para levantar un arco ojival?", "expect": []}
+{"type": "query", "id": "tra-q40", "kind": "ajena", "query": "¿Cómo se fabrica una gaita gallega?", "expect": []}

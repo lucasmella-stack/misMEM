@@ -135,6 +135,16 @@
   cuenta como `compatible` los vectores del modelo activo con su ancho activo (`active_dims`) y añade `stale_dims` para
   los del modelo activo con otro ancho, de modo que `stale_model` queda para los de otro modelo.
 
+### Un eval dorado público en castellano, con suelo en CI
+
+- `pnpm eval` mide el recall sobre un corpus sintético de doce dominios con preguntas literales, paráfrasis,
+  erratas y ajenas, y `engine/tests/golden.test.ts` impide que el modo léxico baje del suelo de
+  `engine/eval/golden/floor.json`, supere las ajenas permitidas o devuelva marcadores de ruido. El test también
+  comprueba el reparto del corpus (doce dominios, 40 preguntas por dominio y los tipos esperados), rechaza que
+  `expect` o `evidence` nombren un id de pregunta y falla si el corpus no está. El corpus es público y
+  reproducible, no viaja en el paquete npm, y quien mejora el recall sube el suelo en el mismo PR. La línea
+  base y los comandos están en `docs/recall.md`.
+
 ### El README describe el sistema: sin modelos concretos y sin una lista cerrada de clientes
 
 - La búsqueda por significado funciona con cualquier modelo detrás de un servidor de embeddings, y la

@@ -1,0 +1,67 @@
+{"type": "memory", "key": "inf-01", "scope": "lucia/infra", "gist": "Alquila un VPS Hetzner CX22 con 2 vCPU y 4 GB de RAM para sus servicios personales.", "days_ago": 180, "details": "Le sobra para un Ollama pequeño, el visor y un par de contenedores. Paga unos 5 euros al mes."}
+{"type": "memory", "key": "inf-02", "scope": "proyecto/facturacion", "gist": "La producción de facturación vive en Fly.io con dos máquinas en la región de Madrid.", "days_ago": 90, "details": "Eligió dos instancias para no depender de un solo proceso durante los despliegues. La base sigue fuera."}
+{"type": "memory", "key": "inf-03", "scope": "lucia/infra", "gist": "Usa Caddy como proxy inverso porque renueva los certificados TLS sin configuración extra.", "days_ago": 240, "details": "Antes tenía un cron con certbot. Caddy le quitó ese trabajo y los errores de renovación."}
+{"type": "memory", "key": "inf-04", "scope": "proyecto/facturacion", "gist": "En facturación, nginx sirve los ficheros estáticos dentro del contenedor de la imagen.", "days_ago": 200}
+{"type": "memory", "key": "inf-05", "scope": "lucia/infra", "gist": "Respalda la base y los documentos con restic hacia Backblaze B2 cada noche a las 3:00.", "days_ago": 120, "details": "La retención es de 7 diarios, 4 semanales y 6 mensuales. Probó una restauración completa en julio."}
+{"type": "memory", "key": "inf-06", "scope": "lucia/infra", "gist": "Guarda una copia semanal con borg en un disco externo que deja en casa de Pablo.", "days_ago": 300, "details": "La copia incluye la base y las fotos. La deja en un disco que se lleva a casa de su hermano cada domingo."}
+{"type": "memory", "key": "inf-07", "scope": "lucia/infra", "gist": "Vigila cinco servicios con Uptime Kuma en el puerto 3001 y avisa por Telegram.", "days_ago": 60, "details": "El panel comprueba cada minuto y manda un mensaje si algo falla dos veces seguidas."}
+{"type": "memory", "key": "inf-08", "scope": "proyecto/facturacion", "gist": "Las métricas de facturación se envían a Grafana Cloud en el plan gratuito.", "days_ago": 75, "details": "El plan gratuito guarda 14 días de métricas. Le basta para mirar picos y comparar semanas."}
+{"type": "memory", "key": "inf-09", "scope": "lucia/infra", "gist": "Levanta el stack casero con Docker Compose: seis contenedores en una sola red.", "days_ago": 220, "details": "El archivo está en un repositorio privado con las variables fuera. Un solo comando levanta todo."}
+{"type": "memory", "key": "inf-10", "scope": "lucia/infra", "gist": "Se conecta a los servicios de casa mediante Cloudflare Tunnel y así no publica puertos en el router.", "days_ago": 45, "details": "El túnel lo arranca un contenedor con token propio. Si se cae, el resto de la casa sigue funcionando."}
+{"type": "memory", "key": "inf-11", "scope": "proyecto/facturacion", "gist": "La base gestionada de facturación hace una instantánea diaria y guarda 14 días.", "days_ago": 130}
+{"type": "memory", "key": "inf-12", "scope": "lucia/infra", "gist": "El VPS corre Ubuntu 24.04 LTS y solo instala paquetes de los repositorios oficiales.", "days_ago": 260}
+{"type": "memory", "key": "inf-13", "scope": "lucia/infra", "gist": "El acceso SSH usa claves ed25519 y tiene prohibida la autenticación por contraseña.", "days_ago": 340, "details": "La clave privada está en el portátil y tiene passphrase. El servidor solo acepta esa clave."}
+{"type": "memory", "key": "inf-14", "scope": "lucia/infra", "gist": "fail2ban banea una IP una hora tras cinco intentos fallidos de SSH.", "days_ago": 310}
+{"type": "memory", "key": "inf-15", "scope": "lucia/infra", "gist": "Conecta el portátil y el VPS por Tailscale para administrar servicios sin exponerlos.", "days_ago": 100, "details": "La red privada le sirve también para acceder a la interfaz del router sin abrir nada."}
+{"type": "memory", "key": "inf-16", "scope": "lucia/infra", "gist": "Programa las tareas con temporizadores de systemd en lugar de cron.", "days_ago": 80}
+{"type": "memory", "key": "inf-17", "scope": "proyecto/facturacion", "gist": "El entorno de pruebas de facturación está en Railway y se borra cada viernes.", "days_ago": 55}
+{"type": "memory", "key": "inf-18", "scope": "lucia/infra", "gist": "Los logs del servidor van a journald con un límite de 500 MB por servicio.", "days_ago": 150}
+{"type": "memory", "key": "inf-19", "scope": "lucia/infra", "gist": "Aprovisiona el VPS con un playbook de Ansible guardado en el repositorio privado.", "days_ago": 280, "details": "El playbook instala Docker, crea el usuario y copia las claves. Se ejecuta desde el portátil."}
+{"type": "memory", "key": "inf-20", "scope": "proyecto/facturacion", "gist": "El despliegue de facturación se lanza desde GitHub Actions por SSH y comprueba /healthz.", "days_ago": 7}
+{"type": "memory", "key": "inf-n1", "scope": "lucia/infra", "gist": "[noise] saludo y charla sobre el servidor y las copias", "days_ago": 2}
+{"type": "memory", "key": "inf-n2", "scope": "proyecto/facturacion", "gist": "[pareto:l0] repaso del despliegue y del proxy", "days_ago": 3}
+{"type": "trait", "key": "inf-t1", "scope": "lucia/infra", "name": "Prefiere autoalojar servicios pequeños antes que pagar una plataforma externa.", "evidence": ["inf-01", "inf-07", "inf-09"]}
+{"type": "trait", "key": "inf-t2", "scope": "lucia/infra", "name": "Nunca expone un puerto a internet si puede entrar por una red privada.", "evidence": ["inf-10", "inf-13", "inf-15"]}
+{"type": "episode", "key": "inf-e1", "scope": "lucia/infra", "body": "Anoche se fue la luz en el barrio y el SAI aguantó doce minutos, justo hasta que llegó el técnico. El VPS siguió vivo porque está fuera de casa, pero el NAS se apagó de golpe. He pedido otro SAI para el router.", "days_ago": 1}
+{"type": "episode", "key": "inf-e2", "scope": "lucia/infra", "body": "Estuve mirando un mini PC de segunda mano para mover el visor y los contenedores. Cuesta 180 euros y gasta menos que el portátil viejo. Andrés dice que ya tenemos demasiados cacharros, y tiene razón, pero Nube ha tumbado el router dos veces esta semana.", "days_ago": 3}
+{"type": "episode", "key": "inf-e3", "scope": "proyecto/facturacion", "body": "Me llegó el aviso de que el disco de la máquina de staging está al 78 por ciento. He borrado imágenes viejas y he bajado al 51, pero habrá que ampliar el volumen antes de la demo. Lo apunto para hablarlo con Marta el lunes.", "days_ago": 5}
+{"type": "query", "id": "inf-q01", "kind": "literal", "query": "¿Qué VPS alquila y con cuántos recursos?", "expect": ["inf-01"]}
+{"type": "query", "id": "inf-q02", "kind": "literal", "query": "¿Con qué herramienta respalda la base y los documentos cada noche?", "expect": ["inf-05"]}
+{"type": "query", "id": "inf-q03", "kind": "literal", "query": "¿Cada cuánto hace instantáneas la base gestionada de facturación?", "expect": ["inf-11"]}
+{"type": "query", "id": "inf-q04", "kind": "literal", "query": "¿Con qué playbook aprovisiona el VPS?", "expect": ["inf-19"]}
+{"type": "query", "id": "inf-q05", "kind": "parafrasis", "query": "¿Qué plataforma aloja el servicio de cobros y con cuántas réplicas?", "expect": ["inf-02"]}
+{"type": "query", "id": "inf-q06", "kind": "parafrasis", "query": "¿Qué servidor web le gestiona el HTTPS de forma automática?", "expect": ["inf-03"]}
+{"type": "query", "id": "inf-q07", "kind": "parafrasis", "query": "¿Con qué servicio detecta que una página se ha caído y por qué canal lo sabe?", "expect": ["inf-07"]}
+{"type": "query", "id": "inf-q08", "kind": "parafrasis", "query": "¿Qué vía privada le permite llegar desde fuera a sus aplicaciones domésticas sin exponer nada al exterior?", "expect": ["inf-10"]}
+{"type": "query", "id": "inf-q09", "kind": "parafrasis", "query": "¿Qué método deja entrar a la máquina únicamente con un fichero criptográfico y no con texto secreto?", "expect": ["inf-13"]}
+{"type": "query", "id": "inf-q10", "kind": "parafrasis", "query": "¿Dónde monta el ambiente de validación de las facturas y cuándo lo elimina?", "expect": ["inf-17"]}
+{"type": "query", "id": "inf-q11", "kind": "sinonimo", "query": "¿Qué servidor web entrega los recursos estáticos de la imagen de facturación?", "expect": ["inf-04"]}
+{"type": "query", "id": "inf-q12", "kind": "sinonimo", "query": "¿Qué herramienta de copias guarda un duplicado semanal en un disco que está fuera de casa?", "expect": ["inf-06"]}
+{"type": "query", "id": "inf-q13", "kind": "sinonimo", "query": "¿Dónde publica las métricas del servicio de facturación sin pagar?", "expect": ["inf-08"]}
+{"type": "query", "id": "inf-q14", "kind": "sinonimo", "query": "¿Con qué mecanismo del sistema operativo agenda tareas en vez de usar cron?", "expect": ["inf-16"]}
+{"type": "query", "id": "inf-q15", "kind": "coloquial", "query": "¿Cómo levanta todos los contenedores de casa de una vez?", "expect": ["inf-09"]}
+{"type": "query", "id": "inf-q16", "kind": "coloquial", "query": "¿Qué distribución tiene puesta en el servidor de Hetzner?", "expect": ["inf-12"]}
+{"type": "query", "id": "inf-q17", "kind": "coloquial", "query": "¿Cómo se despliega facturación cuando alguien mergea?", "expect": ["inf-20"]}
+{"type": "query", "id": "inf-q18", "kind": "sin_tildes", "query": "cuantos intentos fallidos acepta ssh antes de bloquear una ip", "expect": ["inf-14"]}
+{"type": "query", "id": "inf-q19", "kind": "sin_tildes", "query": "donde van a parar los logs del servidor y cuanto espacio ocupan", "expect": ["inf-18"]}
+{"type": "query", "id": "inf-q20", "kind": "sin_tildes", "query": "que herramienta conecta el portatil con el servidor por una red privada", "expect": ["inf-15"]}
+{"type": "query", "id": "inf-q21", "kind": "errata", "query": "¿Donde esta alojdo el VPS de sus servicios personales?", "expect": ["inf-01"]}
+{"type": "query", "id": "inf-q22", "kind": "errata", "query": "¿Cada cuanto se hace la copia con restik?", "expect": ["inf-05"]}
+{"type": "query", "id": "inf-q23", "kind": "errata", "query": "¿Cuantas maquians tiene produccion en Fly.io?", "expect": ["inf-02"]}
+{"type": "query", "id": "inf-q24", "kind": "ingles", "query": "How often does the nightly backup run and where does it store the data?", "expect": ["inf-05"]}
+{"type": "query", "id": "inf-q25", "kind": "ingles", "query": "What tool provisions the server from a playbook?", "expect": ["inf-19"]}
+{"type": "query", "id": "inf-q26", "kind": "larga", "query": "Estoy revisando la configuración de casa y me he dado cuenta de que ya no recuerdo qué componente se encarga de los certificados del proxy, ni si hay que renovarlos a mano cada tres meses; ¿me lo aclaras?", "expect": ["inf-03"]}
+{"type": "query", "id": "inf-q27", "kind": "larga", "query": "Para montar el mismo entorno en otro sitio necesito saber cómo están organizados los contenedores de sus servicios personales, si hay un solo archivo o varios, y cómo se comunican entre ellos.", "expect": ["inf-09"]}
+{"type": "query", "id": "inf-q28", "kind": "larga", "query": "Lucía quiere explicar a una compañera nueva cómo sale un cambio de facturación desde el repositorio hasta producción, y necesita recordar qué servicio lo lanza y qué comprobación se hace al final.", "expect": ["inf-20"]}
+{"type": "query", "id": "inf-q29", "kind": "clave", "query": "restic", "expect": ["inf-05"]}
+{"type": "query", "id": "inf-q30", "kind": "clave", "query": "Caddy", "expect": ["inf-03"]}
+{"type": "query", "id": "inf-q31", "kind": "ambito", "query": "¿Dónde corre la producción?", "expect": ["inf-02"], "scope": "proyecto/facturacion"}
+{"type": "query", "id": "inf-q32", "kind": "ambito", "query": "¿Qué proxy inverso usa?", "expect": ["inf-03"], "scope": "lucia/infra"}
+{"type": "query", "id": "inf-q33", "kind": "episodio", "query": "¿Cuánto aguantó el SAI cuando se fue la luz?", "expect": ["inf-e1"]}
+{"type": "query", "id": "inf-q34", "kind": "episodio", "query": "¿Qué compró o miró para mover los contenedores?", "expect": ["inf-e2"]}
+{"type": "query", "id": "inf-q35", "kind": "rasgo", "query": "¿Qué tipo de servicios prefiere montar ella misma?", "expect": ["inf-t1"]}
+{"type": "query", "id": "inf-q36", "kind": "rasgo", "query": "¿Cómo evita dejar servicios abiertos a internet?", "expect": ["inf-t2"]}
+{"type": "query", "id": "inf-q37", "kind": "ajena", "query": "¿Qué planeta del sistema solar tiene más lunas conocidas?", "expect": []}
+{"type": "query", "id": "inf-q38", "kind": "ajena", "query": "¿Qué héroe griego mató a la hidra de Lerna?", "expect": []}
+{"type": "query", "id": "inf-q39", "kind": "ajena", "query": "¿Qué hace una abeja obrera cuando encuentra una fuente de néctar?", "expect": []}
+{"type": "query", "id": "inf-q40", "kind": "ajena", "query": "¿Cuántos movimientos puede durar una partida de ajedrez antes de las tablas por repetición?", "expect": []}
