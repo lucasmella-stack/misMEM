@@ -23,7 +23,16 @@ export function SearchResults({ term, scope, selected, onSelect }: ListProps & {
   if (!trimmed) {
     return <Empty>Escribe en la caja de búsqueda para recorrer toda la memoria.</Empty>;
   }
-  if (query.isPending) return <Loading label="Buscando en la memoria…" />;
+  // The header, and its live region, sit first in the same wrapper while loading and after, so React
+  // keeps that node and a screen reader announces the cap notice when it appears.
+  if (query.isPending) {
+    return (
+      <div className="flex flex-col gap-2">
+        <SearchHeader term={trimmed} scope={scope} count={0} truncated={false} fetching />
+        <Loading label="Buscando en la memoria…" />
+      </div>
+    );
+  }
   const hits = query.data?.hits ?? [];
 
   return (
