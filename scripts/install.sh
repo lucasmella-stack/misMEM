@@ -426,7 +426,12 @@ mkdir -p "$CONF_DIR" "$BIN_DIR" "$(dirname "$DB")"
       # de EmbeddingGemma), que no es lo que había.
       for v in $EMBED_VARS; do
         val="$(prev "$v")"
-        if [ -n "$val" ]; then
+        if [ "$v" = MISMEM_EMBEDDING_MIN_SCORE ] && [ "$PREV_KIND" = custom ] &&
+          case "${PREV_EMBED:-nomic-embed-text}" in nomic-embed-text*) true ;; *) false ;; esac &&
+          ! printf '%s' "$val" | grep -Eq '^[0-9]+([.][0-9]+)?$'; then
+          # Vacío o inválido, el motor anterior aplicaba el 0,65 de nomic y el nuevo aplicaría 0,5.
+          printf '%s=0.65\n' "$v"
+        elif [ -n "$val" ]; then
           printf '%s=%q\n' "$v" "$val"
         elif defined "$v"; then
           printf '%s=\n' "$v"
