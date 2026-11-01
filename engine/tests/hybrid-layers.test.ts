@@ -521,7 +521,12 @@ describe("backfill de rasgos y episodios", () => {
     const embed: EmbedFn = async (texts) => texts.map(() => axis(1));
     await embedPendingMemories(db, { embedFn: embed, model: "fake" });
 
-    db.prepare("UPDATE traits SET name = ? WHERE id = ?").run("nombre nuevo", trait);
+    // Renaming the trait would now drop its vector by trigger; a fingerprint that no longer matches
+    // is what a changed document prefix or MAX_CHARS leaves, so the test writes one directly.
+    db.prepare("UPDATE layer_embeddings SET fingerprint = ? WHERE layer = 'trait' AND item_id = ?").run(
+      "huella anterior",
+      trait,
+    );
     const again = await embedPendingMemories(db, { embedFn: embed, model: "fake" });
 
     expect(again.layers).toMatchObject({ pending: 1, embedded: 1, failed: 0 });
