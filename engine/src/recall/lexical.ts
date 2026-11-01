@@ -122,17 +122,21 @@ export function lexicalCandidates(
   let rows = strictRows;
   if (strictEmpty && rescue) {
     const relaxedQuery = relaxedTerms(input.query);
-    const relaxed = relaxedFts(relaxedQuery.terms);
-    if (relaxed !== strict) {
-      rows = run(relaxed);
-      // Both sides of the presence gate cover the whole question, never the capped search:
-      // the cap only trims the candidate query, and counting the numerator over its twelve
-      // words made the gate unreachable from forty-one content words on.
-      rescuedPlan = planTerms(db, relaxedQuery, [
-        ...rows.traits,
-        ...rows.memories,
-        ...rows.episodes,
-      ]);
+    // A question made only of rescue fillers ("¿qué podemos hacer?") leaves no term to OR:
+    // the empty expression matched nothing yet still paid three MATCH '""' and a plan.
+    if (relaxedQuery.terms.length > 0) {
+      const relaxed = relaxedFts(relaxedQuery.terms);
+      if (relaxed !== strict) {
+        rows = run(relaxed);
+        // Both sides of the presence gate cover the whole question, never the capped search:
+        // the cap only trims the candidate query, and counting the numerator over its twelve
+        // words made the gate unreachable from forty-one content words on.
+        rescuedPlan = planTerms(db, relaxedQuery, [
+          ...rows.traits,
+          ...rows.memories,
+          ...rows.episodes,
+        ]);
+      }
     }
   }
   const traits: RecallHit[] = (

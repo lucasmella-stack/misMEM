@@ -179,8 +179,8 @@ export interface RelaxedPlan {
   /** Deduplicated content words of the question, up to RELAXED_PRESENCE_MAX_TERMS: the
    * gate's denominator. */
   wordCount: number;
-  /** Distinct words before merging prefixes; it tells a one-word query, which the
-   * deduplicated count would not ("decidir decision" is one word, not two). */
+  /** Distinct words before merging prefixes: two forms of one word merge into a single term
+   * but the question still has two words, and only this count tells a one-word query apart. */
   distinctWords: number;
 }
 

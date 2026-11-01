@@ -138,6 +138,27 @@ describe("recall léxico: frases normales", () => {
     expect(memoryIds("¿qué puedo hacer con el despliegue?")).toEqual([target]);
   });
 
+  it("una pregunta de sólo relleno no gasta una consulta relajada", () => {
+    // "podemos" and "hacer" are the only content words and both are rescue fillers, so the
+    // OR expression had nothing in it: it matched nothing and still paid three MATCH '""'
+    // plus the plan. The strict query already found nothing; the rescue must not run.
+    memory("dev", "el despliegue del servicio usa docker compose");
+    const statement = Object.getPrototypeOf(db.prepare("SELECT 1")) as Statement;
+    const all = vi.spyOn(statement, "all");
+    let hits: string[] = [];
+    let relaxedMatches = 0;
+    try {
+      hits = memoryIds("¿qué podemos hacer?");
+      relaxedMatches = all.mock.calls.filter(
+        ([params]) => (params as { q?: string } | undefined)?.q === '""',
+      ).length;
+    } finally {
+      all.mockRestore();
+    }
+    expect(hits).toEqual([]);
+    expect(relaxedMatches).toBe(0);
+  });
+
   it("al relajar hacen falta dos palabras: una sola en común no alcanza", () => {
     const both = memory("pc", "el teclado retroiluminado tiene luces RGB");
     memory("pc", "el teclado mecánico nuevo");
