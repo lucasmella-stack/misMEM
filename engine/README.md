@@ -5,7 +5,8 @@ traits) sobre una sola base SQLite con FTS5, que comparten todos los clientes qu
 
 ## Uso
 
-En el `mcp.json` del cliente (VS Code, Claude Code, Claude Desktop), sin clonar nada:
+En la configuración MCP de cualquier cliente (opencode, Claude Code, Codex, Cursor, VS Code...), sin clonar
+nada. El fichero, la clave y la forma cambian de uno a otro; éste es el de los que usan `mcpServers` en JSON:
 
 ```json
 {
@@ -19,7 +20,7 @@ En el `mcp.json` del cliente (VS Code, Claude Code, Claude Desktop), sin clonar 
 ```
 
 La base se crea sola en el primer uso: `~/.mismem/mem.db`, o la ruta de `MISMEM_DB`. Requiere Node 22 o
-superior. Con un checkout del repositorio, `mcp.json` apunta al `dist` compilado:
+superior. Con un checkout del repositorio, la configuración apunta al `dist` compilado:
 
 ```json
 {

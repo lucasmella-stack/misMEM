@@ -12,6 +12,14 @@
   reproducible, no viaja en el paquete npm, y quien mejora el recall sube el suelo en el mismo PR. La línea
   base y los comandos están en `docs/recall.md`.
 
+### El README describe el sistema: sin modelos concretos y sin una lista cerrada de clientes
+
+- La búsqueda por significado funciona con cualquier modelo detrás de un servidor de embeddings, y la
+  consolidación con cualquier LLM de API compatible con OpenAI: el README deja de presentar modelos concretos
+  como si fueran parte del sistema.
+- misMEM sirve a cualquier cliente MCP: los ejemplos pasan a ser las herramientas de código (opencode,
+  Claude Code, Codex, Cursor, VS Code), y la lista de clientes que configura el instalador queda en su `--help`.
+
 ### Un solo proveedor de embeddings, con EmbeddingGemma 2 por defecto y sin nomic (#229)
 
 - **Un protocolo**: el `/v1/embeddings` de OpenAI, que sirven llama-server y Ollama. Fuera el camino `/api/embed`,
