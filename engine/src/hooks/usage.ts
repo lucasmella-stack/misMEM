@@ -1,6 +1,6 @@
 // Which memories an answer really used, read from the Claude Code transcript. Reinforcing
 // everything recall returned would reward what always shows up, so the signal is the overlap of
-// distinctive words; it errs towards not reinforcing, the cheap side.
+// distinctive words; it errs towards not reinforcing, the cheap side, except on a gist recall cut.
 import { parseInjection } from "./inject.js";
 import { contentTerms } from "../domain/terms.js";
 
