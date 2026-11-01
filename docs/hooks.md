@@ -6,7 +6,7 @@ acordarse de pedir nada. Son opcionales; `scripts/install.sh` los configura si s
 | Hook | Evento | Qué hace |
 |---|---|---|
 | `mismem-inject` | `UserPromptSubmit` | Busca con el prompt y adelanta unos pocos recuerdos. Busca con `reinforce: false`: lo que el usuario no pidió no es uso. Se mantiene dormido hasta comprobar que el servidor expone `reinforce`, así que se puede configurar antes de desplegar |
-| `mismem-used` | `Stop` | Mira el último turno (lo que el modelo pidió con `recall` y lo que la inyección le puso delante) y refuerza sólo aquello cuyas palabras distintivas reaparecen en la respuesta. Es una aproximación: falla hacia no reforzar |
+| `mismem-used` | `Stop` | Mira el último turno (lo que el modelo pidió con `recall` y lo que la inyección le puso delante) y refuerza sólo aquello cuyas palabras distintivas reaparecen en la respuesta. Es una aproximación: falla hacia no reforzar, salvo con un gist recortado por `recall` (ver abajo) |
 
 Dos matices sobre esa aproximación:
 

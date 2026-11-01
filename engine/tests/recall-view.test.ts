@@ -132,6 +132,17 @@ describe("recallForModel", () => {
     db.close();
   });
 
+  it("keeps a text and details of exactly the cap whole, without truncated", () => {
+    const db = openDb(":memory:");
+    insertMemory(db, { id: "m1", gist: "gist", details: "d".repeat(MAX_DETAILS_CHARS) });
+    const [view] = recallForModel(db, [hit({ layer: "memory", id: "m1", text: "t".repeat(MAX_TEXT_CHARS) })]);
+
+    expect(view?.text).toBe("t".repeat(MAX_TEXT_CHARS));
+    expect(view?.details).toBe("d".repeat(MAX_DETAILS_CHARS));
+    expect(view).not.toHaveProperty("truncated");
+    db.close();
+  });
+
   it("cuts text at the cap with an ellipsis and never splits an emoji", () => {
     const db = openDb(":memory:");
     const body = `${"a".repeat(MAX_TEXT_CHARS - 2)}😀${"b".repeat(50)}`;
