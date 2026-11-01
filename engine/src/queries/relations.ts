@@ -6,7 +6,7 @@ import { coUseEdges } from "../store/connectome.js";
 
 // With EmbeddingGemma 2 any two memories score about 0.67 cosine: on a real DB (326 memories) the
 // median pair is 0.673 and the closest neighbour 0.822. At 0.75 one pair in twenty passes and three
-// neighbours per memory leave clusters; lower, everything connects to everything.
+// neighbours per memory form clusters; lower, everything connects to everything.
 const RELATED_MIN_SCORE = 0.75;
 const RELATED_PER_NODE = 3;
 

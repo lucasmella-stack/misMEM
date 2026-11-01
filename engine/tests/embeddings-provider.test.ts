@@ -59,6 +59,7 @@ describe("loadEmbeddingConfig", () => {
       setEnv({ MISMEM_EMBEDDING_MODEL: model });
       const cfg = loadEmbeddingConfig();
       expect(cfg.queryPrefix).toBe("task: search result | query: ");
+      expect(cfg.docPrefix).toBe("title: none | text: ");
       expect(cfg.minScore).toBe(0.65);
     },
   );

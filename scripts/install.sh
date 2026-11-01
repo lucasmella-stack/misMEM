@@ -326,6 +326,7 @@ PREV_URL="$(prev MISMEM_EMBEDDING_URL)"
 PREV_PROVIDER_EMBED="$(prev MISMEM_EMBEDDING_PROVIDER)"
 PREV_OLLAMA_URL="$(prev MISMEM_OLLAMA_URL)"
 PREV_KIND=""
+FROM_NOMIC=""
 # nomic sólo es "lo que montaba este instalador" si apuntaba al Ollama local; con otro servidor es del
 # usuario y pasa por la pregunta de conservarlo.
 PREV_LOCAL_OLLAMA=""
@@ -378,11 +379,19 @@ if [ "$EMBED_CHOICE" = nomic ] && [ -z "$CAN_GEMMA" ]; then
 elif [ "$EMBED_CHOICE" = nomic ]; then
   say "  nomic-embed-text ya no se usa: paso a EmbeddingGemma 2, y las memorias se reindexan solas."
   EMBED_CHOICE=gemma
+  FROM_NOMIC=1
 fi
 
 if [ "$EMBED_CHOICE" = gemma ] && ! setup_gemma; then
-  say "  Sin el modelo, la búsqueda queda sólo por palabras."
-  EMBED_CHOICE=off
+  if [ -n "$FROM_NOMIC" ]; then
+    # Sin el modelo nuevo, el nomic que funcionaba se conserva en vez de apagar la búsqueda.
+    say "  Sin EmbeddingGemma 2, conservo nomic-embed-text de Ollama."
+    PREV_KIND=custom
+    EMBED_CHOICE=custom
+  else
+    say "  Sin el modelo, la búsqueda queda sólo por palabras."
+    EMBED_CHOICE=off
+  fi
 fi
 
 # Reescribir el bloque sólo si el resultado es otro que el que había.
@@ -434,6 +443,8 @@ mkdir -p "$CONF_DIR" "$BIN_DIR" "$(dirname "$DB")"
       # Lo que ya había se copia tal cual: el instalador sólo reescribe esto cuando se elige algo. Una
       # variable definida pero vacía se copia vacía: omitirla la devolvería al defecto nuevo (el prefijo
       # de EmbeddingGemma), que no es lo que había.
+      PREV_GEMMA_FAMILY=""
+      case "$(printf '%s' "$PREV_EMBED" | tr '[:upper:]' '[:lower:]')" in *embeddinggemma*) PREV_GEMMA_FAMILY=1 ;; esac
       for v in $EMBED_VARS; do
         val="$(prev "$v")"
         if [ "$v" = MISMEM_EMBEDDING_MIN_SCORE ] && [ "$PREV_KIND" = custom ] &&
@@ -445,6 +456,13 @@ mkdir -p "$CONF_DIR" "$BIN_DIR" "$(dirname "$DB")"
           printf '%s=%q\n' "$v" "$val"
         elif defined "$v"; then
           printf '%s=\n' "$v"
+        elif [ -n "$PREV_GEMMA_FAMILY" ] &&
+          { [ "$v" = MISMEM_EMBEDDING_QUERY_PREFIX ] || [ "$v" = MISMEM_EMBEDDING_DOC_PREFIX ]; }; then
+          # EmbeddingGemma configurado a mano sin prefijos se indexó sin ellos; el defecto nuevo los pondría.
+          printf '%s=\n' "$v"
+        elif [ -n "$PREV_GEMMA_FAMILY" ] && [ "$v" = MISMEM_EMBEDDING_MIN_SCORE ]; then
+          # Y con el corte genérico de 0,5, que el defecto nuevo subiría a 0,65.
+          printf '%s=0.5\n' "$v"
         elif [ "$v" = MISMEM_EMBEDDING_URL ] && [ "$PREV_KIND" = custom ]; then
           # Sin URL propia, el motor resolvía una por su cuenta; se deja escrita para no cambiar de servidor.
           printf '%s=%q\n' "$v" "$PREV_RESOLVED_URL"
