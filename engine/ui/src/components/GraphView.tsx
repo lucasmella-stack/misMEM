@@ -57,6 +57,9 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
       api.graph(scope, settings.episodes, settings.related, { enabled: settings.coUse, minN: settings.coUseMinN }, signal),
     placeholderData: (previous, previousQuery) =>
       previousQuery?.queryKey[1] === (scope ?? "") ? previous : undefined,
+    // Hidden it stays mounted, so every write elsewhere refetched the most expensive read the
+    // viewer has. The cache keeps the drawing; coming back is when it is worth refreshing.
+    enabled: visible,
   });
   const data = graphQuery.data;
 
@@ -156,7 +159,7 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
   const topicsQuery = useQuery({
     queryKey: ["topics", scope ?? ""],
     queryFn: ({ signal }) => api.topics(scope, signal),
-    enabled: settings.colorBy === "topic",
+    enabled: visible && settings.colorBy === "topic",
   });
 
   const byTopic = useMemo(
