@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Database as DB } from "better-sqlite3";
 import { openDb } from "../src/store/db.js";
 import { capture } from "../src/memory/capture.js";
@@ -481,6 +481,30 @@ describe("vectores de capa y ciclo de vida", () => {
         .prepare("SELECT 1 FROM layer_embeddings WHERE layer = 'episode' AND item_id = ?")
         .get(episode),
     ).toBeUndefined();
+  });
+
+  it("sin tope explícito, la escritura espera como mucho un segundo al embedder", async () => {
+    const episode = capture(db, { scope: "dev", body: "nota con el tope por defecto" }).id;
+    vi.useFakeTimers();
+    try {
+      let settled = false;
+      const pending = embedLayerItem(db, "episode", episode, {
+        embedFn: () => new Promise(() => undefined),
+        model: "fake",
+      }).then((saved) => {
+        settled = true;
+        return saved;
+      });
+
+      // The default is the smaller of the configured timeout (3 s) and the 1 s write cap.
+      await vi.advanceTimersByTimeAsync(999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(settled).toBe(true);
+      expect(await pending).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("un embedder inyectado que no responde no retiene la escritura más que el tope", async () => {
