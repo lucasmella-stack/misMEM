@@ -49,10 +49,30 @@ function sandbox(stubLlama = true): Sandbox {
   };
 }
 
+/** pnpm resolves its store under HOME, and the sandbox moves HOME: without this it reinstalls from zero. */
+let storeDir: string | undefined;
+async function pnpmStore(): Promise<string> {
+  storeDir ??= await run("pnpm", ["store", "path"]).then(
+    (r) => r.stdout.trim(),
+    () => "",
+  );
+  return storeDir;
+}
+
 async function install(box: Sandbox, args: string[], extra: NodeJS.ProcessEnv = {}) {
-  return run("bash", [INSTALLER, "--yes", "--clients", "none", "--no-timer", ...args], {
-    env: { ...box.env, ...extra },
-  });
+  const env: NodeJS.ProcessEnv = {
+    ...box.env,
+    PNPM_HOME: process.env.PNPM_HOME,
+    npm_config_store_dir: await pnpmStore(),
+    ...extra,
+  };
+  try {
+    return await run("bash", [INSTALLER, "--yes", "--clients", "none", "--no-timer", ...args], { env });
+  } catch (error) {
+    const failure = error as { stdout?: string; stderr?: string };
+    // execFile's message drops the output, and without it a CI failure says nothing.
+    throw Object.assign(new Error(`${failure.stdout ?? ""}\n${failure.stderr ?? ""}`.trim()), failure);
+  }
 }
 
 const written = (box: Sandbox, name: string): string | undefined =>
