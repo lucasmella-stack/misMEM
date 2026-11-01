@@ -6,8 +6,8 @@ variables de DEPLOY.md, no aquí ([qué no se documenta](README.md#qué-no-se-do
 
 ## Un territorio, varias instancias
 
-Cada instancia de un LLM nace sin memoria, y cada cliente (Copilot, Claude Desktop, Claude Code,
-ChatGPT) guarda lo suyo en silos incompatibles. misMEM pone **una base SQLite y un protocolo MCP de seis
+Cada instancia de un LLM nace sin memoria, y cada herramienta (opencode, Claude Code, Codex, Cursor, VS
+Code...) guarda lo suyo en silos incompatibles. misMEM pone **una base SQLite y un protocolo MCP de seis
 invocaciones** al alcance de cualquier cliente que lo hable. La memoria vive en `~/.mismem/mem.db`
 (`MISMEM_DB`) y varios clientes y proyectos la comparten, particionada por `scope`.
 
