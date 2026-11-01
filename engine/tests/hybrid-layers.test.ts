@@ -528,6 +528,24 @@ describe("backfill de rasgos y episodios", () => {
         .get(episode),
     ).toEqual({ model: "fake" });
   });
+
+  it("un vector no finito del embedder no se guarda y la escritura devuelve false", async () => {
+    const episode = capture(db, { scope: "dev", body: "nota con vector inválido" }).id;
+
+    // The injected embedFn skips the provider's own normalization, so this is the check that
+    // keeps a NaN out of the table: a stored one would make every cosine NaN.
+    const saved = await embedLayerItem(db, "episode", episode, {
+      embedFn: async () => [Float32Array.from([NaN, 1])],
+      model: "fake",
+    });
+
+    expect(saved).toBe(false);
+    expect(
+      db
+        .prepare("SELECT 1 FROM layer_embeddings WHERE layer = 'episode' AND item_id = ?")
+        .get(episode),
+    ).toBeUndefined();
+  });
 });
 
 describe("vectores de capa y ciclo de vida", () => {
@@ -564,6 +582,46 @@ describe("vectores de capa y ciclo de vida", () => {
     // cleans layer_embeddings, so a missing one would leave a row pointing at gone text.
     db.prepare("DELETE FROM episodes WHERE id = ?").run(episode);
 
+    expect(
+      db
+        .prepare("SELECT 1 FROM layer_embeddings WHERE layer = 'episode' AND item_id = ?")
+        .get(episode),
+    ).toBeUndefined();
+  });
+
+  it("cambiar el texto de un rasgo o de un episodio retira su vector por disparador", () => {
+    const source = capture(db, { scope: "dev", body: "origen" });
+    const memory = consolidate(db, {
+      scope: "dev",
+      gist: "memoria de apoyo",
+      source_episode_ids: [source.id],
+    }).memory_id;
+    const trait = crystallize(db, {
+      scope: "dev",
+      name: "nombre viejo",
+      evidence_memory_ids: [memory],
+    }).trait_id;
+    const episode = capture(db, { scope: "dev", body: "cuerpo viejo" }).id;
+    saveLayerEmbedding(db, "trait", trait, "fake", axis(1));
+    saveLayerEmbedding(db, "episode", episode, "fake", axis(1));
+
+    // Writing the same text again must keep the vector: the trigger fires only on a real change.
+    db.prepare("UPDATE traits SET name = name WHERE id = ?").run(trait);
+    expect(
+      db
+        .prepare("SELECT model FROM layer_embeddings WHERE layer = 'trait' AND item_id = ?")
+        .get(trait),
+    ).toEqual({ model: "fake" });
+
+    db.prepare("UPDATE traits SET name = ? WHERE id = ?").run("nombre nuevo", trait);
+    db.prepare("UPDATE episodes SET body = ? WHERE id = ?").run("cuerpo nuevo", episode);
+
+    // A vector computed from the old text would keep matching words the item no longer has.
+    expect(
+      db
+        .prepare("SELECT 1 FROM layer_embeddings WHERE layer = 'trait' AND item_id = ?")
+        .get(trait),
+    ).toBeUndefined();
     expect(
       db
         .prepare("SELECT 1 FROM layer_embeddings WHERE layer = 'episode' AND item_id = ?")
@@ -757,7 +815,9 @@ describe("vectores de capa y ciclo de vida", () => {
       for (const trigger of [
         "layer_embeddings_episode_ad",
         "layer_embeddings_episode_au",
+        "layer_embeddings_episode_body_au",
         "layer_embeddings_trait_ad",
+        "layer_embeddings_trait_name_au",
       ]) {
         before.exec(`DROP TRIGGER ${trigger}`);
       }
@@ -779,7 +839,9 @@ describe("vectores de capa y ciclo de vida", () => {
         expect(triggers.map((row) => row.name)).toEqual([
           "layer_embeddings_episode_ad",
           "layer_embeddings_episode_au",
+          "layer_embeddings_episode_body_au",
           "layer_embeddings_trait_ad",
+          "layer_embeddings_trait_name_au",
         ]);
         expect(reopened.prepare("SELECT body FROM episodes WHERE id = ?").get(episode)).toEqual({
           body: "episodio heredado",

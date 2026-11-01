@@ -14,8 +14,8 @@ si todas son vacías, conserva las largas para no quedarse sin consulta.
 
 ### El rescate
 
-Si esa consulta estricta no devuelve nada y no hay capa semántica, `recall` reintenta con una consulta OR
-sobre las mismas palabras menos un relleno más amplio: la estricta conserva las palabras de función que un
+Si esa consulta estricta no devuelve nada y las memorias no tienen vectores comparables, `recall` reintenta
+con una consulta OR sobre las mismas palabras menos un relleno más amplio: la estricta conserva las palabras de función que un
 recuerdo puede contener, y el rescate ignora además verbos y adverbios coloquiales ("puedo", "antes", "cada",
 "todo"). La consulta OR conserva las palabras que no aparecen en ninguna memoria de la base ni en ningún
 candidato; de la puntuación y del recuento de presencia sí las descarta: en una pregunta larga suelen ser
@@ -35,7 +35,9 @@ encontró algo.
 
 Con capa semántica el rescate apenas suma aciertos, empuja hacia abajo la respuesta buena y trae
 memorias de preguntas que no vienen al caso; sin ella es lo que hace aparecer la paráfrasis que la
-consulta estricta deja fuera. Por eso sólo entra cuando no hay nada que puntuar.
+consulta estricta deja fuera. Por eso sólo se apaga cuando las memorias tienen vectores comparables: un
+vector de rasgo o de episodio no puntúa ninguna memoria, y ahí el rescate sigue siendo lo único que trae la
+paráfrasis.
 
 La rareza de un término que cuenta para el rescate tiene un suelo de 3 documentos y una fracción del 5 % de
 la base, de modo que "pocos" significa lo mismo con 300 memorias que con 3.000. Se calibró con
