@@ -453,4 +453,35 @@ describe("engram-compat: aliases that write episodes embed like capture", () => 
       db.prepare("SELECT COUNT(*) AS n FROM layer_embeddings WHERE layer = 'episode'").get(),
     ).toEqual({ n: 1 });
   });
+
+  it("mem_save_prompt stores the vector of the new episode", async () => {
+    const seen: string[] = [];
+    const out = (await dispatchEngramTool(
+      db,
+      "mem_save_prompt",
+      { content: "prompt del usuario" },
+      { embedFn: fakeEmbedder(seen), embeddingModel: "fake" },
+    )) as { id: string };
+
+    expect(seen).toContain("prompt del usuario");
+    expect(db.prepare("SELECT layer, item_id FROM layer_embeddings").all()).toEqual([
+      { layer: "episode", item_id: out.id },
+    ]);
+  });
+
+  it("mem_update fallback stores the vector of the appended episode", async () => {
+    const seen: string[] = [];
+    const out = (await dispatchEngramTool(
+      db,
+      "mem_update",
+      { id: "id-que-no-existe", content: "cambio sobre algo ausente" },
+      { embedFn: fakeEmbedder(seen), embeddingModel: "fake" },
+    )) as { updated: string; new_id: string };
+
+    expect(out.updated).toBe("appended");
+    expect(seen.some((text) => text.includes("cambio sobre algo ausente"))).toBe(true);
+    expect(db.prepare("SELECT layer, item_id FROM layer_embeddings").all()).toEqual([
+      { layer: "episode", item_id: out.new_id },
+    ]);
+  });
 });
