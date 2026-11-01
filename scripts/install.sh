@@ -15,7 +15,8 @@
 # (deepseek|openrouter|openai|compatible|none), MISMEM_INSTALL_API_KEY,
 # MISMEM_INSTALL_MODEL, MISMEM_INSTALL_BASE_URL y MISMEM_INSTALL_HOOKS (yes|no).
 # Con llama-server en el PATH, --embeddings gemma monta EmbeddingGemma 2 (baja el modelo si
-# falta; MISMEM_INSTALL_GEMMA_GGUF apunta a un GGUF que ya tengas). Sin esa opción, --yes
+# falta; MISMEM_INSTALL_GEMMA_GGUF apunta a un GGUF que ya tengas y MISMEM_INSTALL_GEMMA_PORT
+# al puerto preferido, 8080 por defecto). Sin esa opción, --yes
 # conserva el modelo de embeddings que hubiera, salvo nomic-embed-text, que pasa a
 # EmbeddingGemma 2; si no hay ninguno, monta EmbeddingGemma 2.
 # La clave nunca va por argumento: quedaría en el historial y en `ps`.
@@ -137,13 +138,13 @@ step "Instalando misMEM"
 if [ "$FROM_SOURCE" = 1 ]; then
   [ -f "$REPO/engine/package.json" ] || { say "No estoy dentro del repo de misMEM: usa --from-npm."; exit 1; }
   cd "$REPO/engine"
-  if command -v pnpm >/dev/null 2>&1; then
-    pnpm install --frozen-lockfile >/dev/null
-    pnpm build >/dev/null
-  else
-    npm ci --no-audit --no-fund >/dev/null
-    npm run build >/dev/null
-  fi
+  # El repo sólo trae pnpm-lock.yaml: `npm ci` no puede funcionar, y fallaba con un volcado de npm.
+  command -v pnpm >/dev/null 2>&1 || {
+    say "Desde el repo hace falta pnpm: instálalo (npm install -g pnpm) o usa --from-npm."
+    exit 1
+  }
+  pnpm install --frozen-lockfile >/dev/null
+  pnpm build >/dev/null
   cd - >/dev/null
   DIST="$REPO/engine/dist"
   say "  desde el repo: $REPO"
@@ -248,8 +249,6 @@ fi
 # EmbeddingGemma 2 detrás de llama-server. Con memorias que no estén en inglés encuentra muchas más
 # paráfrasis que un modelo pensado para inglés (34 de 50 frente a 4 en las mediciones de la issue #72).
 # Corre en CPU salvo que se pida la GPU: en CPU no gasta VRAM y una consulta tarda unos 15 ms.
-GEMMA_PORT=8080
-GEMMA_URL="http://127.0.0.1:$GEMMA_PORT"
 GEMMA_FILE="embeddinggemma-2-Q8_0.gguf"
 GEMMA_GGUF="${MISMEM_INSTALL_GEMMA_GGUF:-$DATA_DIR/models/$GEMMA_FILE}"
 GEMMA_UNIT="$UNIT_DIR/mismem-embed.service"
@@ -257,11 +256,47 @@ GEMMA_UNIT="$UNIT_DIR/mismem-embed.service"
 # El /health de llama-server da 503 mientras carga el modelo: -f lo cuenta como "no responde".
 embed_answers() { curl -fsS -m 3 "$1/health" >/dev/null 2>&1; }
 
+# Ocupado es que algo lo escuche, aunque no hable HTTP: llama-server tampoco podría abrirlo.
+# El prefijo [.:] evita que el 8080 lo dé por ocupado el 18080 de otro programa.
+port_taken() {
+  if command -v ss >/dev/null 2>&1; then ss -ltn 2>/dev/null | grep -qE "[.:]$1[[:space:]]"; return; fi
+  if command -v netstat >/dev/null 2>&1; then netstat -ltn 2>/dev/null | grep -qE "[.:]$1[[:space:]]"; return; fi
+  (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && exec 3>&-
+}
+
+# El 8080 es el puerto por defecto de llama-server, pero ahí viven igual de a menudo un panel de Traefik,
+# un Jenkins o un Tomcat: con el puerto tomado por algo que no sirve embeddings, llama-server no arrancaría
+# y la búsqueda quedaría sólo por palabras después de bajar 296 MB de modelo. El puerto que escribió una
+# instalación anterior manda, para que re-ejecutar no mueva un servidor que ya anda.
+GEMMA_PORT="${MISMEM_INSTALL_GEMMA_PORT:-}"
+if [ -z "$GEMMA_PORT" ]; then
+  case "$(prev MISMEM_EMBEDDING_MODEL)" in
+    *embeddinggemma*)
+      GEMMA_PORT="$(prev MISMEM_EMBEDDING_URL |
+        sed -nE 's#^https?://(127\.0\.0\.1|localhost):([0-9]+)/?$#\2#p')"
+      ;;
+  esac
+fi
+GEMMA_PORT="${GEMMA_PORT:-8080}"
+GEMMA_MOVED_FROM=""
+# Un servidor de embeddings que ya responda ahí se reutiliza (setup_gemma lo dice), así que no se mueve.
+if port_taken "$GEMMA_PORT" && ! embed_answers "http://127.0.0.1:$GEMMA_PORT"; then
+  for try in $(seq $((GEMMA_PORT + 1)) $((GEMMA_PORT + 20))); do
+    if ! port_taken "$try"; then
+      GEMMA_MOVED_FROM="$GEMMA_PORT"
+      GEMMA_PORT="$try"
+      break
+    fi
+  done
+fi
+GEMMA_URL="http://127.0.0.1:$GEMMA_PORT"
+
 has_user_systemd() { command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; }
 
 # setup_gemma: deja listos el modelo y el servidor. Devuelve 1 si no se pudo o no se quiso bajar el modelo.
 setup_gemma() {
   local llama cmd device="--device none" gpu_default=n ours=""
+  [ -n "$GEMMA_MOVED_FROM" ] && say "  El puerto $GEMMA_MOVED_FROM lo ocupa otra cosa: uso el $GEMMA_PORT."
   llama="$(command -v llama-server || true)"
   has_user_systemd && systemctl --user is-active --quiet mismem-embed.service && ours=1
   if [ -z "$ours" ] && embed_answers "$GEMMA_URL"; then
