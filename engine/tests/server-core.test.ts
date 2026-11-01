@@ -3,6 +3,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Database as DB } from "better-sqlite3";
 import { openDb } from "../src/store/db.js";
+import type { EmbedFn } from "../src/embeddings/provider.js";
 import { ENGRAM_TOOLS } from "../src/mcp/engram-compat.js";
 import { createServer } from "../src/server-core.js";
 
@@ -22,12 +23,17 @@ afterAll(() => {
 let db: DB;
 let client: Client;
 
+async function connect(embedFn?: EmbedFn): Promise<Client> {
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const server = createServer(db, { embedFn });
+  const connected = new Client({ name: "test", version: "0" });
+  await Promise.all([server.connect(serverTransport), connected.connect(clientTransport)]);
+  return connected;
+}
+
 beforeEach(async () => {
   db = openDb(":memory:");
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  const server = createServer(db);
-  client = new Client({ name: "test", version: "0" });
-  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+  client = await connect();
 });
 
 afterEach(async () => {
@@ -167,5 +173,45 @@ describe("MCP tool dispatch", () => {
     expect(r.isError).toBe(true);
     expect(r.text).toContain("Error en capture");
     expect(count("SELECT COUNT(*) AS n FROM episodes")).toBe(0);
+  });
+});
+
+describe("MCP tool dispatch: write-time layer embedding", () => {
+  function fakeEmbedder(seen: string[]): EmbedFn {
+    return async (texts) => {
+      seen.push(...texts);
+      return texts.map(() => Float32Array.from([1, 0]));
+    };
+  }
+
+  // MISMEM_EMBEDDINGS is off here, so a write only stores a vector because the injected
+  // embedder reached it: an alias or a tool that skipped the embedding call leaves no row.
+  async function useEmbedder(): Promise<string[]> {
+    const seen: string[] = [];
+    await client.close();
+    client = await connect(fakeEmbedder(seen));
+    return seen;
+  }
+
+  it("capture stores the vector of the new episode", async () => {
+    const seen = await useEmbedder();
+    const r = await ok<{ id: string }>("capture", { scope: "p/a", body: "vector de capture" });
+    expect(seen).toContain("vector de capture");
+    expect(db.prepare("SELECT layer, item_id FROM layer_embeddings").all()).toEqual([
+      { layer: "episode", item_id: r.id },
+    ]);
+  });
+
+  it("crystallize stores the vector of the new trait", async () => {
+    const seen = await useEmbedder();
+    const r = await ok<{ trait_id: string }>("crystallize", {
+      scope: "p/a",
+      name: "prefiere PRs pequeños",
+      evidence_memory_ids: ["m1"],
+    });
+    expect(seen).toContain("prefiere PRs pequeños");
+    expect(db.prepare("SELECT layer, item_id FROM layer_embeddings").all()).toEqual([
+      { layer: "trait", item_id: r.trait_id },
+    ]);
   });
 });
