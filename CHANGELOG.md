@@ -2,6 +2,16 @@
 
 ## Sin publicar
 
+### Los marcadores de ruido dejan de ocupar un vector
+
+- Un marcador (`[noise] ...`, `[pareto:l0] ...`) no compite en el recall ni gasta un embedding, pero
+  las bases anteriores a esa regla todavía arrastraban los suyos. Al abrir, se borran: son dato
+  derivado y no cuesta nada regenerar lo que haga falta.
+- Medido en una base real: **235 de 3.887 vectores (el 6 %) eran marcadores**. Ensuciaban cualquier
+  lectura que fuera a la tabla de vectores directamente — agrupando las memorias por parecido, la
+  segunda isla más grande eran 235 avisos de «episodios sin señal» pareciéndose entre sí.
+- El camino que escribe vectores ya los excluía, así que no vuelven a aparecer.
+
 ### El tamaño de un nodo dice cuántas conexiones tiene, no cuántos días lleva (#217)
 
 - El radio salía de la saliencia, que nace en la confianza del LLM y decae con una vida media de 90
