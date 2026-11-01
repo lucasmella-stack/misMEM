@@ -8,6 +8,46 @@
   no es neutra y `truncated` si un texto se recortó (2.000 caracteres de `text`, 1.200 de `details`). Las
   respuestas MCP van sin indentación. Los alias `mem_*` conservan sus campos y también van sin indentación; el visor y su API no cambian.
 
+### El README describe el sistema: sin modelos concretos y sin una lista cerrada de clientes
+
+- La búsqueda por significado funciona con cualquier modelo detrás de un servidor de embeddings, y la
+  consolidación con cualquier LLM de API compatible con OpenAI: el README deja de presentar modelos concretos
+  como si fueran parte del sistema.
+- misMEM sirve a cualquier cliente MCP: los ejemplos pasan a ser las herramientas de código (opencode,
+  Claude Code, Codex, Cursor, VS Code), y la lista de clientes que configura el instalador queda en su `--help`.
+
+### Un solo proveedor de embeddings, con EmbeddingGemma 2 por defecto y sin nomic (#229)
+
+- **Un protocolo**: el `/v1/embeddings` de OpenAI, que sirven llama-server y Ollama. Fuera el camino `/api/embed`,
+  `MISMEM_EMBEDDING_PROVIDER` y `MISMEM_OLLAMA_URL`; otro servidor u otro modelo se eligen con
+  `MISMEM_EMBEDDING_URL` y `MISMEM_EMBEDDING_MODEL`, y cambiar de modelo sigue reindexando solo.
+- **Sin configurar nada**, EmbeddingGemma 2 en `http://127.0.0.1:8080`, el puerto del instalador. Con un modelo
+  de la familia EmbeddingGemma (su id contiene `embeddinggemma`) van solos sus prefijos y el corte de 0,65, el
+  mayor que no pierde aciertos en el golden eval (PR #181, que esto sustituye); otro modelo arranca sin prefijos
+  y con 0,5. Quien configuró EmbeddingGemma a mano sin prefijos tiene que reindexar con `mismem-embed --force`.
+- **El instalador** monta sólo EmbeddingGemma 2: `--embeddings gemma|off`. Una instalación con nomic en el Ollama local pasa
+  a EmbeddingGemma 2 al re-ejecutarlo si hay `llama-server` (si no, conserva nomic); nomic en otro servidor u otro modelo se conservan, y una búsqueda apagada
+  con `MISMEM_EMBEDDINGS=off` sigue apagada.
+- **Rompe** a quien use nomic o el proveedor `ollama`, a mano o con el instalador anterior, hasta que re-ejecute el
+  instalador: el motor ya no lee `MISMEM_EMBEDDING_PROVIDER` ni `MISMEM_OLLAMA_URL`, así que la URL pasa a
+  `http://127.0.0.1:8080`, el modelo por defecto a EmbeddingGemma 2 y el corte de nomic de 0,65 a 0,5. Para conservar lo
+  que tenía, que escriba `MISMEM_EMBEDDING_URL=http://127.0.0.1:11434`,
+  `MISMEM_EMBEDDING_MODEL=nomic-embed-text` y `MISMEM_EMBEDDING_MIN_SCORE=0.65`; para pasarse a EmbeddingGemma 2,
+  que re-ejecute el instalador.
+- El comentario del umbral de aristas `related` del grafo se rehace con EmbeddingGemma 2 medido sobre una base
+  real: el par mediano da 0,673 y el vecino más cercano 0,822; el 0,75 se mantiene.
+
+### Un vector inválido ya no esconde una memoria de la búsqueda (#155)
+
+- Cada vector se valida y se normaliza a norma 1 al entrar, venga del servidor de embeddings o de un
+  `embedFn` inyectado: `NaN`, `Infinity`, un componente nulo o no numérico y la norma cero dejan de
+  guardarse. Un vector malo sólo se pierde a sí mismo, sin arrastrar a sus compañeros de lote; un lote con
+  menos vectores que textos o con dimensiones mezcladas cuenta como fallido.
+- El backfill reescribe los vectores que una versión anterior guardó inválidos, y `mismem-embed --status`
+  los cuenta en `invalid`. La consulta degrada a búsqueda por palabras cuando su propio vector no es válido.
+- `--status` no cuenta los marcadores de ruido, que el backfill nunca reescribe, y una tanda entera de
+  vectores inválidos cuenta como fallida: dos seguidas abortan la corrida como si el servidor estuviera caído.
+
 ### La suite de tests ya no llama al servidor de embeddings de quien la corre, y hay una suite que sí lo prueba
 
 - Tras consolidar, `runConsolidation` rellena los vectores con la configuración real, así que cada corrida de

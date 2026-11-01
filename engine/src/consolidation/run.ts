@@ -178,7 +178,7 @@ export async function runConsolidation(
   summary.llm_calls = state.llmCalls;
 
   // Embedding backfill for new memories (and any straggler).
-  // Optional: without Ollama it degrades without affecting consolidation.
+  // Optional: without an embedding server it degrades without affecting consolidation.
   if (!ctx.dryRun) {
     try {
       const emb = await embedPendingMemories(db, { timeoutMs: 120_000, batchSize: 8 });
