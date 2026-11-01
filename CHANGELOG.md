@@ -2,6 +2,8 @@
 
 ## Sin publicar
 
+## 0.9.0 — 2026-11-01
+
 ### El README y la arquitectura cuentan lo que el motor hace hoy
 
 - La tabla del README no mencionaba los temas, el eval dorado, el estado del índice semántico, el
@@ -122,8 +124,6 @@
   no es neutra y `truncated` si un texto se recortó (2.000 caracteres de `text`, 1.200 de `details`). Las
   respuestas MCP van sin indentación. Los alias `mem_*` conservan sus campos y también van sin indentación (salvo `mem_search`, que ante un vacío añade `scopes` y `hint`, como `recall`); el visor y su API no cambian.
 
-## 0.8.0 — 2026-11-01
-
 ### La búsqueda avisa del tope y la lista de rasgos pagina (#180)
 
 - El visor ya no esconde resultados sin decirlo: la búsqueda avisa cuando se queda en el tope de 50 («N resultados, puede haber más: afina la consulta o elige un ámbito») y la lista de rasgos pagina con «cargar más» y su total real, en vez de cortar en 200 con un «N de M» que no se podía completar.
@@ -196,6 +196,9 @@
 
 ### Recall híbrido: las tres capas compiten en un solo ranking (#154)
 
+- **Cambia lo que un cliente recibe**: con embeddings, `recall` devolvía sólo memorias; ahora el mismo
+  tope se reparte entre las tres capas. Quien diera por hecho que todo lo devuelto era una memoria tiene
+  que mirar el campo `layer`, que ya venía en cada resultado.
 - Con embeddings, `recall` devolvía cero episodios pendientes y cero rasgos: las memorias llenaban el tope y
   el rescate léxico se apagaba. Ahora rasgos, memorias y episodios pendientes se fusionan en un único ranking
   RRF, y rasgos y episodios se puntúan también por coseno. El resultado se queda con el mejor rasgo y como
@@ -243,6 +246,8 @@
   `expect` o `evidence` nombren un id de pregunta y falla si el corpus no está. El corpus es público y
   reproducible, no viaja en el paquete npm, y quien mejora el recall sube el suelo en el mismo PR. La línea
   base y los comandos están en `docs/recall.md`.
+
+## 0.8.0 — 2026-11-01
 
 ### El README describe el sistema: sin modelos concretos y sin una lista cerrada de clientes
 
