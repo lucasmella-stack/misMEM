@@ -40,8 +40,8 @@ interface ToolResult {
   content: Array<{ type: string; text: string }>;
 }
 
-async function call(name: string, args: Record<string, unknown>): Promise<{ isError: boolean; text: string }> {
-  const res = (await client.callTool({ name, arguments: args })) as ToolResult;
+async function call(name: string, args?: Record<string, unknown>): Promise<{ isError: boolean; text: string }> {
+  const res = (await client.callTool(args === undefined ? { name } : { name, arguments: args })) as ToolResult;
   return { isError: res.isError === true, text: res.content[0]?.text ?? "" };
 }
 
@@ -353,5 +353,110 @@ describe("MCP guidance", () => {
 
     expect(res.isError).toBe(true);
     expect(res.content[0]?.text).toBe("Error en capture: argumentos: se esperaba un objeto");
+  });
+});
+
+interface IssueCase {
+  branch: string;
+  tool: string;
+  args?: Record<string, unknown>;
+  line: string;
+}
+
+// One row per branch describeIssue() can reach through a real tool schema. A string minimum
+// above 1 and an exclusive numeric maximum have no field to trigger them, so they stay out:
+// inventing a schema would test the test, not the mapping.
+const ISSUE_CASES: IssueCase[] = [
+  {
+    branch: "invalid_type de objeto cuando faltan los argumentos",
+    tool: "capture",
+    line: "Error en capture: argumentos: se esperaba un objeto",
+  },
+  {
+    branch: "invalid_type de texto",
+    tool: "capture",
+    args: { scope: "p/a", body: 7 },
+    line: "Error en capture: body: se esperaba un texto",
+  },
+  {
+    branch: "invalid_type de número",
+    tool: "recall",
+    args: { query: "x", limit: "ten" },
+    line: "Error en recall: limit: se esperaba un número",
+  },
+  {
+    branch: "invalid_type de entero",
+    tool: "recall",
+    args: { query: "x", limit: 2.5 },
+    line: "Error en recall: limit: se esperaba un número entero",
+  },
+  {
+    branch: "invalid_type de booleano",
+    tool: "recall",
+    args: { query: "x", reinforce: "yes" },
+    line: "Error en recall: reinforce: se esperaba true o false",
+  },
+  {
+    branch: "invalid_type de lista",
+    tool: "reinforce",
+    args: { memory_ids: "m1" },
+    line: "Error en reinforce: memory_ids: se esperaba una lista",
+  },
+  {
+    branch: "too_small de texto con mínimo 1",
+    tool: "capture",
+    args: { scope: "p/a", body: "" },
+    line: "Error en capture: body: no puede estar vacío",
+  },
+  {
+    branch: "too_small de lista con mínimo 1",
+    tool: "consolidate",
+    args: { scope: "p/a", gist: "g", source_episode_ids: [] },
+    line: "Error en consolidate: source_episode_ids: no puede estar vacía",
+  },
+  {
+    branch: "too_small numérico inclusivo",
+    tool: "forget",
+    args: { memory_grace_days: -1 },
+    line: "Error en forget: memory_grace_days: no puede ser menor que 0",
+  },
+  {
+    branch: "too_small numérico exclusivo",
+    tool: "recall",
+    args: { query: "x", limit: 0 },
+    line: "Error en recall: limit: tiene que ser mayor que 0",
+  },
+  {
+    branch: "too_big de texto",
+    tool: "capture",
+    args: { scope: "x".repeat(129), body: "a" },
+    line: "Error en capture: scope: no puede pasar de 128 caracteres",
+  },
+  {
+    branch: "too_big de lista",
+    tool: "reinforce",
+    args: { memory_ids: Array.from({ length: 51 }, (_, i) => `m${i}`) },
+    line: "Error en reinforce: memory_ids: no puede tener más de 50 elementos",
+  },
+  {
+    branch: "too_big numérico inclusivo",
+    tool: "recall",
+    args: { query: "x", limit: 51 },
+    line: "Error en recall: limit: no puede ser mayor que 50",
+  },
+  {
+    branch: "invalid_value de enum",
+    tool: "crystallize",
+    args: { scope: "p/a", name: "n", evidence_memory_ids: ["m1"], polarity: "grey" },
+    line: "Error en crystallize: polarity: debe ser uno de: shadow, light, neutral",
+  },
+];
+
+describe("MCP validation messages", () => {
+  it.each(ISSUE_CASES)("$branch", async ({ tool, args, line }) => {
+    const r = await call(tool, args);
+
+    expect(r.isError).toBe(true);
+    expect(r.text).toBe(line);
   });
 });
