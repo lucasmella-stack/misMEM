@@ -177,8 +177,8 @@ export async function recallHybrid(
 
   // The quota is decided by the cosine order before the fusion, never by the fused
   // order: a trait that entered only through an exact word must not displace the trait
-  // that is closest in meaning. A layer with no stored vectors falls back to its first
-  // lexical candidates.
+  // that is closest in meaning. A layer with no vector past its margin (none stored yet, or
+  // none close enough) falls back to its first lexical candidates.
   const quota = (
     semanticIds: readonly string[],
     lexicalIds: readonly string[],
