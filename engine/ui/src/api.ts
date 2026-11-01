@@ -82,7 +82,7 @@ export interface SearchHit {
   via?: "semantic";
 }
 
-/** The `/api/search` response: the applied cap and whether matches were left out. */
+/** The `/api/search` response: the applied cap and whether the page filled it, so more may exist. */
 export interface SearchPage {
   hits: SearchHit[];
   limit: number;
