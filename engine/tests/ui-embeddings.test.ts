@@ -19,6 +19,7 @@ function status(overrides: Partial<EmbeddingStatus> = {}): EmbeddingStatus {
     missing: 0,
     compatible: 10,
     stale_model: 0,
+    outdated: 0,
     stale_dims: 0,
     invalid: 0,
     active_dims: null,
@@ -63,6 +64,18 @@ describe("embeddingWarning", () => {
 
     expect(message).toContain("2 memorias con vectores de otras dimensiones");
     expect(message).toContain("mismem-embed --force");
+  });
+
+  it("avisa del vector que ya no coincide con su texto", () => {
+    const message = embeddingWarning(status({ outdated: 2 }));
+    expect(message).toContain("2 memorias con un vector que ya no coincide con su texto");
+    expect(message).toContain("mismem-embed");
+    expect(message).not.toContain("--force");
+  });
+
+  it("no arma un aviso vacío si el servidor deja de mandar un contador", () => {
+    const sinContador = status({ stale_dims: undefined as unknown as number });
+    expect(embeddingWarning(sinContador)).toBeNull();
   });
 
   it("no manda --force cuando el problema es sólo otro modelo", () => {

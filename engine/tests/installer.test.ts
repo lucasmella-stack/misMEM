@@ -3,7 +3,7 @@
 
 import { execFile } from "node:child_process";
 import { createServer, type Server } from "node:http";
-import { mkdtempSync, readFileSync, writeFileSync, chmodSync, mkdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, chmodSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -14,10 +14,15 @@ const REPO = new URL("../../", import.meta.url).pathname;
 const INSTALLER = join(REPO, "scripts/install.sh");
 
 interface Sandbox {
+  root: string;
+  bin: string;
   home: string;
   env: NodeJS.ProcessEnv;
   envFile: string;
 }
+
+/** Every sandbox made, so afterEach can remove them: 228 of them had piled up in /tmp. */
+const roots: string[] = [];
 
 /** A HOME of its own, plus stubs so no real llama-server or systemd service is touched. */
 function sandbox(stubLlama = true): Sandbox {
@@ -35,7 +40,10 @@ function sandbox(stubLlama = true): Sandbox {
   chmodSync(join(bin, "systemctl"), 0o755);
   const gguf = join(root, "model.gguf");
   writeFileSync(gguf, "");
+  roots.push(root);
   return {
+    root,
+    bin,
     home,
     envFile: join(home, ".config/mismem/env"),
     env: {
@@ -110,6 +118,7 @@ function occupy(port: number, health: boolean): Promise<void> {
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((s) => new Promise((done) => s.close(done))));
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
 describe("install.sh", () => {
@@ -162,6 +171,22 @@ describe("install.sh", () => {
       );
       await install(box, ["--embeddings", "gemma"]);
       expect(written(box, "MISMEM_EMBEDDING_URL")).toBe("http://127.0.0.1:18210");
+    },
+    60_000,
+  );
+
+  it(
+    "cuando pnpm falla, su error se ve en vez de desaparecer",
+    async () => {
+      const box = sandbox();
+      // pnpm writes its errors to stdout, so `>/dev/null` discarded exactly the line that says
+      // why the install aborted: the script failed with no output at all.
+      writeFileSync(join(box.bin, "pnpm"), '#!/bin/sh\necho "ERR_PNPM_DE_PEGA: el lockfile no cuadra"\nexit 1\n');
+      chmodSync(join(box.bin, "pnpm"), 0o755);
+
+      await expect(install(box, [])).rejects.toMatchObject({
+        stdout: expect.stringContaining("ERR_PNPM_DE_PEGA"),
+      });
     },
     60_000,
   );
