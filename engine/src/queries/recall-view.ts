@@ -79,11 +79,11 @@ export function recallForModel(db: DB, hits: readonly RecallHit[]): RecallHitVie
     const rawPolarity = hit.layer === "trait" ? polarityById.get(hit.id) : undefined;
     const polarity = rawPolarity === "shadow" || rawPolarity === "light" ? rawPolarity : undefined;
     // A restored or hand-edited row can hold a non-finite or out-of-range epoch, and
-    // toISOString throws on both; the hit is still useful without its date.
+    // toISOString throws on both; a year past 9999 is not YYYY-MM-DD either. The hit is
+    // still useful without its date.
     const at = new Date(hit.created_at);
-    const date = Number.isFinite(hit.created_at) && !Number.isNaN(at.getTime())
-      ? at.toISOString().slice(0, 10)
-      : undefined;
+    const iso = Number.isFinite(hit.created_at) && !Number.isNaN(at.getTime()) ? at.toISOString() : "";
+    const date = /^\d{4}-\d{2}-\d{2}T/.test(iso) ? iso.slice(0, 10) : undefined;
 
     const view: RecallHitView = {
       layer: hit.layer,
