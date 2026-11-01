@@ -2,6 +2,13 @@
 
 ## Sin publicar
 
+### Salir del visor puede fallar y decirlo
+
+- El botón de salir navegaba al formulario de entrada **pasara lo que pasara**: iba con `.finally()`,
+  así que una salida que falló se veía exactamente igual que una que funcionó, con la cookie todavía
+  viva. Ahora sólo navega si el servidor confirmó, y si no lo dice. Sus dos rutas pasan a ser
+  relativas, como las de `api.ts`, para que misMEM siga funcionando montado en otra ruta.
+
 ### El README dice lo mismo con menos palabras
 
 - El párrafo del instalador eran ciento setenta palabras en un bloque, con detalles que ya están en su
