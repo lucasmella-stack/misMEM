@@ -17,6 +17,7 @@ import {
   embedPendingMemories,
   getEmbeddingIndexStatus,
 } from "../src/embeddings/store.js";
+import { runConsolidation } from "../src/consolidation/run.js";
 import type { EmbedFn } from "../src/embeddings/provider.js";
 
 let db: DB;
@@ -570,8 +571,27 @@ describe("vectores de capa y ciclo de vida", () => {
     const path = join(dir, "mem.db");
     try {
       const before = openDb(path);
+      const source = capture(before, { scope: "dev", body: "origen heredado" }).id;
+      const memory = consolidate(before, {
+        scope: "dev",
+        gist: "memoria heredada",
+        source_episode_ids: [source],
+      }).memory_id;
+      const trait = crystallize(before, {
+        scope: "dev",
+        name: "rasgo heredado",
+        evidence_memory_ids: [memory],
+      }).trait_id;
       const episode = capture(before, { scope: "dev", body: "episodio heredado" }).id;
-      // A DB created before this change has no layer table at all.
+      // A DB created before this change has neither the table nor the triggers that keep it
+      // in step with episodes and traits, so a bare DROP TABLE would leave them behind.
+      for (const trigger of [
+        "layer_embeddings_episode_ad",
+        "layer_embeddings_episode_au",
+        "layer_embeddings_trait_ad",
+      ]) {
+        before.exec(`DROP TRIGGER ${trigger}`);
+      }
       before.exec("DROP TABLE layer_embeddings");
       before.close();
 
@@ -582,6 +602,16 @@ describe("vectores de capa y ciclo de vida", () => {
             .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'layer_embeddings'")
             .get(),
         ).toEqual({ name: "layer_embeddings" });
+        const triggers = reopened
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'layer_embeddings%' ORDER BY name",
+          )
+          .all() as Array<{ name: string }>;
+        expect(triggers.map((row) => row.name)).toEqual([
+          "layer_embeddings_episode_ad",
+          "layer_embeddings_episode_au",
+          "layer_embeddings_trait_ad",
+        ]);
         expect(reopened.prepare("SELECT body FROM episodes WHERE id = ?").get(episode)).toEqual({
           body: "episodio heredado",
         });
@@ -590,13 +620,47 @@ describe("vectores de capa y ciclo de vida", () => {
           embedFn: async (texts) => texts.map(() => axis(1)),
           model: "fake",
         });
-        expect(stats.layers).toEqual({ pending: 1, embedded: 1, failed: 0 });
+        expect(stats.layers).toEqual({ pending: 2, embedded: 2, failed: 0 });
+
+        reopened.prepare("DELETE FROM traits WHERE id = ?").run(trait);
+        expect(
+          reopened
+            .prepare("SELECT 1 FROM layer_embeddings WHERE layer = 'trait' AND item_id = ?")
+            .get(trait),
+        ).toBeUndefined();
+
+        consolidate(reopened, {
+          scope: "dev",
+          gist: "absorbe el episodio heredado",
+          source_episode_ids: [episode],
+        });
+        expect(
+          reopened
+            .prepare("SELECT 1 FROM layer_embeddings WHERE layer = 'episode' AND item_id = ?")
+            .get(episode),
+        ).toBeUndefined();
       } finally {
         reopened.close();
       }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it("la consolidación registra los fallos del backfill de rasgos y episodios", async () => {
+    const episode = capture(db, { scope: "dev", body: "episodio sin vector" }).id;
+    // Old enough for the pending cutoff; the backfill does not look at it.
+    db.prepare("UPDATE episodes SET created_at = ? WHERE id = ?").run(1, episode);
+    const logs: string[] = [];
+    await runConsolidation(db, {
+      // No scope is consolidated, so the run spends no LLM call and only backfills.
+      scopeFilter: "sin-escuchas",
+      llm: { apiKey: "fake", model: "fake" },
+      embedFn: async () => null,
+      log: (line) => logs.push(line),
+    });
+
+    expect(logs).toContainEqual(expect.stringContaining("capas pendientes=1 embebidas=0 fallidas=1"));
   });
 });
 

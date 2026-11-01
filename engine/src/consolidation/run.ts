@@ -1,6 +1,7 @@
 import type { Database as DB } from "better-sqlite3";
 import { envNonNegativeNumber, envPositiveNumber } from "../env.js";
 import { AUTO_BACKFILL_MAX_ROWS, embedPendingMemories } from "../embeddings/store.js";
+import type { EmbedFn } from "../embeddings/provider.js";
 import { distill, loadLlmConfig, LlmFatalError, type LlmConfig } from "./llm.js";
 import {
   beginScope,
@@ -33,6 +34,8 @@ export interface RunOptions {
   uncitedStrikes?: number;
   llm?: LlmConfig;
   distillFn?: DistillFn;
+  /** Injected embedder for the trailing backfill; the CLI and the job leave it unset. */
+  embedFn?: EmbedFn;
   log?: (msg: string) => void;
 }
 
@@ -185,9 +188,16 @@ export async function runConsolidation(
         timeoutMs: 120_000,
         batchSize: 8,
         maxRows: AUTO_BACKFILL_MAX_ROWS,
+        embedFn: opts.embedFn,
       });
-      if (emb.pending > 0) {
-        log(`[consolidation] embeddings: pendientes=${emb.pending} embebidas=${emb.embedded} fallidas=${emb.failed}`);
+      // Layer failures are invisible in the memory counters, and a run that only had traits
+      // or pending episodes to embed logged nothing at all.
+      const failed = emb.failed + emb.layers.failed;
+      if (emb.pending > 0 || emb.layers.pending > 0 || failed > 0) {
+        log(
+          `[consolidation] embeddings: pendientes=${emb.pending} embebidas=${emb.embedded} fallidas=${emb.failed}; ` +
+            `capas pendientes=${emb.layers.pending} embebidas=${emb.layers.embedded} fallidas=${emb.layers.failed}`,
+        );
       }
     } catch {
       /* the semantic layer never breaks the sleep cycle */

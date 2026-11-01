@@ -29,7 +29,12 @@ export function updateEngramTarget(
       | { name: string }
       | undefined;
     if (!trait) return null;
-    if (trait.name === content) return { target: "trait", renamed: false };
+    if (trait.name === content) {
+      // The text did not change, so the vector still describes it and is kept. The touch
+      // still counts as an update: the viewer orders traits by `updated_at`.
+      db.prepare("UPDATE traits SET updated_at = ? WHERE id = ?").run(at, id);
+      return { target: "trait", renamed: false };
+    }
     // The vector described the old name; it is deleted here, in the same transaction, and
     // the alias embeds the new one through the best-effort write path afterwards.
     db.prepare("UPDATE traits SET name = ?, updated_at = ? WHERE id = ?").run(content, at, id);
