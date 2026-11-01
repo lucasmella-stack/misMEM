@@ -2,6 +2,8 @@
 
 ## Sin publicar
 
+## 0.8.0 — 2026-11-01
+
 ### El README describe el sistema: sin modelos concretos y sin una lista cerrada de clientes
 
 - La búsqueda por significado funciona con cualquier modelo detrás de un servidor de embeddings, y la
