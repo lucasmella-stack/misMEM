@@ -304,8 +304,8 @@ export async function embedPendingMemories(
     pendingLayers,
     budget - selectedRows.length,
   );
-  // Memory rows always save, so the top-level shape carries no discarded counter: only the
-  // layers can refuse a vector that went stale while the embedder worked.
+  // Memory rows always save, so their discarded count is always 0 and BackfillStats does not
+  // declare it: only the layers can refuse a vector that went stale while the embedder worked.
   return { pending: pendingRows.length, ...memories, layers };
 }
 
