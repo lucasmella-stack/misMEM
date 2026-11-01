@@ -109,7 +109,7 @@ node dist/eval-cli.js --mode semantico
 
 El segundo exige `pnpm build` y las variables `MISMEM_EMBEDDING_*` del servidor de embeddings
 ([DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única)); `--mode auto` usa el semántico sólo si
-el embedder deja todas las memorias embebidas sin un solo lote fallido. Si alguna se queda sin vector,
+ningún lote falló, ni de memorias ni de rasgos o episodios, y hay al menos una memoria con vector; si no,
 mide en léxico y la línea `modo:` lo dice. Los datos viven en `engine/eval/golden/`, un `.jsonl` por
 dominio; su validación está en `engine/src/recall/golden-corpus.ts` y su carga y medición en
 `engine/src/recall/golden.ts`. La puerta de CI
@@ -124,7 +124,7 @@ Línea base del 2026-11-01 (tope 5, aciertos dentro del tope; caduca cuando camb
 | Modo | Global | MRR | Paráfrasis | Episodio | Rasgo | Ajenas con algo | Recuerdos por pregunta |
 |---|---|---|---|---|---|---|---|
 | Léxico | 254/432 | 0,54 | 2/72 | 21/24 | 10/24 | 4/48 | 1,6 |
-| Semántico (`embeddinggemma-2`, corte 0,65) | 411/432 | 0,87 | 64/72 | 23/24 | 19/24 | 12/48 | 4,87 |
+| Semántico (`embeddinggemma-2`, corte 0,65) | 411/432 | 0,87 | 64/72 | 23/24 | 19/24 | 12/48 | 4,9 |
 
 En el semántico, las tres capas compiten en el mismo ranking: rasgos y episodios pendientes pasan de 0/24 a
 19/24 y 23/24. El acierto en primera posición es 355/432 y el de las preguntas que esperan una memoria,
