@@ -58,6 +58,7 @@
     "start:http": "node dist/server-http.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p ui/tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "lint": "biome lint .",
     "knip": "knip",

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // mismem-embed: backfill and reindex of memory embeddings against the configured server
-// (Ollama by default, or OpenAI-compatible). Idempotent: it fills missing or stale vectors;
+// (EmbeddingGemma 2 on llama-server by default). Idempotent: it fills missing or stale vectors;
 // --force rebuilds compatible ones too.
 import { defaultDbPath, openDefaultDb } from "./store/db.js";
 import { embedPendingMemories, getEmbeddingIndexStatus } from "./embeddings/store.js";
@@ -12,7 +12,7 @@ function help(): void {
   console.log(
     "mismem-embed [--scope <name>] [--batch 32] [--status] [--force]\n" +
       `DB: ${defaultDbPath()} (override con MISMEM_DB)\n` +
-      "Variables: MISMEM_EMBEDDING_PROVIDER (ollama|openai), MISMEM_EMBEDDING_URL o MISMEM_OLLAMA_URL,\n" +
+      "Variables: MISMEM_EMBEDDING_URL (servidor con /v1/embeddings: llama-server u Ollama),\n" +
       "     MISMEM_EMBEDDING_MODEL, MISMEM_EMBEDDING_QUERY_PREFIX, MISMEM_EMBEDDING_DOC_PREFIX,\n" +
       "     MISMEM_EMBEDDING_MIN_SCORE, MISMEM_EMBEDDING_MAX_CHARS, MISMEM_EMBEDDING_TIMEOUT_MS,\n" +
       "     MISMEM_EMBEDDINGS=off\n" +
@@ -48,7 +48,7 @@ async function main(): Promise<void> {
     }
 
     console.log(
-      `[embed] modelo=${cfg.model} ${cfg.provider}=${cfg.url} memorias=${status.memories} embebidas=${status.embedded}`,
+      `[embed] modelo=${cfg.model} servidor=${cfg.url} memorias=${status.memories} embebidas=${status.embedded}`,
     );
     const result = await embedPendingMemories(db, {
       scope: args.scope,
@@ -60,11 +60,7 @@ async function main(): Promise<void> {
       `[embed] pendientes=${result.pending} embebidas=${result.embedded} reembebidas=${result.reembedded} fallidas=${result.failed}`,
     );
     if (result.failed > 0 && result.embedded === 0) {
-      console.error(
-        cfg.provider === "openai"
-          ? `[embed] ¿El servidor de embeddings está corriendo? Probá: curl ${cfg.url}/health`
-          : `[embed] ¿Ollama está corriendo? Probá: curl ${cfg.url}/api/tags — y \`ollama pull ${cfg.model}\``,
-      );
+      console.error(`[embed] ¿El servidor de embeddings está corriendo en ${cfg.url} y sirve ${cfg.model}?`);
       process.exitCode = 1;
     }
   } finally {
