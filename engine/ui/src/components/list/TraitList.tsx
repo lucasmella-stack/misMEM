@@ -17,7 +17,8 @@ export function TraitList({ scope, selected, onSelect }: ListProps) {
   const pages = query.data?.pages.map((page) => page.rows) ?? [];
   const lostRows = pagesLostRows(pages);
   // Refetching keeps the stale offsets, so the gap survives; resetting restarts at the first page
-  // and lines the offsets up with the rows again.
+  // and lines the offsets up with the rows again. Offset paging cannot see a delete ahead of the
+  // loaded pages: one row slides into a page already read until the list is reloaded.
   useEffect(() => {
     if (!lostRows) return;
     void queryClient.resetQueries({ queryKey: ["traits", scope ?? ""], exact: true });

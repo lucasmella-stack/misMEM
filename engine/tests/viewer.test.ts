@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import type { Database as DB } from "better-sqlite3";
 import { openDb } from "../src/store/db.js";
 import { capture } from "../src/memory/capture.js";
@@ -171,11 +171,13 @@ describe("viewer: /api/recent", () => {
   });
 
   it("con fuerza y fecha empatadas desempata por id para que las páginas no se pisen", () => {
-    const clock = vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
-    const ids = ["uno", "dos", "tres"].map(
-      (name) => crystallize(db, { scope: "a", name, evidence_memory_ids: [`mem_${name}`] }).trait_id,
+    // Fixed ids inserted out of order: without the id tie-break SQLite would return insertion order,
+    // so the test fails every time instead of one run in six with random ulids.
+    const ids = ["t3", "t1", "t5", "t2", "t6", "t4"];
+    const insert = db.prepare(
+      "INSERT INTO traits (id, scope, name, evidence_memory_ids, created_at, updated_at) VALUES (?, 'a', ?, '[]', 1, 1)",
     );
-    clock.mockRestore();
+    for (const id of ids) insert.run(id, `rasgo ${id}`);
 
     const read = (query: string) => {
       const res = mockRes();
@@ -186,6 +188,7 @@ describe("viewer: /api/recent", () => {
     const rows = [
       ...read("layer=trait&scope=a&limit=2&offset=0").rows,
       ...read("layer=trait&scope=a&limit=2&offset=2").rows,
+      ...read("layer=trait&scope=a&limit=2&offset=4").rows,
     ];
     expect(rows.map((row: { id: string }) => row.id)).toEqual([...ids].sort().reverse());
   });
