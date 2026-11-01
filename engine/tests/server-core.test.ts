@@ -2,8 +2,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
-import { ENGRAM_TOOLS } from "../src/engram-compat.js";
+import { openDb } from "../src/store/db.js";
+import { ENGRAM_TOOLS } from "../src/mcp/engram-compat.js";
 import { createServer } from "../src/server-core.js";
 
 // The real MCP entry point: a Client talks to createServer() over a linked in-memory transport,

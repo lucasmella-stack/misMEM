@@ -14,8 +14,8 @@ interface Props {
 const SKELETON_ROWS = ["s1", "s2", "s3", "s4", "s5"];
 
 /**
- * En pantallas anchas es una columna; por debajo, una fila que se desplaza. Un
- * desplegable escondía los ámbitos, que es justo lo que se viene a ver aquí.
+ * On wide screens it is a column; below that, a row that scrolls. A dropdown hid the scopes,
+ * which is exactly what one comes here to see.
  */
 
 export function Scopes({ scopes, isPending, error, current, onChange }: Props) {

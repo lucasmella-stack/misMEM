@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { envNonNegativeNumber, envOptionalPositiveNumber, envPositiveNumber } from "../src/env.js";
-import { decayedSalience } from "../src/salience.js";
+import { decayedSalience } from "../src/memory/salience.js";
 
 const NAME = "MISMEM_TEST_ENV_NUMBER";
 

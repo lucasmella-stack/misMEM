@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
+import { openDb } from "../src/store/db.js";
 import {
   MAX_DETAILS_CHARS,
   MAX_TEXT_CHARS,
   recallForModel,
   recallMissForModel,
   type RecallHitView,
-} from "../src/recall-view.js";
+} from "../src/queries/recall-view.js";
 import type { RecallHit } from "../src/schema.js";
 
 // Fixed clock near midnight UTC: a local-time formatter would report the next day in

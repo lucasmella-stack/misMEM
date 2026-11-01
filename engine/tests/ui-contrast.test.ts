@@ -25,8 +25,8 @@ function hex(tokens: Map<string, string>, name: string): string {
 }
 
 /**
- * `bg-brand/15` es marca al 15 % de alfa sobre el fondo: se compone canal a canal en
- * sRGB (0-255), que es lo que hace el navegador al pintar la capa translúcida.
+ * `bg-brand/15` is brand at 15% alpha over the background: blended per channel in
+ * sRGB (0-255), which is what the browser does when painting the translucent layer.
  */
 function over(brand: string, background: string, alpha: number): string {
   const channel = (value: string, index: number): number =>
@@ -63,7 +63,7 @@ describe("contraste de los tokens de texto", () => {
     }
   });
 
-  // `field` es el fondo real de los chips y de los avisos: no basta con pasar sobre surface.
+  // `field` is the real background of chips and notices: passing over surface is not enough.
   it("los tokens de texto pasan AA sobre field", () => {
     for (const [theme, selector] of themes) {
       const tokens = themeTokens(selector);
@@ -74,7 +74,7 @@ describe("contraste de los tokens de texto", () => {
     }
   });
 
-  // El badge `+N` de los ámbitos pinta brand-text sobre brand al 15 %.
+  // The scopes' `+N` badge paints brand-text over brand at 15%.
   it("brand-text pasa AA sobre brand al 15 % en surface y surface-raised", () => {
     for (const [theme, selector] of themes) {
       const tokens = themeTokens(selector);

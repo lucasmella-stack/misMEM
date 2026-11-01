@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
-import { capture, consolidate, crystallize, recall, recallHybrid } from "../src/tools.js";
+import { openDb } from "../src/store/db.js";
+import { capture } from "../src/memory/capture.js";
+import { consolidate } from "../src/memory/consolidate.js";
+import { crystallize } from "../src/memory/crystallize.js";
+import { recall, recallHybrid } from "../src/recall/recall.js";
 import { embedPendingMemories, saveMemoryEmbedding } from "../src/embeddings/store.js";
 import type { EmbedFn } from "../src/embeddings/provider.js";
 
@@ -39,8 +42,8 @@ describe("recall léxico: frases normales", () => {
   });
 
   it("rescata una paráfrasis que vive en los detalles, no sólo en el gist", () => {
-    // FTS5 indexa `gist` y `details`; el rescate tiene que puntuar sobre ese mismo texto o
-    // encuentra el candidato por una columna y lo descarta porque en la otra no está.
+    // FTS5 indexes `gist` and `details`; the rescue must score over that same text, or it
+    // finds the candidate in one column and discards it because it is missing from the other.
     const id = memory(
       "oficina",
       "nota corta sobre la oficina",
@@ -50,9 +53,9 @@ describe("recall léxico: frases normales", () => {
   });
 
   it("dos formas de la misma palabra no cuentan como dos coincidencias", () => {
-    // `decidir` busca por `deci` y `decision` por `decis`, así que un solo token las
-    // satisface a las dos. Sin deduplicar por prefijo, el mínimo de dos se cumple con una
-    // única palabra y se rescata la memoria que sólo dice `decision`.
+    // `decidir` searches for `deci` and `decision` for `decis`, so a single token satisfies
+    // both. Without prefix dedup, the minimum of two is met by one word and the memory that
+    // only says `decision` gets rescued.
     memory("dev", "la decision quedó tomada");
     memory("dev", "vamos a decidir mañana");
     expect(memoryIds("decidir decision")).toEqual([]);
@@ -71,9 +74,9 @@ describe("recall léxico: frases normales", () => {
   });
 
   it("al relajar, lo que coincide en más palabras va primero", () => {
-    // La de tres coincidencias es más larga a propósito: bm25 penaliza longitud y, sin el
-    // orden por coincidencias, adelantaría la corta de dos. Así el test mide ese criterio
-    // y no el puesto que ya trae FTS5.
+    // The three-match one is deliberately longer: bm25 penalises length and, without the
+    // order by matches, it would jump ahead of the short two-match one. This way the test
+    // measures that criterion and not the rank FTS5 already returns.
     const three = memory(
       "pc",
       "las luces del teclado del portátil y además varias palabras de relleno para alargarla",
@@ -98,17 +101,17 @@ describe("recall léxico: frases normales", () => {
   });
 
   it("el prefijo no casa con una palabra más corta que la consulta", () => {
-    // `solar` recorta a `sola`, que es una palabra distinta. Sin la guarda de longitud, el
-    // rescate la cuenta como si fuera una flexión y una pregunta de astronomía trae una
-    // memoria que habla de "una sola pasada".
+    // `solar` wins on the prefix `sola`, a different word. Without the length guard, the
+    // rescue counts it as an inflection and an astronomy question brings back a memory
+    // that talks about "una sola pasada".
     memory("huerto", "panel solar del tejado");
     memory("dev", "una sola pasada por el sistema dejó todo listo");
     expect(memoryIds("sistema solar")).toEqual([]);
   });
 
   it("una palabra común no rescata si no la acompañan dos raras", () => {
-    // Ocho memorias de fondo hacen que "sistema" y "equipo" sean vocabulario común:
-    // cada una aparece en cuatro documentos, por encima del umbral de rareza.
+    // Eight background memories make "sistema" and "equipo" common vocabulary: each
+    // appears in four documents, above the rarity threshold.
     for (const gist of [
       "sistema de archivos del servidor",
       "sistema de energía del portátil",
@@ -121,9 +124,9 @@ describe("recall léxico: frases normales", () => {
     ]) {
       memory("pc", gist);
     }
-    // "sistema" y "equipo" coinciden, pero no distinguen: son comunes.
+    // "sistema" and "equipo" match but do not discriminate: they are common.
     memory("pc", "el sistema del equipo de riego");
-    // Una sola palabra rara tampoco basta.
+    // A single rare word is not enough either.
     memory("dev", "kubernetes en el cluster");
     const two = memory("dev", "despliegue de kubernetes con traefik en el ingress");
 
@@ -146,8 +149,8 @@ describe("recall léxico: frases normales", () => {
 
 describe("recall léxico sin memorias: rescata episodios y rasgos", () => {
   it("rescata un episodio cuando sus palabras no están en ninguna memoria", () => {
-    // Sin memorias, todos los términos salen con frecuencia 0. Descartarlos por eso vaciaba
-    // el rescate en la instalación recién nacida, que es justo donde no hay capa semántica.
+    // With no memories every term has frequency 0. Discarding them for that emptied the
+    // rescue on a fresh install, which is exactly where there is no semantic layer.
     const episode = capture(db, { scope: "dev", body: "configurar servidor nginx" }).id;
 
     const hits = recall(db, { query: "configurando servidores nginx", reinforce: false }).hits;
@@ -156,8 +159,8 @@ describe("recall léxico sin memorias: rescata episodios y rasgos", () => {
   });
 
   it("rescata un rasgo cuando su nombre no está en ninguna memoria", () => {
-    // Los rasgos tampoco viven en `memories_fts`: medir ahí su vocabulario no puede decidir
-    // si se rescatan.
+    // Traits do not live in `memories_fts` either: measuring their vocabulary there cannot
+    // decide whether they are rescued.
     const ajeno = capture(db, { scope: "dev", body: "notas de finanzas" }).id;
     const trait = crystallize(db, {
       scope: "dev",
@@ -176,9 +179,9 @@ describe("recall estricto: desempates", () => {
     const at = Date.now();
     const stale = memory("pc", "alfa beta gamma delta");
     const fresh = memory("pc", "delta gamma beta alfa");
-    // Mismo perfil de términos, así que mismo bm25: sólo cambia la saliencia. La vieja
-    // tiene la saliencia cruda más alta; la decaída, más baja. Desempatar por la cruda
-    // pondría primero la que ya no se usa; el orden actual desempata por la decaída.
+    // Same term profile, so same bm25: only salience changes. The old one has the higher
+    // raw salience; the decayed one is lower. Ties broken by raw salience would put the
+    // unused one first; the current order breaks ties by the decayed value.
     db.prepare("UPDATE memories SET salience = 0.9, salience_updated_at = ? WHERE id = ?").run(
       at - 730 * 86_400_000,
       stale,
@@ -233,8 +236,8 @@ describe("recall híbrido: el rescate sólo cuando no hay capa semántica", () =
     await embedPendingMemories(db, { embedFn: embed, model: "fake" });
     const query = { query: "configurando servidores nginx", limit: 5, reinforce: false };
 
-    // Sin capa semántica el episodio y el rasgo se rescatan; con ella, la búsqueda queda en
-    // la estricta.
+    // Without a semantic layer the episode and the trait are rescued; with it, the search
+    // stays strict.
     expect(recall(db, query).hits.map((hit) => hit.id)).toContain(pendiente);
     expect(recall(db, query).hits.map((hit) => hit.id)).toContain(rasgo);
     const result = await recallHybrid(db, query, async (texts) => texts.map(() => Float32Array.from([1, 0])), {
@@ -247,9 +250,9 @@ describe("recall híbrido: el rescate sólo cuando no hay capa semántica", () =
   });
 
   it("un vector de una memoria de ruido no cierra la puerta al rescate", async () => {
-    // `semanticSearchMemories` excluye el ruido, así que ese vector no puntúa nada; si la
-    // puerta lo cuenta, apaga el rescate sin capa que lo sustituya. Puede pasar en bases
-    // que embebieron memorias `[noise]` antes de que el backfill las excluyera.
+    // `semanticSearchMemories` excludes noise, so that vector scores nothing; if the gate
+    // counted it, it would switch off the rescue with no layer to replace it. This can
+    // happen in dbs that embedded `[noise]` memories before the backfill excluded them.
     memory("dev", "configurar servidor apache");
     const ruido = memory("dev", "[noise] 3 episodios sin señal consolidable");
     saveMemoryEmbedding(db, ruido, "fake", Float32Array.from([1, 0]));
@@ -326,8 +329,8 @@ describe("recall híbrido: el rescate sólo cuando no hay capa semántica", () =
   });
 
   it("sin ningún vector del modelo activo, rescata", async () => {
-    // Embeddings activos pero backfill pendiente o modelo cambiado: el vector de la consulta
-    // no tiene con qué compararse y el recall depende sólo de lo léxico.
+    // Embeddings on but backfill pending or model changed: the query vector has nothing
+    // to compare against and recall depends on the lexical side alone.
     const id = memory("dev", "configurar servidor nginx");
     const embed: EmbedFn = async (texts) => texts.map(() => Float32Array.from([1, 0]));
 
@@ -342,8 +345,8 @@ describe("recall híbrido: el rescate sólo cuando no hay capa semántica", () =
   });
 
   it("el corte semántico no toca lo que encontró la búsqueda estricta", async () => {
-    // El corte es una puerta para lo rescatado, no un filtro global: un acierto exacto de
-    // FTS5 se devuelve aunque su vector quede por debajo del mínimo.
+    // The cut is a gate for rescued hits, not a global filter: an exact FTS5 match is
+    // returned even if its vector falls below the minimum.
     const id = memory("dev", "deploy docker traefik");
     const vecs = new Map<string, Float32Array>([
       ["docker traefik deploy", Float32Array.from([1, 0])],

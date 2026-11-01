@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
-import { capture, consolidate, crystallize } from "../src/tools.js";
+import { openDb } from "../src/store/db.js";
+import { capture } from "../src/memory/capture.js";
+import { consolidate } from "../src/memory/consolidate.js";
+import { crystallize } from "../src/memory/crystallize.js";
 import {
   dispatchEngramTool,
   isEngramTool,
   ENGRAM_TOOLS,
-} from "../src/engram-compat.js";
+} from "../src/mcp/engram-compat.js";
 
 let db: DB;
 
@@ -219,6 +221,34 @@ describe("engram-compat: mem_update", () => {
         )
         .get(memory_id),
     ).toBeUndefined();
+  });
+
+  it("rolls the gist back when invalidating the embedding fails", () => {
+    const { id: ep } = capture(db, { scope: "s", body: "x" });
+    const { memory_id } = consolidate(db, {
+      scope: "s",
+      gist: "old",
+      source_episode_ids: [ep],
+    });
+    db.prepare(
+      `INSERT INTO memory_embeddings (memory_id, model, dims, vec, created_at)
+       VALUES (?, 'fake', 1, ?, ?)`,
+    ).run(memory_id, Buffer.from(new Float32Array([1]).buffer), Date.now());
+    // Both writes are one transaction: a delete that fails must not leave the new gist stored
+    // next to a vector that still describes the old text.
+    db.exec(
+      `CREATE TRIGGER refuse_embedding_delete BEFORE DELETE ON memory_embeddings
+       BEGIN SELECT RAISE(ABORT, 'embedding delete refused'); END;`,
+    );
+
+    expect(() =>
+      dispatchEngramTool(db, "mem_update", { id: memory_id, content: "new gist" }),
+    ).toThrow(/embedding delete refused/);
+
+    const row = db
+      .prepare("SELECT gist FROM memories WHERE id = ?")
+      .get(memory_id) as { gist: string };
+    expect(row.gist).toBe("old");
   });
 
   it("appends new episode if id not found", () => {

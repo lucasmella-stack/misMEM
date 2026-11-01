@@ -4,7 +4,7 @@ import { ago, exact, percent } from "../ui/src/format";
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 9, 25, 12, 0, 0);
 
-/** Las fechas relativas son la información útil; la exacta va en el `title`. */
+/** Relative dates are the useful information; the exact one goes in `title`. */
 describe("ago", () => {
   it("con now fijo, hace 3 días da 'hace 3 días'", () => {
     expect(ago(NOW - 3 * DAY, NOW)).toBe("hace 3 días");

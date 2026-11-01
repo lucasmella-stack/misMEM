@@ -1,8 +1,5 @@
-/**
- * La saliencia (0..1) decide cuánta tinta lleva el texto de una memoria. El suelo
- * del 0 % es `ink-muted`, que pasa AA en los dos temas; el 100 % es `ink`. La mezcla
- * la hace el CSS con color-mix, así que aquí sólo se normaliza y se recorta.
- */
+// Owns the salience-to-ink mapping, from `ink-muted` at 0 % (AA in both themes) to `ink` at
+// 100 %; the CSS mixes it with color-mix, so this only normalises and clamps.
 export function inkPercent(salience: number): number {
   if (!Number.isFinite(salience)) return 100;
   return Math.round(Math.max(0, Math.min(1, salience)) * 100);

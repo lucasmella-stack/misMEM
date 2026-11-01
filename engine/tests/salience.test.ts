@@ -4,13 +4,15 @@ import Database from "better-sqlite3";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openDb } from "../src/db.js";
-import { capture, consolidate, forget } from "../src/tools.js";
+import { openDb } from "../src/store/db.js";
+import { capture } from "../src/memory/capture.js";
+import { consolidate } from "../src/memory/consolidate.js";
+import { forget } from "../src/memory/forget.js";
 import {
   decayMemories,
   decayedSalience,
   reinforceMemories,
-} from "../src/salience.js";
+} from "../src/memory/salience.js";
 
 const DAY = 86_400_000;
 let db: DB;

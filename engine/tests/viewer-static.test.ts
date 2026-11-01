@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import type { ServerResponse } from "node:http";
-import { serveUi } from "../src/viewer-static.js";
+import { loginAssets, serveUi, UI_DIR } from "../src/viewer-static.js";
 
 interface MockResponse {
   statusCode: number;
@@ -85,5 +85,26 @@ describe("viewer-static: serveUi", () => {
     const res = serve("/viewer", join(root, "no-existe"));
     expect(res.statusCode).toBe(503);
     expect(res.body).toMatch(/pnpm build/);
+  });
+});
+
+describe("recursos de la pantalla de entrada", () => {
+  it("la carpeta de la interfaz es absoluta, no relativa al directorio de trabajo", () => {
+    // It was read as "dist/ui", which only resolved when the server happened to run from
+    // engine/: installed from npm the sign-in page lost its logo for everyone.
+    expect(isAbsolute(UI_DIR)).toBe(true);
+  });
+
+  it("sirve los dos logos por su ruta, y sin la interfaz compilada no falla", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mismem-ui-"));
+    expect(loginAssets(dir).size).toBe(0);
+
+    writeFileSync(join(dir, "logo.webp"), "claro");
+    writeFileSync(join(dir, "logo-dark.webp"), "oscuro");
+    const assets = loginAssets(dir);
+
+    expect([...assets.keys()].sort()).toEqual(["/login-logo-dark.webp", "/login-logo.webp"]);
+    expect(assets.get("/login-logo.webp")?.toString()).toBe("claro");
+    rmSync(dir, { recursive: true, force: true });
   });
 });
