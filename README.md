@@ -69,8 +69,8 @@ Instala misMEM desde el repo clonado, pregunta dónde guardar la memoria y con q
 (DeepSeek, OpenRouter, OpenAI, un servidor compatible o ninguno), guarda la clave en
 `~/.config/mismem/env` con permisos 600 y configura los clientes MCP que encuentra en la máquina (en Claude
 Code, también los hooks de inyección y refuerzo; `--help` da la lista). Para la búsqueda por significado
-deja montado un servidor de embeddings local si hay `llama-server`; el modelo se cambia con dos variables
-([cómo](docs/recall.md#por-significado-opcional)). Si se quiere, deja la consolidación nocturna como timer de
+deja montado un servidor de embeddings local si hay `llama-server`; otro servidor u otro modelo se eligen
+con `MISMEM_EMBEDDING_URL` y `MISMEM_EMBEDDING_MODEL` ([cómo](docs/recall.md#por-significado-opcional)). Si se quiere, deja la consolidación nocturna como timer de
 systemd. Los clientes llaman a
 `~/.local/bin/mismem-run`, así que ninguna clave queda en su configuración. Volver a ejecutarlo actualiza
 sin duplicar, y no pisa a ciegas una configuración de misMEM hecha a mano: los hooks de Claude Code que
@@ -94,7 +94,8 @@ en `/mcp`. Para exponerlo con Traefik y TLS, o para construirla en el servidor, 
 
 ### npm: sin clonar nada
 
-En la configuración MCP del cliente (el nombre del fichero y de la clave cambian de uno a otro):
+En la configuración MCP del cliente. El fichero, la clave y la forma cambian de uno a otro; éste es el de
+los que usan `mcpServers` en JSON:
 
 ```json
 {
