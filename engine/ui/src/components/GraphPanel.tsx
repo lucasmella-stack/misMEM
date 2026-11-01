@@ -20,6 +20,8 @@ export interface GraphSettings {
   localEnabled: boolean;
   depth: 1 | 2 | 3;
   colorByScope: boolean;
+  /** What the radius measures: the drawn edges of each node, or its salience. */
+  sizeByConnections: boolean;
   arrows: boolean;
   textThreshold: number;
   nodeSize: number;
@@ -42,6 +44,8 @@ export const DEFAULT_SETTINGS: GraphSettings = {
   localEnabled: false,
   depth: 2,
   colorByScope: true,
+  // Salience said mostly how old a memory was; what makes one central is how much hangs off it.
+  sizeByConnections: true,
   // Off by default: the approved mock-up had none and they add ink to the drawing.
   arrows: false,
   textThreshold: 1.6,
@@ -260,6 +264,12 @@ export function GraphPanel({ settings, onChange, scopes, width, connectome }: Pr
         </Section>
 
         <Section title="Visualización">
+          <ToggleRow
+            id="gp-size-by"
+            label="Tamaño por conexiones"
+            checked={settings.sizeByConnections}
+            onChange={(v) => onChange({ sizeByConnections: v })}
+          />
           <ToggleRow
             id="gp-arrows"
             label="Flechas"

@@ -2,6 +2,21 @@
 
 ## Sin publicar
 
+### El tamaño de un nodo dice cuántas conexiones tiene, no cuántos días lleva (#217)
+
+- El radio salía de la saliencia, que nace en la confianza del LLM y decae con una vida media de 90
+  días: en la práctica el dibujo decía sobre todo la antigüedad, y entre 2,2 px y 4,1 px todos los
+  nodos medían casi lo mismo. Ahora sale del **número de aristas visibles** de cada nodo, contadas en
+  el cliente con los filtros puestos, así que apagar una capa redimensiona el grafo con ella.
+- El radio no pasa de **tres veces el mínimo**: el peso crece hasta 9× y los píxeles salen de su raíz
+  cuadrada, así que un nodo muy conectado destaca sin tapar a sus vecinos. Como el peso también
+  alimenta la simulación, los centros ganan espacio, que es lo que se busca.
+- Por conexiones todas las capas miden igual: un rasgo fijo en 5 y un episodio en una saliencia de 0,5
+  no decían nada de cuál organiza a los demás.
+- **El área para pinchar** deja de ser siempre de 7 px: ese es su mínimo y crece con el nodo.
+- *Ajustes del grafo* trae el selector: **Tamaño por conexiones**, encendido por defecto; apagándolo
+  vuelve el dibujo por saliencia de antes.
+
 ### El instalador ya no se queda sin búsqueda semántica porque el 8080 esté ocupado
 
 - El puerto de `llama-server` estaba fijo en 8080, donde viven igual de a menudo un panel de Traefik, un

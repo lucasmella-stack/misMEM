@@ -109,6 +109,20 @@ type LinkEnd = string | { id: string };
 const idOf = (end: LinkEnd): string => (typeof end === "string" ? end : end.id);
 
 /** Direct neighbours, whether or not the library has already swapped ids for node objects. */
+/**
+ * One count per node of the edges actually drawn: the server only counts co-use degree, and only
+ * with the connectome on, so the drawing counts what it has in front of it.
+ */
+export function visibleDegrees(links: Array<{ source: LinkEnd; target: LinkEnd }>): Map<string, number> {
+  const degrees = new Map<string, number>();
+  const bump = (id: string) => degrees.set(id, (degrees.get(id) ?? 0) + 1);
+  for (const link of links) {
+    bump(idOf(link.source));
+    bump(idOf(link.target));
+  }
+  return degrees;
+}
+
 export function neighborsOf(links: Array<{ source: LinkEnd; target: LinkEnd }>, id: string): Set<string> {
   const neighbors = new Set<string>();
   for (const link of links) {

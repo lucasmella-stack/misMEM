@@ -136,3 +136,17 @@ describe("la lectura del conectoma", () => {
     expect(within(entry).getByText("0.60")).toBeTruthy();
   });
 });
+
+describe("el selector de qué mide el tamaño", () => {
+  it("viene en conexiones y deja volver a la saliencia", async () => {
+    const user = userEvent.setup();
+    const onChange = panel({}, 1000);
+    await user.click(screen.getByRole("button", { name: /^visualización$/i }));
+
+    const toggle = screen.getByRole("switch", { name: /tamaño por conexiones/i });
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+
+    await user.click(toggle);
+    expect(onChange.mock.calls).toEqual([[{ sizeByConnections: false }]]);
+  });
+});
