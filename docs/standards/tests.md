@@ -11,7 +11,7 @@ Vitest, desde `engine/`: `pnpm test`. El typecheck también cubre los tests (`pn
 | `engine/tests/contribution-standard.test.ts` | Que formularios, plantillas, `release.yml` y `CONTRIBUTING.md` nombren sólo etiquetas declaradas |
 | `engine/tests/golden.test.ts` | El suelo del eval dorado público: el modo léxico no baja de `floor.json`, no supera `lexico_ajenas_max` y no devuelve ruido |
 | `mismem-bench` | La calidad del recall sobre la memoria real, con un banco privado; **no corre en CI** |
-| `pnpm eval` | La calidad del recall sobre el corpus dorado público, reproducible en cualquier máquina |
+| `pnpm eval --mode lexico` | La calidad del recall sobre el corpus dorado público, reproducible en cualquier máquina: el modo `auto` pasa a semántico en cuanto responde un servidor de embeddings, así que la cifra comparable es la léxica |
 
 ## Reglas
 

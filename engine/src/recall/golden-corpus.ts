@@ -5,7 +5,8 @@ import { basename } from "node:path";
 import { z } from "zod";
 import { Scope } from "../schema.js";
 
-const GOLDEN_KINDS = [
+/** Exported so the CI gate can demand one floor line per scored kind. */
+export const GOLDEN_KINDS = [
   "literal",
   "parafrasis",
   "sinonimo",
@@ -135,6 +136,11 @@ export function parseGolden(files: readonly GoldenFile[]): GoldenCorpus {
         queries.push({ where, kind: data.kind, expect: data.expect });
       } else {
         recordKeys.add(key);
+        // A memory leaves its episode behind as `golden-<key>-source`, so a record key ending
+        // in `-source` would take an id another record already owns.
+        if (key.endsWith("-source")) {
+          fail(where, `la clave ${key} acaba en -source, que choca con el episodio derivado de una memoria`);
+        }
         if (data.type === "trait") traits.push({ where, evidence: data.evidence });
       }
       records.push({ ...data, domain });
