@@ -48,6 +48,13 @@ const hit = (partial: Partial<RecallHit> & Pick<RecallHit, "layer" | "id">): Rec
 // A lone surrogate means a cut fell in the middle of an emoji's UTF-16 pair.
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 
+describe("topes publicados", () => {
+  it("son los 2.000 y 1.200 puntos de código que documentan docs/recall.md y el CHANGELOG", () => {
+    expect(MAX_TEXT_CHARS).toBe(2000);
+    expect(MAX_DETAILS_CHARS).toBe(1200);
+  });
+});
+
 describe("recallForModel", () => {
   describe("in a host zone far from UTC", () => {
     const hostTz = process.env.TZ;
