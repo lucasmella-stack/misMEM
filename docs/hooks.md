@@ -10,11 +10,11 @@ acordarse de pedir nada. Son opcionales; `scripts/install.sh` los configura si s
 
 Dos matices sobre esa aproximación:
 
-- Con `MISMEM_HOOK_URL`, la inyección recibe de `recall` el `text` ya recortado a 2.000 caracteres
-  (`MAX_TEXT_CHARS`). Sin servidor remoto lee la base y recibe el texto entero. Con el presupuesto por defecto
-  (`MISMEM_HOOK_MAX_CHARS`, 1.200) un recuerdo de ese tamaño no se inyecta por ninguno de los dos caminos; con un
-  presupuesto de 2.000 o más, el recorte remoto cabe y el texto entero local no, y lo inyectado deja de ser
-  lo mismo.
+- Con `MISMEM_HOOK_URL`, la inyección recibe de `recall` el `text` ya recortado a 2.000 puntos de código
+  (`MAX_TEXT_CHARS`). Sin servidor remoto lee la base y recibe el texto entero. El presupuesto del hook
+  (`MISMEM_HOOK_MAX_CHARS`, 1.200 por defecto) cuenta unidades UTF-16, no puntos de código: con el valor por
+  defecto un recuerdo de ese tamaño no se inyecta por ningún camino, y con un presupuesto alto un recuerdo
+  largo puede caber recortado por el camino remoto y no caber entero por el local.
 - `mismem-used` mide el solapamiento sólo sobre el `text` del hit, recortado cuando vino de un `recall` por
   MCP: los `details` no cuentan como señal, aunque el modelo también los recibe: el refuerzo depende sólo de
   que la respuesta repita palabras del gist. El recorte puede quitar palabras que la respuesta no repetía, así que para un gist por
