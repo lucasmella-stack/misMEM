@@ -135,6 +135,46 @@
   cuenta como `compatible` los vectores del modelo activo con su ancho activo (`active_dims`) y añade `stale_dims` para
   los del modelo activo con otro ancho, de modo que `stale_model` queda para los de otro modelo.
 
+### Recall híbrido: las tres capas compiten en un solo ranking (#154)
+
+- Con embeddings, `recall` devolvía cero episodios pendientes y cero rasgos: las memorias llenaban el tope y
+  el rescate léxico se apagaba. Ahora rasgos, memorias y episodios pendientes se fusionan en un único ranking
+  RRF, y rasgos y episodios se puntúan también por coseno. El resultado se queda con el mejor rasgo y como
+  mucho dos episodios, elegidos por coseno antes de la fusión: una coincidencia exacta de palabras no puede
+  adelantar a un rasgo o un episodio más cercano por significado. Sin ese tope, los rasgos y los episodios
+  desplazaban a la memoria concreta. En
+  el eval dorado (tope 5) el modo semántico pasa de 368/432 a 411/432, con episodio de 0/24 a 23/24 y rasgo
+  de 0/24 a 19/24; el acierto en primera posición sube de 329 a 355, el MRR de 0,796 a 0,871 y las preguntas
+  ajenas quedan en 12/48 con 33 recuerdos. Las preguntas que esperan una memoria aciertan en primera 328/384
+  frente a 329/384 de la línea base, y ningún tipo de pregunta pierde más de un acierto frente a ella.
+- Los vectores de rasgos y episodios pendientes viven en la tabla aditiva `layer_embeddings`, con borrado por
+  disparador al consolidar o borrar el item. `mismem-embed`, `consolidate` y el backfill los reindexan igual
+  que las memorias; `capture`, `crystallize`, los aliases `mem_save`, `mem_session_summary` y `mem_update`, y
+  `/api/crystallize` del visor los embeben en el acto, sin romper la escritura si el embedder falla. Renombrar
+  un rasgo por `mem_update` borra su vector viejo y embebe el nombre nuevo en el acto; con el mismo nombre no
+  toca el vector. Guardar un vector de capa comprueba, dentro de la misma transacción, que el item sigue vivo,
+  que el episodio sigue pendiente y que el texto es el que se embebió, así que una carrera con un renombrado o
+  una consolidación no deja un vector obsoleto.
+- `docs/recall.md` y `docs/architecture.md` describen el ranking nuevo y la línea base del 2026-11-01. El test
+  de `fin-q35` recorre las capas reales por `recallHybrid` y comprueba que el hook recibe `fin-t1`. Tests en
+  `engine/tests/hybrid-layers.test.ts`, `engine/tests/inject.test.ts` y `engine/tests/recall-relaxed.test.ts`.
+- Corrige los hallazgos de revisión del PR: `mismem-embed` cuenta también los fallos del backfill de rasgos
+  y episodios y sale con 1 sólo cuando algo falló y no se embebió nada, igual que con las memorias (un fallo
+  parcial sigue saliendo con 0); la consolidación los registra en su log, sin cambiar su código de salida; el tope de un segundo de la escritura cubre
+  también un `embedFn` inyectado, así que un embedder que no responde no retiene `capture`, `crystallize` ni el
+  visor; `mem_update` con el mismo nombre de rasgo conserva el vector pero avanza `updated_at`, que el visor usa
+  para desempatar dos rasgos de la misma fuerza, porque ordena primero por `strength`; el test de una base
+  anterior a `layer_embeddings` borra también sus disparadores, y otro comprueba que borrar un episodio
+  pendiente retira su vector por disparador, igual que consolidarlo; y `docs/recall.md` describe la saliencia
+  como lo que hace el código, un peso pequeño sobre las memorias y no un desempate sólo entre ellas. Tests en
+  `engine/tests/embed-cli.test.ts`, `engine/tests/hybrid-layers.test.ts` y `engine/tests/engram-compat.test.ts`.
+- Cierra los hallazgos de la séptima revisión: renombrar un rasgo o cambiar el cuerpo de un episodio
+  borra su vector por disparador cuando el texto cambia de verdad, no sólo al borrar o consolidar el item;
+  `docs/recall.md` ya no afirma que el rescate sólo entre cuando no hay nada que puntuar, porque sigue
+  entrando mientras las memorias no tengan vectores comparables; y hay tests que comprueban que la
+  escritura descarta un vector no finito del embedder y que `recall` por MCP puntúa con el embedder
+  inyectado. Tests en `engine/tests/hybrid-layers.test.ts` y `engine/tests/server-core.test.ts`.
+
 ### Un eval dorado público en castellano, con suelo en CI
 
 - `pnpm eval` mide el recall sobre un corpus sintético de doce dominios con preguntas literales, paráfrasis,

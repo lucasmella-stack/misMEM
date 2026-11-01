@@ -311,8 +311,8 @@ El banco es privado: no lo subas a ningún repo.
 ## Privacidad
 
 - La base vive en el volumen del servidor y no sale de ahí.
-- El servidor de embeddings recibe el texto de cada memoria y de cada consulta:
-  por eso va en la red interna.
+- El servidor de embeddings recibe el texto de cada memoria, de cada rasgo, de cada episodio
+  pendiente y de cada consulta: por eso va en la red interna.
 - **La consolidación manda episodios textuales a un proveedor externo**
   (DeepSeek, OpenRouter u OpenAI) o al servidor compatible que configures:
   hasta 60.000 caracteres por llamada, con el nombre del ámbito. Es opcional:

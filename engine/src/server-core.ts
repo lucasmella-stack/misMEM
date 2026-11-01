@@ -8,7 +8,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Database as DB } from "better-sqlite3";
 import { ZodError } from "zod";
-import { capture } from "./memory/capture.js";
+import { captureAndEmbed, embedWrittenLayer } from "./memory/embed-write.js";
 import { recallHybrid } from "./recall/recall.js";
 import { consolidate } from "./memory/consolidate.js";
 import { crystallize } from "./memory/crystallize.js";
@@ -19,6 +19,7 @@ import { MCP_INSTRUCTIONS } from "./mcp/guide.js";
 import { embedPendingMemories } from "./embeddings/store.js";
 import { dispatchEngramTool, isEngramTool } from "./mcp/engram-compat.js";
 import { ENGRAM_TOOLS } from "./mcp/engram-tools.js";
+import type { EmbedFn } from "./embeddings/provider.js";
 
 // The advertised inputSchemas are hand-written mirrors of the Zod schemas in schema.ts, which
 // are what actually validates calls. tests/tool-schemas.test.ts fails if the two drift.
@@ -39,7 +40,7 @@ export const CANONICAL_TOOLS = [
   {
     name: "recall",
     description:
-      "Hybrid search: FTS5 across all layers plus semantic ranking for memories. Reinforces returned memories (Hebbian) unless MISMEM_REINFORCE_ON_RECALL=off. Each hit carries its layer, the UTC date (YYYY-MM-DD), the details of a memory, the polarity of a trait when it is not neutral, and truncated when a string was clipped to fit the reply. When truncated is true, mem_get_observation with the id returns the full text. Use when the user asks something that may already be stored, and to check what is known about a scope.",
+      "Hybrid search: FTS5 across all layers plus semantic ranking for memories, traits and pending episodes. Reinforces returned memories (Hebbian) unless MISMEM_REINFORCE_ON_RECALL=off. Each hit carries its layer, the UTC date (YYYY-MM-DD), the details of a memory, the polarity of a trait when it is not neutral, and truncated when a string was clipped to fit the reply. When truncated is true, mem_get_observation with the id returns the full text. Use when the user asks something that may already be stored, and to check what is known about a scope.",
     inputSchema: {
       type: "object",
       required: ["query"],
@@ -208,8 +209,14 @@ function describeZodError(tool: string, error: ZodError): string {
     .join("\n");
 }
 
-export function createServer(db: DB): Server {
-  const server = new Server(
+
+// The embedder is injectable for tests: the write path must store a vector even when
+// MISMEM_EMBEDDINGS is off, and production keeps the default of none.
+export function createServer(
+  db: DB,
+  options: { embedFn?: EmbedFn; embeddingModel?: string } = {},
+): Server {
+  const embedOpts = { embedFn: options.embedFn, model: options.embeddingModel };  const server = new Server(
     { name: "mismem", version },
     { capabilities: { tools: {} }, instructions: MCP_INSTRUCTIONS },
   );
@@ -223,11 +230,15 @@ export function createServer(db: DB): Server {
     try {
       let result: unknown;
       switch (name) {
-        case "capture":
-          result = capture(db, args);
+        case "capture": {
+          result = await captureAndEmbed(db, args, embedOpts);
           break;
+        }
         case "recall": {
-          const { hits } = await recallHybrid(db, args);
+          // Same embedder as the writes, so what capture stored is what recall compares against.
+          const { hits } = await recallHybrid(db, args, options.embedFn, {
+            embeddingModel: options.embeddingModel,
+          });
           // A miss is where a model gives up: say which scopes do hold something, and
           // whether the scope it asked for is the problem. A search that found something
           // keeps its old shape; the model can retry from the hits.
@@ -248,15 +259,18 @@ export function createServer(db: DB): Server {
         case "reinforce":
           result = reinforce(db, args);
           break;
-        case "crystallize":
-          result = crystallize(db, args);
+        case "crystallize": {
+          const trait = crystallize(db, args);
+          result = trait;
+          await embedWrittenLayer(db, "trait", trait.trait_id, embedOpts);
           break;
+        }
         case "forget":
           result = forget(db, args);
           break;
         default:
           if (isEngramTool(name)) {
-            result = await dispatchEngramTool(db, name, args);
+            result = await dispatchEngramTool(db, name, args, options);
             break;
           }
           throw new Error(`Herramienta desconocida: ${name}`);

@@ -2,7 +2,7 @@
 // write that own the SQL, so clients coming from Engram (agents, CLAUDE.md, mcp.json) keep
 // working unchanged. The catalogue is in `engram-tools.ts`.
 import type { Database as DB } from "better-sqlite3";
-import { capture } from "../memory/capture.js";
+import { captureAndEmbed, embedWrittenLayer } from "../memory/embed-write.js";
 import { updateEngramTarget } from "../memory/engram-update.js";
 import { pendingEpisodes } from "../memory/pending.js";
 import { observationById } from "../queries/observation.js";
@@ -58,18 +58,19 @@ function suggestTopicKey(title: string, content: string): string {
   return `${category}/${slug}`;
 }
 
-export function dispatchEngramTool(
+export async function dispatchEngramTool(
   db: DB,
   name: string,
   rawArgs: unknown,
   searchOptions: { embedFn?: EmbedFn; embeddingModel?: string } = {},
-): unknown {
+): Promise<unknown> {
   const args = asObject(rawArgs);
+  const embedOpts = { embedFn: searchOptions.embedFn, model: searchOptions.embeddingModel };
 
   switch (name) {
     case "mem_save": {
       const scope = asString(args.scope) || DEFAULT_SCOPE;
-      return capture(db, { scope, body: formatSaveBody(args) });
+      return captureAndEmbed(db, { scope, body: formatSaveBody(args) }, embedOpts);
     }
 
     case "mem_search": {
@@ -102,25 +103,32 @@ export function dispatchEngramTool(
 
     case "mem_session_summary": {
       const scope = asString(args.scope) || "session";
-      return capture(db, { scope, body: asString(args.content) });
+      return captureAndEmbed(db, { scope, body: asString(args.content) }, embedOpts);
     }
 
     case "mem_save_prompt": {
       const scope = asString(args.scope) || "prompts";
-      return capture(db, { scope, body: asString(args.content) });
+      return captureAndEmbed(db, { scope, body: asString(args.content) }, embedOpts);
     }
 
     case "mem_update": {
       const id = asString(args.id);
       const content = asString(args.content);
       if (!id || !content) throw new Error("mem_update: faltan 'id' y 'content'");
-      const target = updateEngramTarget(db, id, content, Date.now());
-      if (target) return { updated: target, id };
+      const update = updateEngramTarget(db, id, content, Date.now());
+      if (update) {
+        if (update.renamed) await embedWrittenLayer(db, "trait", id, embedOpts);
+        return { updated: update.target, id };
+      }
       // Fallback: append new episode that references the original id
-      const result = capture(db, {
-        scope: DEFAULT_SCOPE,
-        body: `[update of ${id}]\n${content}`,
-      });
+      const result = await captureAndEmbed(
+        db,
+        {
+          scope: DEFAULT_SCOPE,
+          body: `[update of ${id}]\n${content}`,
+        },
+        embedOpts,
+      );
       return { updated: "appended", original_id: id, new_id: result.id };
     }
 

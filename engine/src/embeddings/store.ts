@@ -1,13 +1,20 @@
-// Owns the memory_embeddings SQL: saving vectors, brute-force search over them, backfill and index status.
-// No native extensions: vectors live as Float32Array BLOBs and the cosine runs in JS, sized for a personal
-// memory (thousands of rows, not millions) without adding install fragility.
+// Owns the memory_embeddings SQL: saving vectors, brute-force search over them, backfill and
+// index status. The vectors of traits and pending episodes live in `layers.ts`.
 import type { Database as DB } from "better-sqlite3";
 import { readMeta, writeMeta } from "../store/meta.js";
 import { excludeNoiseSql } from "../store/rows.js";
-import { embedTexts, loadEmbeddingConfig, type EmbedFn } from "./provider.js";
-import { cosine, checkedUnitVectors } from "./vector.js";
-
-const MAX_CONSECUTIVE_FAILURES = 2;
+import {
+  embedInBatches,
+  resolveEmbedOptions,
+  type ResolveOptions,
+} from "./batch.js";
+import {
+  embedPendingLayersResolved,
+  layerIndexStatus,
+  type LayerIndexStatus,
+} from "./layers.js";
+import { loadEmbeddingConfig } from "./provider.js";
+import { cosine } from "./vector.js";
 
 const activeDimsKey = (model: string): string => `embedding_dims:${model}`;
 
@@ -110,6 +117,8 @@ export interface BackfillStats {
   embedded: number;
   reembedded: number;
   failed: number;
+  /** Traits and pending episodes share the same run, reported apart. */
+  layers: { pending: number; embedded: number; failed: number; discarded: number };
 }
 
 /**
@@ -143,31 +152,24 @@ function invalidEmbeddingIds(db: DB, model: string): string[] {
 }
 
 /**
- * Embeds memories without a vector or with a stale model (idempotent).
- * Covers any pending write path and allows an explicit reindex.
+ * Embeds memories, traits and pending episodes that have no vector or an outdated model
+ * (idempotent). It covers any pending write path and allows an explicit reindex.
  */
 export async function embedPendingMemories(
   db: DB,
-  opts: {
-    scope?: string;
-    batchSize?: number;
-    embedFn?: EmbedFn;
-    model?: string;
-    timeoutMs?: number;
-    expectedDims?: number;
-    force?: boolean;
-  } = {},
+  opts: ResolveOptions = {},
 ): Promise<BackfillStats> {
   const cfg = loadEmbeddingConfig();
   if (!cfg.enabled && !opts.embedFn) {
-    return { pending: 0, embedded: 0, reembedded: 0, failed: 0 };
+    return {
+      pending: 0,
+      embedded: 0,
+      reembedded: 0,
+      failed: 0,
+      layers: { pending: 0, embedded: 0, failed: 0, discarded: 0 },
+    };
   }
-  const embedFn =
-    opts.embedFn ??
-    ((texts: string[]) => embedTexts(texts, { ...cfg, timeoutMs: opts.timeoutMs ?? cfg.timeoutMs }));
-  const model = opts.model ?? cfg.model;
-  const batchSize = opts.batchSize ?? 32;
-  const maxChars = cfg.maxChars;
+  const resolved = resolveEmbedOptions(opts, cfg);
   const needsEmbedding = [
     "e.memory_id IS NULL",
     "e.model <> @model",
@@ -179,7 +181,7 @@ export async function embedPendingMemories(
   // Rows the previous version saved with NaN or a zero norm stay "compatible" for the SQL
   // filter, so they are collected here and treated as pending. Only the backfill pays for
   // walking these BLOBs; the recall path never does.
-  const invalidIds = opts.force ? [] : invalidEmbeddingIds(db, model);
+  const invalidIds = opts.force ? [] : invalidEmbeddingIds(db, resolved.model);
   const pendingRows = db
     .prepare(
       `SELECT m.id, m.gist, m.details, e.memory_id IS NOT NULL AS had_embedding
@@ -195,7 +197,7 @@ export async function embedPendingMemories(
     )
     .all({
       scope: opts.scope,
-      model,
+      model: resolved.model,
       expectedDims: opts.expectedDims,
       invalidIds: JSON.stringify(invalidIds),
     }) as Array<{
@@ -205,57 +207,31 @@ export async function embedPendingMemories(
     had_embedding: number;
   }>;
 
-  const stats: BackfillStats = {
-    pending: pendingRows.length,
-    embedded: 0,
-    reembedded: 0,
-    failed: 0,
-  };
-
-  let consecutiveFailures = 0;
-  for (let i = 0; i < pendingRows.length; i += batchSize) {
-    const batch = pendingRows.slice(i, i + batchSize);
-    const texts = batch.map((m) =>
-      (m.details ? `${m.gist}\n${m.details}` : m.gist).slice(0, maxChars),
-    );
-    const raw = await embedFn(texts);
-    // An injected embedFn reaches this point without going through `embedTexts`, so the
-    // vectors are validated here too. A short response is a failed batch; inside a batch
-    // with the right shape, each bad vector is counted alone and its neighbours are saved.
-    const vecs = raw && raw.length === batch.length ? checkedUnitVectors(raw) : null;
-    // A batch whose vectors are all unusable is as dead as a null response. Without this the
-    // guard never trips and a broken embedder walks the whole backlog; each memory still
-    // counts as failed once.
-    if (!vecs || vecs.every((vec) => vec === null)) {
-      // A slow or odd batch does not doom the rest; two in a row do: the embedder is down.
-      consecutiveFailures++;
-      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-        stats.failed += pendingRows.length - i;
-        break;
-      }
-      stats.failed += batch.length;
-      continue;
-    }
-    consecutiveFailures = 0;
-    let savedDims: number | undefined;
-    for (let j = 0; j < batch.length; j++) {
-      const vec = vecs[j];
-      const mem = batch[j];
-      if (!mem) continue;
-      if (!vec) {
-        stats.failed++;
-        continue;
-      }
-      saveMemoryEmbedding(db, mem.id, model, vec);
+  let savedDims: number | undefined;
+  const memories = await embedInBatches(
+    pendingRows,
+    resolved.embedFn,
+    resolved.batchSize,
+    (m) => (m.details ? `${m.gist}\n${m.details}` : m.gist).slice(0, resolved.maxChars),
+    (m, vec) => {
+      saveMemoryEmbedding(db, m.id, resolved.model, vec);
       savedDims = vec.length;
-      stats.embedded++;
-      if (mem.had_embedding) stats.reembedded++;
-    }
-    // The status reads this instead of guessing from the majority, which lags a width change.
-    if (savedDims !== undefined) writeMeta(db, activeDimsKey(model), String(savedDims));
-  }
-  return stats;
-}
+      return true;
+    },
+  );
+  // The status reads this instead of guessing from the majority, which lags a width change.
+  if (savedDims !== undefined) writeMeta(db, activeDimsKey(resolved.model), String(savedDims));
+
+  const layers = await embedPendingLayersResolved(db, resolved);
+  // Memory rows always save, so the top-level shape carries no discarded counter: only the
+  // layers can refuse a vector that went stale while the embedder worked.
+  return {
+    pending: pendingRows.length,
+    embedded: memories.embedded,
+    reembedded: memories.reembedded,
+    failed: memories.failed,
+    layers,
+  };}
 
 export interface EmbeddingIndexStatus {
   memories: number;
@@ -264,6 +240,7 @@ export interface EmbeddingIndexStatus {
   compatible: number;
   stale_model: number;
   stale_dims: number;
+  layers: { trait: LayerIndexStatus; episode: LayerIndexStatus };
   /** Active-model rows a previous version stored with a non-finite component or a zero norm. */
   invalid: number;
   models: Array<{ model: string; dims: number; count: number }>;
@@ -332,11 +309,18 @@ export function getEmbeddingIndexStatus(
         ).n;
   const models = db
     .prepare(
-      `SELECT e.model, e.dims, COUNT(*) AS count FROM memory_embeddings e
-       JOIN memories m ON m.id = e.memory_id
-       WHERE ${excludeNoiseSql("m")}
-       GROUP BY e.model, e.dims
-       ORDER BY count DESC, e.model, e.dims`,
+      // Both tables, and on the memory side without the noise markers: they do not compete
+      // in recall, so they do not count as index either.
+      `SELECT model, dims, SUM(count) AS count FROM (
+         SELECT e.model AS model, e.dims AS dims, COUNT(*) AS count FROM memory_embeddings e
+           JOIN memories m ON m.id = e.memory_id
+           WHERE ${excludeNoiseSql("m")}
+           GROUP BY e.model, e.dims
+         UNION ALL
+         SELECT model, dims, COUNT(*) AS count FROM layer_embeddings GROUP BY model, dims
+       )
+       GROUP BY model, dims
+       ORDER BY count DESC, model, dims`,
     )
     .all() as Array<{ model: string; dims: number; count: number }>;
 
@@ -348,6 +332,10 @@ export function getEmbeddingIndexStatus(
     stale_model: embedded - compatible - stale_dims,
     stale_dims,
     active_dims: dims ?? null,
+    layers: {
+      trait: layerIndexStatus(db, "trait", activeModel),
+      episode: layerIndexStatus(db, "episode", activeModel),
+    },
     invalid: invalidEmbeddingIds(db, activeModel).length,
     models,
   };

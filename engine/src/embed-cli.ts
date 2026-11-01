@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// mismem-embed: backfill and reindex of memory embeddings against the configured server
-// (EmbeddingGemma 2 on llama-server by default). Idempotent: it fills missing or stale vectors;
-// --force rebuilds compatible ones too.
+// mismem-embed: backfill and reindex of the embeddings of memories, traits and pending
+// episodes against the configured server (EmbeddingGemma 2 on llama-server by default).
+// Idempotent: it fills missing or stale vectors; --force rebuilds compatible ones too.
 import { defaultDbPath, openDefaultDb } from "./store/db.js";
 import { embedPendingMemories, getEmbeddingIndexStatus } from "./embeddings/store.js";
 import { loadEmbeddingConfig } from "./embeddings/provider.js";
@@ -59,7 +59,17 @@ async function main(): Promise<void> {
     console.log(
       `[embed] pendientes=${result.pending} embebidas=${result.embedded} reembebidas=${result.reembedded} fallidas=${result.failed}`,
     );
-    if (result.failed > 0 && result.embedded === 0) {
+    console.log(
+      `[embed] rasgos y episodios pendientes=${result.layers.pending} embebidos=${result.layers.embedded} fallidos=${result.layers.failed} descartados=${result.layers.discarded}`,
+    );
+    // A discarded layer row changed while its vector was computed: it is not an embedder
+    // failure, so it stays out of the exit code below.
+    // The layer backfill fails on its own when every pending item is a trait or an episode,
+    // which leaves the memory counters at zero: the exit code has to read both.
+    const failed = result.failed + result.layers.failed;
+    const embedded = result.embedded + result.layers.embedded;
+    console.log(`[embed] total embebidas=${embedded} fallidas=${failed}`);
+    if (failed > 0 && embedded === 0) {
       console.error(`[embed] ¿El servidor de embeddings está corriendo en ${cfg.url} y sirve ${cfg.model}?`);
       process.exitCode = 1;
     }

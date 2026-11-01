@@ -3,6 +3,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Database as DB } from "better-sqlite3";
 import { openDb } from "../src/store/db.js";
+import type { EmbedFn } from "../src/embeddings/provider.js";
 import { ENGRAM_TOOLS } from "../src/mcp/engram-compat.js";
 import { createServer } from "../src/server-core.js";
 
@@ -22,12 +23,17 @@ afterAll(() => {
 let db: DB;
 let client: Client;
 
+async function connect(embedFn?: EmbedFn, embeddingModel?: string): Promise<Client> {
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const server = createServer(db, { embedFn, embeddingModel });
+  const connected = new Client({ name: "test", version: "0" });
+  await Promise.all([server.connect(serverTransport), connected.connect(clientTransport)]);
+  return connected;
+}
+
 beforeEach(async () => {
   db = openDb(":memory:");
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  const server = createServer(db);
-  client = new Client({ name: "test", version: "0" });
-  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+  client = await connect();
 });
 
 afterEach(async () => {
@@ -458,5 +464,65 @@ describe("MCP validation messages", () => {
 
     expect(r.isError).toBe(true);
     expect(r.text).toBe(line);
+  });
+});
+
+
+describe("MCP tool dispatch: write-time layer embedding", () => {
+  function fakeEmbedder(seen: string[]): EmbedFn {
+    return async (texts) => {
+      seen.push(...texts);
+      return texts.map(() => Float32Array.from([1, 0]));
+    };
+  }
+
+  // MISMEM_EMBEDDINGS is off here, so a write only stores a vector because the injected
+  // embedder reached it: an alias or a tool that skipped the embedding call leaves no row.
+  async function useEmbedder(model?: string): Promise<string[]> {
+    const seen: string[] = [];
+    await client.close();
+    client = await connect(fakeEmbedder(seen), model);
+    return seen;
+  }
+
+  it("capture stores the vector of the new episode", async () => {
+    const seen = await useEmbedder();
+    const r = await ok<{ id: string }>("capture", { scope: "p/a", body: "vector de capture" });
+    expect(seen).toContain("vector de capture");
+    expect(db.prepare("SELECT layer, item_id FROM layer_embeddings").all()).toEqual([
+      { layer: "episode", item_id: r.id },
+    ]);
+  });
+
+  it("crystallize stores the vector of the new trait", async () => {
+    const seen = await useEmbedder();
+    const r = await ok<{ trait_id: string }>("crystallize", {
+      scope: "p/a",
+      name: "prefiere PRs pequeños",
+      evidence_memory_ids: ["m1"],
+    });
+    expect(seen).toContain("prefiere PRs pequeños");
+    expect(db.prepare("SELECT layer, item_id FROM layer_embeddings").all()).toEqual([
+      { layer: "trait", item_id: r.trait_id },
+    ]);
+  });
+
+  it("recall puntúa con el embedder inyectado, no sólo con el de la configuración", async () => {
+    // MISMEM_EMBEDDINGS is off, so a recall that ignored the injection would have no query
+    // vector and could not return a hit that shares no word with the episode.
+    const seen = await useEmbedder("fake");
+    const ep = await ok<{ id: string }>("capture", {
+      scope: "p/a",
+      body: "el proxy rota las credenciales por la noche",
+    });
+    seen.length = 0;
+
+    const r = await ok<{ hits: Array<{ id: string; layer: string; via?: string }> }>("recall", {
+      query: "cómo cambio la contraseña del servidor",
+    });
+
+    expect(seen).toContain("cómo cambio la contraseña del servidor");
+    expect(r.hits).toHaveLength(1);
+    expect(r.hits[0]).toMatchObject({ id: ep.id, layer: "episode", via: "semantic" });
   });
 });

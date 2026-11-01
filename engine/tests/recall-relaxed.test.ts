@@ -5,6 +5,7 @@ import { capture } from "../src/memory/capture.js";
 import { consolidate } from "../src/memory/consolidate.js";
 import { crystallize } from "../src/memory/crystallize.js";
 import { recall, recallHybrid } from "../src/recall/recall.js";
+import { saveLayerEmbedding } from "../src/embeddings/layers.js";
 import { embedPendingMemories, saveMemoryEmbedding } from "../src/embeddings/store.js";
 import type { EmbedFn } from "../src/embeddings/provider.js";
 
@@ -224,7 +225,7 @@ describe("recall híbrido: el rescate sólo cuando no hay capa semántica", () =
     expect(result.hits.map((hit) => hit.id)).not.toContain(lexico);
   });
 
-  it("con vectores, tampoco rescata rasgos ni episodios, que no tienen corte semántico", async () => {
+  it("con vectores, rasgos y episodios pendientes compiten con su propio vector", async () => {
     const indexada = memory("dev", "configurar servidor apache");
     const pendiente = capture(db, { scope: "dev", body: "configurar servidor nginx" }).id;
     const rasgo = crystallize(db, {
@@ -232,20 +233,30 @@ describe("recall híbrido: el rescate sólo cuando no hay capa semántica", () =
       name: "configurar servidor nginx",
       evidence_memory_ids: [indexada],
     }).trait_id;
-    const embed: EmbedFn = async (texts) => texts.map(() => Float32Array.from([0, 1]));
+    // The stored memory points away from the query; the pending episode and the trait,
+    // which used to have no vector, point at it.
+    const vecs = new Map<string, Float32Array>([
+      ["configurando servidores nginx", Float32Array.from([1, 0])],
+      ["configurar servidor apache", Float32Array.from([0, 1])],
+      ["configurar servidor nginx", Float32Array.from([1, 0])],
+    ]);
+    const embed: EmbedFn = async (texts) =>
+      texts.map((text) => vecs.get(text) ?? Float32Array.from([0, 1]));
     await embedPendingMemories(db, { embedFn: embed, model: "fake" });
     const query = { query: "configurando servidores nginx", limit: 5, reinforce: false };
 
-    // Without a semantic layer the episode and the trait are rescued; with it, the search
-    // stays strict.
+    // Without a semantic layer the episode and the trait are rescued; with it, they enter
+    // through their own vector.
     expect(recall(db, query).hits.map((hit) => hit.id)).toContain(pendiente);
     expect(recall(db, query).hits.map((hit) => hit.id)).toContain(rasgo);
-    const result = await recallHybrid(db, query, async (texts) => texts.map(() => Float32Array.from([1, 0])), {
+    const result = await recallHybrid(db, query, embed, {
       reinforce: false,
       embeddingModel: "fake",
     });
-    expect(result.hits.map((hit) => hit.id)).not.toContain(pendiente);
-    expect(result.hits.map((hit) => hit.id)).not.toContain(rasgo);
+    expect(result.hits.map((hit) => hit.id)).toContain(pendiente);
+    expect(result.hits.map((hit) => hit.id)).toContain(rasgo);
+    expect(result.hits.find((hit) => hit.id === pendiente)?.via).toBe("semantic");
+    expect(result.hits.find((hit) => hit.id === rasgo)?.via).toBe("semantic");
     expect(result.hits.map((hit) => hit.id)).not.toContain(indexada);
   });
 
@@ -314,6 +325,27 @@ describe("recall híbrido: el rescate sólo cuando no hay capa semántica", () =
       { reinforce: false, embeddingModel: "fake" },
     );
 
+    expect(result.hits.map((hit) => hit.id)).toContain(episode);
+  });
+
+  it("sin vectores de memoria, un vector de episodio no apaga el rescate", async () => {
+    // The episode got its vector at capture while the memories were never indexed (the
+    // embeddings were switched on later). With the rescue tied to any layer vector, the
+    // strict query misses the memory and the episode vector has no memory to compare, so
+    // the memory would disappear from the result.
+    const id = memory("dev", "configurar servidor nginx");
+    const episode = capture(db, { scope: "dev", body: "despliegue nocturno del proxy" }).id;
+    saveLayerEmbedding(db, "episode", episode, "fake", Float32Array.from([1, 0]));
+    const embed: EmbedFn = async (texts) => texts.map(() => Float32Array.from([1, 0]));
+
+    const result = await recallHybrid(
+      db,
+      { query: "configurando servidores nginx", limit: 5 },
+      embed,
+      { reinforce: false, embeddingModel: "fake" },
+    );
+
+    expect(result.hits.map((hit) => hit.id)).toContain(id);
     expect(result.hits.map((hit) => hit.id)).toContain(episode);
   });
 

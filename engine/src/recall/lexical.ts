@@ -18,7 +18,7 @@ import {
 export const CANDIDATE_POOL_LIMIT = 50;
 const MEMORY_FTS_SCAN_LIMIT = 200;
 
-export interface TraitCandidate {
+interface TraitCandidate {
   id: string;
   scope: string;
   text: string;
@@ -35,7 +35,7 @@ interface MemoryCandidate extends SalienceRow {
   fts_rank: number;
 }
 
-export interface EpisodeCandidate {
+interface EpisodeCandidate {
   id: string;
   scope: string;
   text: string;
@@ -62,9 +62,9 @@ export function lexicalCandidates(
   /** With no semantic layer answering, the rescue is the only thing that finds a natural phrase. */
   { rescue = true }: { rescue?: boolean } = {},
 ): {
-  traits: TraitCandidate[];
+  traits: RecallHit[];
   memories: RecallHit[];
-  episodes: EpisodeCandidate[];
+  episodes: RecallHit[];
 } {
   const strict = escapeFts(input.query);
   const scopeFilter = input.scope ? "AND t.scope = @scope" : "";
@@ -133,16 +133,16 @@ export function lexicalCandidates(
       rescuedWordCount = Math.min(wordCount, RELAXED_MAX_TERMS);
     }
   }
-  const traitRows: TraitCandidate[] = (
+  const traits: RecallHit[] = (
     rescuedTerms
       ? relaxRows(rows.traits, rescuedTerms, rescuedWordCount)
       : rows.traits
-  ).map(({ fts_rank: _ftsRank, ...row }) => row);
-  const episodeRows: EpisodeCandidate[] = (
+  ).map(({ fts_rank: _ftsRank, ...row }) => ({ layer: "trait" as const, ...row }));
+  const episodes: RecallHit[] = (
     rescuedTerms
       ? relaxRows(rows.episodes, rescuedTerms, rescuedWordCount)
       : rows.episodes
-  ).map(({ fts_rank: _ftsRank, ...row }) => row);
+  ).map(({ fts_rank: _ftsRank, ...row }) => ({ layer: "episode" as const, ...row }));
 
   // Rescue already comes ordered by matches and cut to RELAXED_MAX_RESULTS. The strict path
   // keeps FTS5's order and breaks ties by decayed salience: the raw value favoured what was
@@ -166,9 +166,5 @@ export function lexicalCandidates(
       created_at: r.created_at,
     }));
 
-  return {
-    traits: traitRows,
-    memories,
-    episodes: episodeRows,
-  };
+  return { traits, memories, episodes };
 }

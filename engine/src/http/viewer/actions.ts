@@ -7,6 +7,8 @@ import type { Database as DB } from "better-sqlite3";
 import { z } from "zod";
 import { CrystallizeInput, Scope } from "../../schema.js";
 import { crystallize } from "../../memory/crystallize.js";
+import { embedWrittenLayer } from "../../memory/embed-write.js";
+import type { EmbedFn } from "../../embeddings/provider.js";
 import {
   editMemory,
   forgetMemory,
@@ -107,6 +109,8 @@ export async function handleAction(
     job?: ConsolidationJob;
     allowDelete?: boolean;
     confirmations?: ForgetConfirmations;
+    embedFn?: EmbedFn;
+    embeddingModel?: string;
   } = {},
 ): Promise<boolean> {
   try {
@@ -116,7 +120,12 @@ export async function handleAction(
       return true;
     }
     if (pathname === "/api/crystallize") {
-      json(res, 200, crystallizeFromUi(db, body));
+      const trait = crystallizeFromUi(db, body);
+      await embedWrittenLayer(db, "trait", trait.trait_id, {
+        embedFn: opts.embedFn,
+        model: opts.embeddingModel,
+      });
+      json(res, 200, trait);
       return true;
     }
     const match = ROUTE.exec(pathname);

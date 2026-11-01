@@ -349,6 +349,11 @@ describe("getEmbeddingIndexStatus", () => {
       stale_dims: 0,
       invalid: 0,
       active_dims: null,
+      // Layers share the status: a trait and a pending episode are indexed too.
+      layers: {
+        trait: { items: 0, embedded: 0, missing: 0, compatible: 0, stale_model: 0 },
+        episode: { items: 0, embedded: 0, missing: 0, compatible: 0, stale_model: 0 },
+      },
       models: [],
     });
   });

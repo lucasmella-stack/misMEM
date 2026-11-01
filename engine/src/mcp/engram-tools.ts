@@ -35,7 +35,7 @@ export const ENGRAM_TOOLS: EngramToolDef[] = [
   {
     name: "mem_search",
     description:
-      "[engram-compat] Hybrid search: FTS5 across all layers plus semantic ranking for memories.",
+      "[engram-compat] Hybrid search: FTS5 across all layers plus semantic ranking for memories, traits and pending episodes.",
     inputSchema: {
       type: "object",
       required: ["query"],

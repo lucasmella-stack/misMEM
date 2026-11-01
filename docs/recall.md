@@ -1,8 +1,10 @@
 # Cómo busca recall
 
-`recall` devuelve traits, después memories, después episodes. Dentro de las memories fusiona dos señales
-con RRF: las palabras (FTS5) y, si hay un servidor de embeddings, el significado. La relevancia va antes
-que la saliencia, que sólo desempata. Esta página cuenta el comportamiento; las constantes están en
+`recall` pone traits, memories y episodes en un solo ranking: las tres capas compiten por la misma plaza con
+RRF. Cada señal aporta `peso / (60 + puesto)` y un recuerdo que encuentran varias señales sube; ninguna capa
+conserva un escalón fijo. La saliencia sólo puntúa a las memories: suma `saliencia * 0,0002` a su RRF, por
+debajo de un puesto en la cabeza, así que ahí sólo desempata y más abajo puede mover dos o tres plazas; rasgos
+y episodios no la llevan. Las constantes están en
 `engine/src/recall/` y las variables, en la tabla de [DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única).
 
 ## Por palabras (siempre)
@@ -11,14 +13,16 @@ FTS5 exige que estén **todas** las palabras de la consulta, sin contar las vac�
 
 ### El rescate
 
-Si esa consulta estricta no devuelve nada y no hay capa semántica, `recall` reintenta con una consulta OR
-y conserva sólo los candidatos que comparten al menos dos términos informativos. Con una sola palabra
-basta una; en consultas largas, el 30 % de sus palabras. Devuelve hasta 3 por capa. El rescate alcanza a
-rasgos, episodios y memorias, y no altera una búsqueda que ya encontró algo.
+Si esa consulta estricta no devuelve nada y las memorias no tienen vectores comparables, `recall` reintenta
+con una consulta OR y conserva sólo los candidatos que comparten al menos dos términos informativos. Con una
+sola palabra basta una; en consultas largas, el 30 % de sus palabras. Devuelve hasta 3 por capa. El rescate
+alcanza a rasgos, episodios y memorias, y no altera una búsqueda que ya encontró algo.
 
 Con capa semántica el rescate apenas suma aciertos, empuja hacia abajo la respuesta buena y trae
 memorias de preguntas que no vienen al caso; sin ella es lo que hace aparecer la paráfrasis que la
-consulta estricta deja fuera. Por eso sólo entra cuando no hay nada que puntuar.
+consulta estricta deja fuera. Por eso sólo se apaga cuando las memorias tienen vectores comparables: un
+vector de rasgo o de episodio no puntúa ninguna memoria, y ahí el rescate sigue siendo lo único que trae la
+paráfrasis.
 
 La rareza de un término que cuenta para el rescate tiene un suelo de 3 documentos y una fracción del 5 % de
 la base, de modo que "pocos" significa lo mismo con 300 memorias que con 3.000. Se calibró con
@@ -34,13 +38,27 @@ servidor en el primero libre y escribe `MISMEM_EMBEDDING_URL`.
 Los vectores se guardan como BLOB en la misma SQLite y la búsqueda es coseno en JS, sin extensiones
 nativas. Si el servidor no responde, todo degrada silenciosamente a FTS5 puro.
 
-La semántica cubre deliberadamente sólo `memories`; `episodes` y `traits` conservan búsqueda FTS5.
-Backfill y reindexado: `mismem-embed` (`--status`, `--force`). Los vectores se normalizan a norma 1
+La semántica cubre las tres capas. Las memorias guardan su vector en `memory_embeddings`; los rasgos y los
+episodios pendientes, en `layer_embeddings`. Esos vectores se escriben al capturar o cristalizar y en el
+backfill, nunca al vuelo en una consulta. En el ranking por significado las tres capas forman una sola lista
+ordenada por coseno, con una prima de 0,05 para la memoria consolidada; ninguna capa hereda una posición fija.
+Un rasgo exige 0,06 de margen sobre el corte y un episodio pendiente 0,01, porque una regla corta y general se
+parece a cualquier pregunta de su tema. Cuando hay vectores, el resultado se queda con el mejor rasgo y como
+mucho dos episodios por consulta, elegidos por coseno antes de la fusión: una coincidencia exacta de palabras
+no puede adelantar a un rasgo o un episodio que está más cerca por significado. Sin ese tope, los rasgos y los
+episodios desplazaban a la memoria concreta que responde. Si la capa semántica está encendida pero ningún
+vector de esa capa pasa su margen (porque todavía no los tiene, por ejemplo justo después de actualizar y antes
+del primer `mismem-embed`, o porque ninguno se parece lo bastante), el tope se queda con los primeros candidatos
+léxicos de la capa. El modo
+léxico, sin vectores, no aplica el tope.
+Backfill y reindexado: `mismem-embed` (`--status`, `--force`), que recorre memorias, rasgos y episodios
+pendientes. Los vectores se normalizan a norma 1
 al entrar. Un vector con un componente no finito o con norma cero sólo se pierde a sí mismo: sus
 compañeros de lote se guardan igual. En cambio, un vector sin dimensiones o un lote con dimensiones
 mezcladas descarta el lote entero a propósito, como si el servidor no hubiera respondido, en vez de
 guardar vectores que nunca puntuarían. Una tanda entera de vectores inválidos cuenta como fallida, y
-dos seguidas abortan la corrida como si el servidor estuviera caído. El backfill reescribe además los
+dos seguidas cortan esa pasada (memorias, rasgos o episodios) como si el servidor estuviera caído; la pasada
+de la capa siguiente lo vuelve a intentar. El backfill reescribe además los
 vectores inválidos que una versión anterior ya había guardado. `--status` cuenta esos vectores
 inválidos en `invalid`, sin los marcadores de ruido, que el backfill nunca reescribe.
 
@@ -104,7 +122,7 @@ node dist/eval-cli.js --mode semantico
 
 El segundo exige `pnpm build` y las variables `MISMEM_EMBEDDING_*` del servidor de embeddings
 ([DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única)); `--mode auto` usa el semántico sólo si
-el embedder deja todas las memorias embebidas sin un solo lote fallido. Si alguna se queda sin vector,
+ningún lote falló, ni de memorias ni de rasgos o episodios, y hay al menos una memoria con vector; si no,
 mide en léxico y la línea `modo:` lo dice. Los datos viven en `engine/eval/golden/`, un `.jsonl` por
 dominio; su validación está en `engine/src/recall/golden-corpus.ts` y su carga y medición en
 `engine/src/recall/golden.ts`. La puerta de CI
@@ -118,10 +136,13 @@ Línea base del 2026-11-01 (tope 5, aciertos dentro del tope; caduca cuando camb
 
 | Modo | Global | MRR | Paráfrasis | Episodio | Rasgo | Ajenas con algo | Recuerdos por pregunta |
 |---|---|---|---|---|---|---|---|
-| Léxico | 222/432 | 0,48 | 1/72 | 20/24 | 9/24 | 4/48 | 0,9 |
-| Semántico (`embeddinggemma-2`, corte 0,65) | 368/432 | 0,80 | 64/72 | 0/24 | 0/24 | 12/48 | 4,8 |
+| Léxico | 222/432 | 0,49 | 1/72 | 20/24 | 9/24 | 4/48 | 0,9 |
+| Semántico (`embeddinggemma-2`, corte 0,65) | 411/432 | 0,87 | 64/72 | 23/24 | 19/24 | 12/48 | 4,9 |
 
-Los dos ceros del semántico son el issue #154.
+En el semántico, las tres capas compiten en el mismo ranking: rasgos y episodios pendientes pasan de 0/24 a
+19/24 y 23/24. El acierto en primera posición es 355/432 y el de las preguntas que esperan una memoria,
+328/384, frente a 329/384 de la línea base sin vectores de capa. El episodio que sigue sin aparecer (`dev-q33`) no es un fallo del ranking: su texto no dice
+"Lucía", que está sólo en el ámbito, y otro episodio parecido puntúa algo más alto.
 
 ### El corpus dorado
 

@@ -34,7 +34,7 @@ persiste, lo cristalizado permanece.
 |---|---|---|---|
 | `episodes` | Lo que ocurrió: texto original y fechado | No vencen solos: `forget` los borra una vez consolidados (30 días por defecto en la herramienta MCP, 90 en `mismem-forget`) | Evidencia y contexto inmediato |
 | `memories` | Lo aprendido al resumir varios episodios | Su `salience` baja si no se usa y sube al recordarla | Conocimiento operativo y búsqueda semántica |
-| `traits` | Patrones, preferencias o decisiones estables | Permanente salvo borrado explícito | Identidad y reglas de máxima prioridad |
+| `traits` | Patrones, preferencias o decisiones estables | Permanente salvo borrado explícito | Identidad y reglas generales; sin prioridad fija en el recall |
 
 Ejemplo: "hoy PostgreSQL rindió mejor" es un episode; "PostgreSQL es preferible en este proyecto" es una
 memory; "priorizamos soluciones robustas para concurrencia" puede cristalizar como trait.
@@ -54,8 +54,9 @@ resume las tablas.
 | `forget` | episodes y memories → nada | el usuario | Suelta lo que ya no se consulta; la herramienta MCP simula por defecto |
 
 Además, una **capa de compatibilidad con Engram** (`mem_save`, `mem_search`, `mem_context`,
-`mem_session_*`, ...) para los clientes que hablan ese protocolo. El orden de prioridad al buscar es
-traits, después memories, después episodes; los marcadores de ruido (`[noise] ...`, `[pareto:l0] ...`)
+`mem_session_*`, ...) para los clientes que hablan ese protocolo. Al buscar, las tres capas compiten en un
+solo ranking RRF: rasgos, memorias y episodios pendientes se puntúan por palabras y, si hay embeddings, por
+significado, sin un escalón fijo entre capas. Los marcadores de ruido (`[noise] ...`, `[pareto:l0] ...`)
 quedan fuera (`engine/src/domain/noise.ts`).
 
 ## Componentes
@@ -76,8 +77,8 @@ quedan fuera (`engine/src/domain/noise.ts`).
 
 El eval dorado no es un binario: su corpus vive en `engine/eval/golden/` y se corre desde el repositorio con
 `pnpm eval --mode lexico` o, tras `pnpm build`, con `node dist/eval-cli.js --mode semantico`; sin `--mode`
-elige el semántico sólo si el servidor de embeddings deja todas las memorias embebidas sin lotes fallidos;
-si alguna se queda sin vector, mide en léxico y la línea `modo:` lo declara. El corpus no viaja en el
+elige el semántico sólo si ningún lote de memorias, rasgos o episodios falló y hay alguna memoria con
+vector; si no, mide en léxico y la línea `modo:` lo declara. El corpus no viaja en el
 paquete npm.
 Su validación está en `engine/src/recall/golden-corpus.ts` y su carga y medición en `recall/golden.ts`.
 
@@ -91,7 +92,8 @@ en sólo lectura que el fichero es una base de misMEM con `store/probe.ts` antes
 ## Almacenamiento
 
 SQLite con WAL (varios lectores y un escritor concurrente), con `better-sqlite3`. Los vectores de la
-búsqueda por significado son un BLOB por memoria en la misma base. El fichero se crea con permisos `0600`.
+búsqueda por significado son un BLOB por memoria (`memory_embeddings`) y por rasgo o episodio pendiente
+(`layer_embeddings`) en la misma base. El fichero se crea con permisos `0600`.
 
 ## Saliencia, decay y olvido
 
@@ -157,6 +159,7 @@ lo que faltaba era que esos nodos entraran en la ventana.
 
 - **Engine**: TypeScript estricto, ES2022, ESM, Node 22 o superior.
 - **Almacenamiento**: SQLite con WAL, `better-sqlite3`.
-- **Búsqueda**: FTS5 más RRF semántico para las memories, manteniendo traits > memories > episodes.
+- **Búsqueda**: FTS5 y fusión RRF sobre las palabras y los vectores guardados de las tres capas: memorias,
+  rasgos y episodios pendientes.
 - **Protocolo**: [Model Context Protocol](https://modelcontextprotocol.io/) con `@modelcontextprotocol/sdk`.
 - **Validación**: Zod en las entradas de las herramientas MCP, los cuerpos POST del visor, la salida del LLM y el banco de `mismem-bench`; los argumentos de cada CLI se validan en su `*-args.ts` y la entrada de los hooks se parsea a la defensiva.
