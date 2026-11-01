@@ -15,7 +15,7 @@
   mayoría de los vectores guardados: tras un cambio de ancho del proveedor, la mayoría son justo los vectores
   que la búsqueda ya no lee. Sin ancho registrado, el estado sigue usando la mayoría.
 - `mismem-embed --status` cambia de significado: ya no cuenta los marcadores de ruido como memorias, sólo
-  cuenta como `compatible` los vectores del modelo activo con su ancho dominante y añade `stale_dims` para
+  cuenta como `compatible` los vectores del modelo activo con su ancho activo (`active_dims`) y añade `stale_dims` para
   los del modelo activo con otro ancho, de modo que `stale_model` queda para los de otro modelo.
 
 ### La suite de tests ya no llama al servidor de embeddings de quien la corre, y hay una suite que sí lo prueba

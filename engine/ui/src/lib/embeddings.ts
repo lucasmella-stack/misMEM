@@ -46,8 +46,9 @@ export function embeddingWarning(status: EmbeddingStatus | undefined): string | 
 }
 
 /**
- * The width the server recorded as active, which is the one search compares against. A base
- * indexed before the width was recorded reports null, and then nothing is claimed about a vector.
+ * The width the server reports as active, the one search compares against: the last one the
+ * embedder produced, or the stored majority before that was recorded. Null only when the base has
+ * no vector of the active model, and then nothing is claimed about a vector.
  */
 export function activeModelDims(status: EmbeddingStatus | undefined): number | undefined {
   return status?.active_dims ?? undefined;
