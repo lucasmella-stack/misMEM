@@ -21,8 +21,8 @@
 
 ## Qué es y por qué
 
-Cada instancia de un LLM nace sin memoria, y cada herramienta (Claude Code, Codex, Cursor, VS Code,
-opencode...) guarda lo suyo en silos incompatibles: hay que repetir el contexto y la continuidad muere entre
+Cada instancia de un LLM nace sin memoria, y cada herramienta (opencode, Claude Code, Codex, Cursor,
+VS Code...) guarda lo suyo en silos incompatibles: hay que repetir el contexto y la continuidad muere entre
 sesiones. misMEM lo resuelve con **una base SQLite (`~/.mismem/mem.db`) y un protocolo MCP de seis
 invocaciones**, accesible desde cualquier cliente que hable MCP. *La cooperatividad hace a la persistencia
 de la información.*
@@ -32,7 +32,7 @@ destilado persiste, lo cristalizado permanece.
 
 ```mermaid
 flowchart LR
-    C["Cualquier cliente MCP<br/>Claude Code, Codex, Cursor,<br/>VS Code, opencode..."]
+    C["Cualquier cliente MCP<br/>opencode, Claude Code, Codex,<br/>Cursor, VS Code..."]
 
     subgraph E["engine (Node 22)"]
         S["server.ts<br/>MCP por stdio"]
