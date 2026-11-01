@@ -2,6 +2,22 @@
 
 ## Sin publicar
 
+### Un solo proveedor de embeddings, con EmbeddingGemma 2 por defecto y sin nomic (#229)
+
+- **Un protocolo**: el `/v1/embeddings` de OpenAI, que sirven llama-server y Ollama. Fuera el camino `/api/embed`,
+  `MISMEM_EMBEDDING_PROVIDER` y `MISMEM_OLLAMA_URL`; otro servidor u otro modelo se eligen con
+  `MISMEM_EMBEDDING_URL` y `MISMEM_EMBEDDING_MODEL`, y cambiar de modelo sigue reindexando solo.
+- **Sin configurar nada**, EmbeddingGemma 2 en `http://127.0.0.1:8080`, el puerto del instalador. Con un modelo
+  de la familia EmbeddingGemma (su id contiene `embeddinggemma`) van solos sus prefijos y el corte de 0,65, el
+  mayor que no pierde aciertos en el golden eval (PR #181, que esto sustituye); otro modelo arranca sin prefijos
+  y con 0,5. Quien configuró EmbeddingGemma a mano sin prefijos tiene que reindexar con `mismem-embed --force`.
+- **El instalador** monta sólo EmbeddingGemma 2: `--embeddings gemma|off`. Una instalación con nomic pasa a
+  EmbeddingGemma 2 al re-ejecutarlo; una configuración propia con otro modelo se conserva.
+- **Rompe** a quien tenga nomic o el proveedor `ollama` configurado a mano: la búsqueda queda por palabras hasta
+  que apunte `MISMEM_EMBEDDING_URL` a su servidor (Ollama: `http://127.0.0.1:11434`) o re-ejecute el instalador.
+- El comentario del umbral de aristas `related` del grafo se rehace con EmbeddingGemma 2 medido sobre una base
+  real: el par mediano da 0,673 y el vecino más cercano 0,822; el 0,75 se mantiene.
+
 ### La pantalla de entrada perdía su logo al instalar desde npm
 
 - El logo se leía de `"dist/ui"`, una ruta **relativa al directorio de trabajo**. Dentro del repo

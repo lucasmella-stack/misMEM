@@ -16,7 +16,7 @@
 # MISMEM_INSTALL_MODEL, MISMEM_INSTALL_BASE_URL y MISMEM_INSTALL_HOOKS (yes|no).
 # Con llama-server en el PATH, --embeddings gemma monta EmbeddingGemma 2 (baja el modelo si
 # falta; MISMEM_INSTALL_GEMMA_GGUF apunta a un GGUF que ya tengas). Sin esa opción, --yes
-# conserva el modelo de embeddings que hubiera y, si no hay ninguno, nomic-embed-text.
+# conserva el modelo de embeddings que hubiera y, si no hay ninguno, monta EmbeddingGemma 2.
 # La clave nunca va por argumento: quedaría en el historial y en `ps`.
 #
 # Re-ejecutarlo actualiza en vez de duplicar.
@@ -34,8 +34,8 @@ Uso: install.sh [opciones]
   --clients LISTA      claude-code,opencode,claude-desktop,vscode,cursor | all | none
                        (por defecto, los que se detectan en la máquina)
   --timer / --no-timer Consolidación nocturna con systemd de usuario (por defecto pregunta)
-  --embeddings MODELO  gemma | nomic: modelo de embeddings. gemma (EmbeddingGemma 2, multilingüe)
-                       necesita llama-server en el PATH; nomic usa Ollama
+  --embeddings MODO    gemma | off: EmbeddingGemma 2 (multilingüe, necesita llama-server en el
+                       PATH) o sin búsqueda por significado
   --embeddings-gpu     EmbeddingGemma 2 en la GPU en vez de en la CPU
   --help               Esta ayuda
 EOF
@@ -61,8 +61,8 @@ while [ $# -gt 0 ]; do
       shift
       ;;
     --embeddings)
-      [ $# -ge 2 ] || { echo "--embeddings necesita gemma o nomic" >&2; exit 64; }
-      case "$2" in gemma | nomic) EMBED_FLAG="$2" ;; *) echo "--embeddings: gemma o nomic, no '$2'" >&2; exit 64 ;; esac
+      [ $# -ge 2 ] || { echo "--embeddings necesita gemma u off" >&2; exit 64; }
+      case "$2" in gemma | off) EMBED_FLAG="$2" ;; *) echo "--embeddings: gemma u off, no '$2'" >&2; exit 64 ;; esac
       shift
       ;;
     --embeddings-gpu) GEMMA_GPU=yes ;;
@@ -230,8 +230,8 @@ fi
 # ---------------------------------------------------------------- 3. embeddings
 
 # EmbeddingGemma 2 detrás de llama-server. Con memorias que no estén en inglés encuentra muchas más
-# paráfrasis que nomic-embed-text (34 de 50 frente a 4 en las mediciones de la issue #72). Corre en CPU
-# salvo que se pida la GPU: en CPU no gasta VRAM y una consulta tarda unos 15 ms.
+# paráfrasis que un modelo pensado para inglés (34 de 50 frente a 4 en las mediciones de la issue #72).
+# Corre en CPU salvo que se pida la GPU: en CPU no gasta VRAM y una consulta tarda unos 15 ms.
 GEMMA_PORT=8080
 GEMMA_URL="http://127.0.0.1:$GEMMA_PORT"
 GEMMA_FILE="embeddinggemma-2-Q8_0.gguf"
@@ -307,100 +307,75 @@ EOF
 }
 
 step "Búsqueda semántica"
-OLLAMA_URL="${MISMEM_OLLAMA_URL:-$(prev MISMEM_OLLAMA_URL)}"
-OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
 EMBEDDINGS_OFF=""
 CAN_GEMMA=""
 { command -v llama-server >/dev/null 2>&1 || embed_answers "$GEMMA_URL"; } && CAN_GEMMA=1
 
-# Qué había: gemma y nomic son los dos que monta este instalador; cualquier otra cosa (otro modelo, otro
-# servidor, otra URL) es del usuario y no se toca sin que lo pida.
+# Qué había: gemma es lo que monta este instalador y nomic lo que montaba antes, que se sustituye; cualquier
+# otra cosa (otro modelo, otro servidor, otra URL) es del usuario y no se toca sin que lo pida.
 PREV_EMBED="$(prev MISMEM_EMBEDDING_MODEL)"
-PREV_PROVIDER="$(prev MISMEM_EMBEDDING_PROVIDER)"
 PREV_URL="$(prev MISMEM_EMBEDDING_URL)"
 PREV_KIND=""
-if [ -n "$PREV_EMBED$PREV_PROVIDER$PREV_URL" ]; then
+if [ -n "$PREV_EMBED$PREV_URL$(prev MISMEM_EMBEDDING_PROVIDER)$(prev MISMEM_OLLAMA_URL)" ]; then
   PREV_KIND=custom
   case "$PREV_EMBED" in
-    embeddinggemma-2) if [ "$PREV_PROVIDER" = openai ] && [ "${PREV_URL:-$GEMMA_URL}" = "$GEMMA_URL" ]; then PREV_KIND=gemma; fi ;;
-    nomic-embed-text*) if [ "$PREV_PROVIDER" != openai ] && [ -z "$PREV_URL" ]; then PREV_KIND=nomic; fi ;;
+    embeddinggemma-2) if [ "${PREV_URL:-$GEMMA_URL}" = "$GEMMA_URL" ]; then PREV_KIND=gemma; fi ;;
+    nomic-embed-text*) PREV_KIND=nomic ;;
   esac
 fi
 # Variables que se conservan tal cual cuando no se elige otro modelo.
-EMBED_VARS="MISMEM_EMBEDDING_PROVIDER MISMEM_EMBEDDING_URL MISMEM_EMBEDDING_MODEL MISMEM_EMBEDDING_QUERY_PREFIX
-  MISMEM_EMBEDDING_DOC_PREFIX MISMEM_EMBEDDING_MIN_SCORE MISMEM_EMBEDDING_MAX_CHARS MISMEM_EMBEDDING_TIMEOUT_MS
-  MISMEM_OLLAMA_URL"
+EMBED_VARS="MISMEM_EMBEDDING_URL MISMEM_EMBEDDING_MODEL MISMEM_EMBEDDING_QUERY_PREFIX MISMEM_EMBEDDING_DOC_PREFIX
+  MISMEM_EMBEDDING_MIN_SCORE MISMEM_EMBEDDING_MAX_CHARS MISMEM_EMBEDDING_TIMEOUT_MS"
 
 # Sin opción, lo que hubiera se conserva: re-ejecutar no cambia el modelo (reindexar es caro).
-EMBED_CHOICE="${PREV_KIND:-nomic}"
+EMBED_CHOICE="${PREV_KIND:-gemma}"
 if [ -n "$EMBED_FLAG" ]; then
   EMBED_CHOICE="$EMBED_FLAG"
   if [ "$EMBED_CHOICE" = gemma ] && [ -z "$CAN_GEMMA" ]; then
     say "--embeddings gemma necesita llama-server en el PATH (o un servidor de embeddings en $GEMMA_URL)."
     exit 1
   fi
-else
-  if [ "$PREV_KIND" = custom ] && ! confirm "  Ya tienes embeddings configurados (${PREV_EMBED:-sin modelo}, ${PREV_PROVIDER:-ollama}). ¿Conservarlos?" y; then
-    EMBED_CHOICE=nomic
-  fi
-  if [ "$ASSUME_YES" != 1 ] && [ "$EMBED_CHOICE" != custom ] && { [ -n "$CAN_GEMMA" ] || [ "$EMBED_CHOICE" = gemma ]; }; then
-    default_choice=1
-    [ -n "$PREV_EMBED" ] && [ "$PREV_KIND" != gemma ] && default_choice=2
-    say "  Modelo de embeddings para buscar por significado:"
-    say "  1) EmbeddingGemma 2 (recomendado): multilingüe, 296 MB, corre en CPU con llama-server"
-    say "  2) nomic-embed-text: ligero, por Ollama; pensado para inglés, con otro idioma casi no encuentra paráfrasis"
-    case "$(ask "  Modelo" "$default_choice")" in
-      1 | gemma | embeddinggemma-2) EMBED_CHOICE=gemma ;;
-      *) EMBED_CHOICE=nomic ;;
-    esac
-  fi
+elif [ "$PREV_KIND" = custom ] && ! confirm "  Ya tienes embeddings configurados (${PREV_EMBED:-sin modelo}, ${PREV_URL:-URL por defecto}). ¿Conservarlos?" y; then
+  EMBED_CHOICE=gemma
+fi
+if [ "$EMBED_CHOICE" = nomic ]; then
+  say "  nomic-embed-text ya no se usa: paso a EmbeddingGemma 2, y las memorias se reindexan solas."
+  EMBED_CHOICE=gemma
 fi
 
 if [ "$EMBED_CHOICE" = gemma ] && ! setup_gemma; then
-  say "  Sigo con nomic-embed-text."
-  EMBED_CHOICE=nomic
+  say "  Sin el modelo, la búsqueda queda sólo por palabras."
+  EMBED_CHOICE=off
 fi
 
 # Reescribir el bloque sólo si el resultado es otro que el que había.
 EMBED_KEEP=""
 if [ "$EMBED_CHOICE" = "$PREV_KIND" ]; then EMBED_KEEP=1; fi
 
-# Con nomic, el servicio que montó este instalador ya no se usa y seguiría ocupando el puerto y la memoria.
-if [ "$EMBED_CHOICE" = nomic ] && grep -qs 'Generado por scripts/install.sh' "$GEMMA_UNIT" && has_user_systemd &&
+# Sin búsqueda por significado, el servicio que montó este instalador seguiría ocupando el puerto y la memoria.
+if [ "$EMBED_CHOICE" = off ] && grep -qs 'Generado por scripts/install.sh' "$GEMMA_UNIT" && has_user_systemd &&
   { systemctl --user is-enabled --quiet mismem-embed.service || systemctl --user is-active --quiet mismem-embed.service; }; then
   systemctl --user disable --now mismem-embed.service >/dev/null 2>&1 || true
   say "  Paro y desactivo el servicio mismem-embed (llama-server): ya no se usa y ocupaba el puerto $GEMMA_PORT y memoria."
 fi
 
 if [ "$EMBED_CHOICE" = custom ]; then
-  say "  Conservo los embeddings que ya tenías (${PREV_EMBED:-sin modelo}, ${PREV_PROVIDER:-ollama})."
+  say "  Conservo los embeddings que ya tenías (${PREV_EMBED:-sin modelo}, ${PREV_URL:-URL por defecto})."
   [ "$(prev MISMEM_EMBEDDINGS)" = off ] && EMBEDDINGS_OFF=1
 elif [ "$EMBED_CHOICE" = gemma ]; then
   # Sin MISMEM_EMBEDDINGS=off: con el servidor parado la búsqueda ya degrada a palabras, y así no queda
   # apagada cuando el usuario lo arranque.
   embed_answers "$GEMMA_URL" || warn "Nada responde en $GEMMA_URL: hasta que arranques llama-server la búsqueda es sólo por palabras."
 else
-  [ -n "$CAN_GEMMA" ] || say "  Si tus memorias no están en inglés, EmbeddingGemma 2 funciona mucho mejor: instala llama.cpp (llama-server) y vuelve a ejecutar esto."
-  if curl -fsS -m 3 "$OLLAMA_URL/api/tags" >/dev/null 2>&1; then
-    if curl -fsS -m 3 "$OLLAMA_URL/api/tags" | grep -q '"nomic-embed-text'; then
-      say "  Ollama responde y ya tiene nomic-embed-text."
-    elif command -v ollama >/dev/null 2>&1 && confirm "  Ollama responde. ¿Bajar nomic-embed-text (unos 270 MB) para buscar por significado?" y; then
-      ollama pull nomic-embed-text
-    else
-      say "  Sin el modelo de embeddings la búsqueda es sólo por palabras."
-    fi
-  else
-    # Sin Ollama cada búsqueda esperaría el timeout del embedder para nada.
-    EMBEDDINGS_OFF=1
-    say "  Ollama no responde en $OLLAMA_URL: la búsqueda queda sólo por palabras."
-    say "  Para activarla: instala Ollama, 'ollama pull nomic-embed-text' y vuelve a ejecutar esto."
-  fi
+  # Apagada del todo: sin servidor, cada búsqueda esperaría el timeout del embedder para nada.
+  EMBEDDINGS_OFF=1
+  say "  Búsqueda sólo por palabras. Para buscar por significado: instala llama.cpp (llama-server) y vuelve a ejecutar esto."
 fi
 
-NEW_EMBED=nomic-embed-text
+NEW_EMBED=""
 [ "$EMBED_CHOICE" = gemma ] && NEW_EMBED=embeddinggemma-2
 [ "$EMBED_CHOICE" = custom ] && NEW_EMBED="$PREV_EMBED"
-if [ -n "$PREV_EMBED" ] && [ "$PREV_EMBED" != "$NEW_EMBED" ]; then
+if [ -n "$PREV_EMBED" ] && [ -n "$NEW_EMBED" ] && [ "$PREV_EMBED" != "$NEW_EMBED" ]; then
   say "  Cambia el modelo de embeddings: las memorias se reindexan solas en el siguiente backfill; para hacerlo ya: $RUN mismem-embed"
 fi
 
@@ -422,15 +397,11 @@ mkdir -p "$CONF_DIR" "$BIN_DIR" "$(dirname "$DB")"
       done
     elif [ "$EMBED_CHOICE" = gemma ]; then
       # Prefijos y corte son los medidos para este modelo (issue #72, README).
-      printf 'MISMEM_EMBEDDING_PROVIDER=openai\n'
       printf 'MISMEM_EMBEDDING_URL=%q\n' "$GEMMA_URL"
       printf 'MISMEM_EMBEDDING_MODEL=embeddinggemma-2\n'
       printf 'MISMEM_EMBEDDING_QUERY_PREFIX=%q\n' "task: search result | query: "
       printf 'MISMEM_EMBEDDING_DOC_PREFIX=%q\n' "title: none | text: "
       printf 'MISMEM_EMBEDDING_MIN_SCORE=0.65\n'
-    else
-      printf 'MISMEM_OLLAMA_URL=%q\n' "$OLLAMA_URL"
-      printf 'MISMEM_EMBEDDING_MODEL=%q\n' "nomic-embed-text"
     fi
     [ -n "$EMBEDDINGS_OFF" ] && printf 'MISMEM_EMBEDDINGS=off\n'
     if [ "$PROVIDER" != none ]; then

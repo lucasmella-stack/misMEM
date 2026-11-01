@@ -180,12 +180,7 @@ y EmbeddingGemma 2, que cruza idiomas:
 Y en `mismem-brain` (sumándolo a la red `internal`):
 
 ```yaml
-      MISMEM_EMBEDDING_PROVIDER: openai
       MISMEM_EMBEDDING_URL: http://mismem-embed:8080
-      MISMEM_EMBEDDING_MODEL: embeddinggemma-2
-      MISMEM_EMBEDDING_QUERY_PREFIX: "task: search result | query: "
-      MISMEM_EMBEDDING_DOC_PREFIX: "title: none | text: "
-      MISMEM_EMBEDDING_MIN_SCORE: "0.65"
 ```
 
 El modelo (296 MB) se baja una vez de
@@ -416,12 +411,10 @@ Sin default: si falta una de las dos (como variable o como parámetro del script
 | Var | Default | Descripción |
 |-----|---------|-------------|
 | `MISMEM_EMBEDDINGS` | `auto` | `off` apaga la capa; con `auto`, si el servidor no responde se busca sólo por palabras |
-| `MISMEM_EMBEDDING_PROVIDER` | `ollama` | `ollama` (`/api/embed`) u `openai` (`/v1/embeddings`, p. ej. llama-server) |
-| `MISMEM_EMBEDDING_URL` | `http://127.0.0.1:11434` (ollama) / `http://127.0.0.1:8080` (openai) | Servidor de embeddings |
-| `MISMEM_OLLAMA_URL` | — | Nombre anterior de la URL; sólo vale para `ollama` |
-| `MISMEM_EMBEDDING_MODEL` | `nomic-embed-text` | Modelo. Cambiarlo reindexa solo |
-| `MISMEM_EMBEDDING_QUERY_PREFIX` / `_DOC_PREFIX` | vacío | Prefijos que algunos modelos piden para consulta y documento. Cambiarlos exige `mismem-embed --force` |
-| `MISMEM_EMBEDDING_MIN_SCORE` | `0.65` con `nomic-embed-text`; `0.5` con cualquier otro modelo | Parecido mínimo (coseno) para que una memoria cuente. Con EmbeddingGemma 2 conviene `0.65` (con `0,68` sale casi igual), pero hay que fijarlo a mano: sólo `nomic-embed-text` sube el default a `0.65`; `0` trae todo. Un valor explícito gana siempre al default |
+| `MISMEM_EMBEDDING_URL` | `http://127.0.0.1:8080` | Servidor de embeddings con `/v1/embeddings`: llama-server, u Ollama en `http://127.0.0.1:11434` |
+| `MISMEM_EMBEDDING_MODEL` | `embeddinggemma-2` | Modelo. Cambiarlo reindexa solo |
+| `MISMEM_EMBEDDING_QUERY_PREFIX` / `_DOC_PREFIX` | los de EmbeddingGemma (`task: search result \| query: ` y `title: none \| text: `) si el modelo es de esa familia (su id contiene `embeddinggemma`, sin distinguir mayúsculas); si no, vacíos | Prefijos de consulta y documento. Vacíos a propósito (`=`) los quitan. Cambiarlos exige `mismem-embed --force` |
+| `MISMEM_EMBEDDING_MIN_SCORE` | `0.65` con la familia EmbeddingGemma; `0.5` con cualquier otro modelo | Parecido mínimo (coseno) para que una memoria cuente. 0,65 es el mayor corte que no pierde aciertos con EmbeddingGemma (PR #181); `0` trae todo. Un valor explícito gana siempre |
 | `MISMEM_EMBEDDING_MAX_CHARS` | `4000` | Tope del texto de cada memoria al indexar. Cambiarlo exige `--force` |
 | `MISMEM_EMBEDDING_TIMEOUT_MS` | `3000` | Espera por consulta (el reindexado usa 120 s) |
 

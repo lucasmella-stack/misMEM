@@ -4,9 +4,9 @@ import type { Database as DB } from "better-sqlite3";
 import { cosine } from "../embeddings/vector.js";
 import { coUseEdges } from "../store/connectome.js";
 
-// With nomic-embed-text even unrelated text scores 0.6-0.7 cosine: measured on a real DB
-// (118 memories), the closest neighbour has a median of 0.795. At 0.75 with three
-// neighbours per memory clusters appear; lower, everything connects to everything.
+// With EmbeddingGemma 2 any two memories score about 0.67 cosine: on a real DB (326 memories) the
+// median pair is 0.673 and the closest neighbour 0.822. At 0.75 one pair in twenty passes and three
+// neighbours per memory leave clusters; lower, everything connects to everything.
 const RELATED_MIN_SCORE = 0.75;
 const RELATED_PER_NODE = 3;
 
