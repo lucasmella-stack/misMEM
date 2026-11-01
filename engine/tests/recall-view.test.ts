@@ -262,7 +262,7 @@ describe("recallMissForModel", () => {
     expect(view.scopes).toEqual(["p/a"]);
     expect(view.hint).toContain("p/typo");
     expect(view.hint).toMatch(/no tiene/);
-    expect(view.hint).toContain("usa uno de los que aparecen en scopes");
+    expect(view.hint).toContain("con otro de los que aparecen en scopes");
     db.close();
   });
 

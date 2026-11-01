@@ -134,7 +134,7 @@ export function recallMissForModel(db: DB, scope?: string): RecallMissView {
   const hint =
     scopes.length === 0
       ? `El ámbito "${scope}" no tiene nada que coincida y la memoria todavía no guarda contenido. Prueba con otra búsqueda, con otro ámbito o sin scope.`
-      : `El ámbito "${scope}" no tiene nada que coincida. Repite la búsqueda sin scope o usa uno de los que aparecen en scopes.`;
+      : `El ámbito "${scope}" no tiene nada que coincida. Repite la búsqueda sin scope o con otro de los que aparecen en scopes.`;
   return { scopes, hint };
 }
 
