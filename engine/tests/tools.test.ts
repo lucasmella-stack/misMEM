@@ -1,14 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
-import {
-  capture,
-  recall,
-  consolidate,
-  crystallize,
-  forget,
-  reinforce,
-} from "../src/tools.js";
+import { openDb } from "../src/store/db.js";
+import { capture } from "../src/memory/capture.js";
+import { recall } from "../src/recall/recall.js";
+import { consolidate } from "../src/memory/consolidate.js";
+import { crystallize } from "../src/memory/crystallize.js";
+import { forget } from "../src/memory/forget.js";
+import { reinforce } from "../src/memory/reinforce.js";
 
 let db: DB;
 const DAY = 86_400_000;
@@ -163,8 +161,8 @@ describe("reinforce", () => {
   });
 
   it("un rasgo se cuenta aparte, no como id inventado", () => {
-    // La inyección también adelanta rasgos; si cayeran en `unknown`, esa alarma
-    // —la de "alguien manda ids que no existen"— sonaría desde el primer día.
+    // Injection also surfaces traits; if they fell into `unknown`, that alarm (someone
+    // sends ids that do not exist) would ring from day one.
     const real = memory("el deploy usa docker compose");
     const rasgo = crystallize(db, {
       scope: "test",

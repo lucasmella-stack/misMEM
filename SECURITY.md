@@ -7,8 +7,8 @@ En privado, por GitHub: pestaña **Security** del repositorio, **Report a vulner
 para quien mantiene. No abras un issue público, y no publiques la prueba de concepto hasta
 que haya arreglo.
 
-Alcanza con lo mínimo para reproducirlo: versión (la de `engine/package.json`), cómo lo
-corrés (MCP local, npm, o servidor HTTP en Docker) y qué lográs.
+Basta con lo mínimo para reproducirlo: versión (la de `engine/package.json`), cómo se
+ejecuta (MCP local, npm, o servidor HTTP en Docker) y qué se consigue.
 
 ## Qué versiones reciben arreglos
 
@@ -31,6 +31,6 @@ Cuenta como vulnerabilidad cualquier forma de:
 - **Filtrar memoria a un tercero** por logs, errores, telemetría o cualquier salida que
   incluya contenido que no pediste.
 
-Fuera de alcance: el contenido que le pasás al agente (si le contás un secreto, queda en tu
+Fuera de alcance: el contenido que se le pasa al agente (un secreto que se le cuente queda en la
 DB) y exponer el servidor HTTP a internet sin BasicAuth ni proxy, que ya está documentado como
 inseguro. Los avisos de dependencias van por Dependabot, no por acá.

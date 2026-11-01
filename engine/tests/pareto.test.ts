@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classify } from "../src/pareto/classifier.js";
+import { classify } from "../src/consolidation/pareto.js";
 
 describe("Pareto classifier", () => {
   it("texto vacío → L0 importance 0", () => {

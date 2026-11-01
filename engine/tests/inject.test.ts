@@ -6,11 +6,12 @@ import {
   parseScopeList,
   selectForInjection,
   worthRecalling,
-} from "../src/inject.js";
+} from "../src/hooks/inject.js";
 import type { RecallHit } from "../src/schema.js";
-import { openDb } from "../src/db.js";
-import { recallHybrid } from "../src/tools.js";
-import { saveLayerEmbedding, saveMemoryEmbedding } from "../src/embeddings/store.js";
+import { openDb } from "../src/store/db.js";
+import { recallHybrid } from "../src/recall/recall.js";
+import { saveLayerEmbedding } from "../src/embeddings/layers.js";
+import { saveMemoryEmbedding } from "../src/embeddings/store.js";
 
 /** Unit vector whose cosine with [1, 0] is exactly `score`. */
 function axis(score: number): Float32Array {
@@ -72,6 +73,13 @@ describe("selectForInjection", () => {
     const hits = [hit({ id: "viejo" }), hit({ id: "nuevo" })];
     const chosen = selectForInjection(hits, { alreadyPresent: new Set(["viejo"]) });
     expect(chosen.map((h) => h.id)).toEqual(["nuevo"]);
+  });
+
+  it("por defecto pone cinco, porque los pares crecen al cuadrado con lo que hay delante", () => {
+    // Three memories give at most three pairs and five give ten, and `co_use` only learns from
+    // pairs. The character budget still caps what actually travels.
+    const hits = Array.from({ length: 8 }, (_, i) => hit({ id: `m${i}`, text: "x" }));
+    expect(selectForInjection(hits)).toHaveLength(5);
   });
 
   it("respeta el tope de cantidad", () => {

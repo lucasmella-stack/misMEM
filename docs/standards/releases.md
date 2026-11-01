@@ -23,8 +23,8 @@ con fecha en el [`CHANGELOG.md`](../../CHANGELOG.md). Versionado semántico.
 3. Tag anotado sobre el merge, en `main` actualizado:
    `git tag -a vX.Y.Z -m 'misMEM X.Y.Z'` y `git push origin vX.Y.Z`.
 4. El tag lanza `docker.yml`: corre el mismo CI y publica `ghcr.io/lucasmella-stack/mismem-brain` con la
-   versión exacta y `major.minor`; `latest` sólo desde el tag estable más alto. Si falla al empujar, ver
-   `DEPLOY.md`.
+   versión exacta y `major.minor`; en un push, `latest` sólo desde el tag estable más alto, y en una
+   republicación manual, desde el tag despachado. Si falla al empujar, ver `DEPLOY.md`.
 5. Release de GitHub sobre el tag con notas generadas (agrupadas por [`.github/release.yml`](../../.github/release.yml)
    según las etiquetas de los PR) y la sección del CHANGELOG.
 6. `pnpm publish` desde `engine/`, a mano: ningún workflow publica en npm. `prepublishOnly` repite

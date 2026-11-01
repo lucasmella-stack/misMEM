@@ -1,16 +1,30 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
+import { openDb } from "../src/store/db.js";
 import { saveMemoryEmbedding } from "../src/embeddings/store.js";
-import { capture, consolidate, crystallize } from "../src/tools.js";
-import { EXPORT_ROOT, exportObsidian, safeName } from "../src/obsidian.js";
+import { capture } from "../src/memory/capture.js";
+import { consolidate } from "../src/memory/consolidate.js";
+import { crystallize } from "../src/memory/crystallize.js";
+import { EXPORT_ROOT, exportObsidian } from "../src/export/obsidian.js";
 
 let db: DB;
 let vault: string;
+const posix = process.platform !== "win32";
 
 const manifestOf = (dir: string): { version: number; files: Record<string, { id: string; scope: string }> } =>
   JSON.parse(readFileSync(join(dir, EXPORT_ROOT, ".mismem-export.json"), "utf8"));
@@ -32,20 +46,6 @@ function memoryFrom(scope: string, gist: string, bodies: string[], vec?: number[
 
 const notes = (sub: string): string[] => readdirSync(join(vault, EXPORT_ROOT, sub)).sort();
 const read = (sub: string, name: string): string => readFileSync(join(vault, EXPORT_ROOT, sub, name), "utf8");
-
-describe("safeName", () => {
-  it("quita lo que Obsidian o Windows no admiten y corta por palabra", () => {
-    expect(safeName('a/b\\c:d*e?f"g<h>i|j#k^l[m]n')).toBe("a b c d e f g h i j k l m n");
-    expect(safeName("una frase bastante larga que no entra", 20)).toBe("una frase bastante");
-    expect(safeName("termina en punto.")).toBe("termina en punto");
-    expect(safeName("///")).toBe("sin título");
-  });
-
-  it("quita los caracteres de control: un NUL revienta la escritura y los demás rompen el sync", () => {
-    expect(safeName("antes\u0000despues")).toBe("antes despues");
-    expect(safeName("control \u0001 y \u001b escape\u007f")).toBe("control y escape");
-  });
-});
 
 describe("exportObsidian", () => {
   it("una nota por memoria, rasgo y ámbito, enlazadas por origen, rasgo y parecido", () => {
@@ -93,7 +93,7 @@ describe("exportObsidian", () => {
     memoryFrom("a", "se queda", ["x"]);
     const gone = memoryFrom("a", "se va", ["y"]);
     exportObsidian(db, { dir: vault });
-    // Una nota de la persona dentro de la misma carpeta no se toca nunca.
+    // A person's note inside the same folder is never touched.
     writeFileSync(join(vault, EXPORT_ROOT, "Memorias", "mi nota.md"), "mía");
     mkdirSync(join(vault, "Diario"), { recursive: true });
     writeFileSync(join(vault, "Diario", "hoy.md"), "también mía");
@@ -137,7 +137,7 @@ describe("exportObsidian", () => {
       expect(() => exportObsidian(empty, { dir: vault })).toThrow(
         /no hay memorias ni rasgos que exportar: no se toca la bóveda/,
       );
-      // --dry-run tampoco pasa: el aviso es el mismo antes de calcular nada.
+      // --dry-run does not pass either: the warning is the same before computing anything.
       expect(() => exportObsidian(empty, { dir: vault, dryRun: true })).toThrow(
         /no hay memorias ni rasgos que exportar/,
       );
@@ -170,7 +170,7 @@ describe("exportObsidian", () => {
 
     expect(() => exportObsidian(db, { dir: vault })).toThrow(/no se puede interpretar: .*\.mismem-export\.json/);
     expect(notes("Memorias")).toEqual(memories);
-    // El manifiesto corrupto no se pisa: arreglarlo o borrarlo es cosa de la persona.
+    // The corrupt manifest is not overwritten: fixing or deleting it is up to the person.
     expect(readFileSync(manifestPath, "utf8")).toBe("{ roto");
   });
 
@@ -189,7 +189,7 @@ describe("exportObsidian", () => {
     expect(manifest.version).toBe(2);
     expect(Object.values(manifest.files).map((e) => e.scope).sort()).toEqual(["a", "a", "b", "b"]);
 
-    // Aunque b ya no esté en la base, un export de a no puede llevarse su nota.
+    // Even if b is no longer in the db, an export of a cannot take its note.
     db.prepare("DELETE FROM episodes WHERE consolidated_into = ?").run(b);
     db.prepare("DELETE FROM memories WHERE id = ?").run(b);
     const again = exportObsidian(db, { dir: vault, scope: "a" });
@@ -226,7 +226,7 @@ describe("exportObsidian", () => {
     expect(exportObsidian(db, { dir: vault })).toMatchObject({ removed: 0, skipped: 1 });
     expect(existsSync(editedPath)).toBe(true);
 
-    // Formato viejo (array de rutas): sin id no hay prueba de propiedad, así que no se borra.
+    // Old format (array of paths): without an id there is no proof of ownership, so nothing is deleted.
     writeFileSync(join(vault, EXPORT_ROOT, ".mismem-export.json"), JSON.stringify([`Memorias/${edited}`]));
     const after = exportObsidian(db, { dir: vault });
     expect(after).toMatchObject({ removed: 0, skipped: 1 });
@@ -249,7 +249,7 @@ describe("exportObsidian", () => {
     const note = read("Memorias", notes("Memorias").find((n) => n.startsWith("memoria alpha")) as string);
     expect(note).toContain(`Ámbito: [[Ámbitos/${long} (${scopeHash(alpha)})|${alpha}]]`);
 
-    // Exportar un solo ámbito no le quita el sufijo: la colisión se mide sobre toda la base.
+    // Exporting a single scope does not drop its suffix: collisions are measured across the whole db.
     expect(exportObsidian(db, { dir: vault, scope: alpha })).toMatchObject({ written: 0, removed: 0 });
     expect(notes("Ámbitos")).toContain(`${long} (${scopeHash(alpha)}).md`);
   });
@@ -258,7 +258,7 @@ describe("exportObsidian", () => {
     memoryFrom("CON", "memoria", ["x"]);
     exportObsidian(db, { dir: vault });
     expect(notes("Ámbitos")).toEqual([`CON (${scopeHash("CON")}).md`]);
-    // Los que no colisionan ni son reservados se quedan como siempre.
+    // Those that neither collide nor are reserved stay as always.
     memoryFrom("a", "otra", ["y"]);
     exportObsidian(db, { dir: vault });
     expect(notes("Ámbitos")).toContain("a.md");
@@ -273,5 +273,101 @@ describe("exportObsidian", () => {
     expect(memory).toContain("[[Ámbitos/a b c|a b c]]");
     const scopeNote = read("Ámbitos", "a b c.md");
     expect(scopeNote).toContain("|cuida esto y barra]]");
+  });
+
+  it.runIf(posix)("una nota que es un enlace simbólico no se escribe fuera", () => {
+    const id = memoryFrom("a", "una memoria", ["x"]);
+    exportObsidian(db, { dir: vault });
+    const note = join(vault, EXPORT_ROOT, "Memorias", notes("Memorias")[0] as string);
+    const outside = mkdtempSync(join(tmpdir(), "mismem-fuera-"));
+    try {
+      const target = join(outside, "ajeno.md");
+      writeFileSync(target, "intacto\n");
+      rmSync(note);
+      symlinkSync(target, note);
+      // The note must change: the export only writes when the content differs.
+      db.prepare("UPDATE memories SET details = ? WHERE id = ?").run("contenido nuevo", id);
+
+      const stats = exportObsidian(db, { dir: vault });
+      expect(readFileSync(target, "utf8")).toBe("intacto\n");
+      expect(lstatSync(note).isSymbolicLink()).toBe(true);
+      expect(stats).toMatchObject({ written: 0, skipped: 1 });
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it.runIf(posix)("un manifiesto que es un enlace simbólico detiene el export", () => {
+    const id = memoryFrom("a", "una memoria", ["x"]);
+    exportObsidian(db, { dir: vault });
+    const note = join(vault, EXPORT_ROOT, "Memorias", notes("Memorias")[0] as string);
+    const noteBefore = readFileSync(note, "utf8");
+    // A pending write proves the refusal comes before any note is touched.
+    db.prepare("UPDATE memories SET details = ? WHERE id = ?").run("contenido nuevo", id);
+    const manifest = join(vault, EXPORT_ROOT, ".mismem-export.json");
+    const outside = mkdtempSync(join(tmpdir(), "mismem-fuera-"));
+    try {
+      const target = join(outside, "ajeno.json");
+      writeFileSync(target, readFileSync(manifest, "utf8"));
+      rmSync(manifest);
+      symlinkSync(target, manifest);
+      const before = readFileSync(target, "utf8");
+
+      expect(() => exportObsidian(db, { dir: vault })).toThrow(/enlace simbólico/);
+      expect(readFileSync(target, "utf8")).toBe(before);
+      expect(readFileSync(note, "utf8")).toBe(noteBefore);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it.runIf(posix)("una carpeta que es un enlace simbólico no recibe notas fuera", () => {
+    const outside = mkdtempSync(join(tmpdir(), "mismem-fuera-"));
+    try {
+      mkdirSync(join(vault, EXPORT_ROOT), { recursive: true });
+      symlinkSync(outside, join(vault, EXPORT_ROOT, "Memorias"));
+      memoryFrom("a", "una memoria", ["x"]);
+
+      const stats = exportObsidian(db, { dir: vault });
+      expect(readdirSync(outside)).toEqual([]);
+      expect(stats).toMatchObject({ written: 1, skipped: 1 });
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it.runIf(posix)("una carpeta enlazada colgante o en bucle se salta y el manifiesto se escribe", () => {
+    mkdirSync(join(vault, EXPORT_ROOT), { recursive: true });
+    symlinkSync(join(vault, "no-existe"), join(vault, EXPORT_ROOT, "Memorias"));
+    const loop = join(vault, EXPORT_ROOT, "Ámbitos");
+    symlinkSync(loop, loop);
+    memoryFrom("a", "una memoria", ["x"]);
+
+    const stats = exportObsidian(db, { dir: vault });
+    expect(stats).toMatchObject({ written: 0, skipped: 2, removed: 0 });
+    expect(existsSync(join(vault, EXPORT_ROOT, ".mismem-export.json"))).toBe(true);
+  });
+
+  it.runIf(posix)("la pasada de borrado no atraviesa una carpeta que pasó a ser un enlace", () => {
+    const gone = memoryFrom("a", "se va", ["x"]);
+    memoryFrom("a", "se queda", ["y"]);
+    exportObsidian(db, { dir: vault });
+    const name = notes("Memorias").find((n) => n.startsWith("se va")) as string;
+    const outside = mkdtempSync(join(tmpdir(), "mismem-fuera-"));
+    try {
+      const moved = join(outside, name);
+      renameSync(join(vault, EXPORT_ROOT, "Memorias", name), moved);
+      rmSync(join(vault, EXPORT_ROOT, "Memorias"), { recursive: true });
+      symlinkSync(outside, join(vault, EXPORT_ROOT, "Memorias"));
+      db.prepare("DELETE FROM episodes WHERE consolidated_into = ?").run(gone);
+      db.prepare("DELETE FROM memories WHERE id = ?").run(gone);
+
+      const stats = exportObsidian(db, { dir: vault });
+      // One write pass skip (se queda) and one remove pass skip (se va).
+      expect(stats).toMatchObject({ removed: 0, skipped: 2 });
+      expect(readFileSync(moved, "utf8")).toContain("se va");
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
   });
 });

@@ -1,6 +1,6 @@
 // Owns the episode view of the detail panel: a read-only pending episode taken from the selection.
 import { useEffect } from "react";
-import type { Selection } from "../App";
+import type { Selection } from "@/lib/selection";
 import { ago, exact } from "../format";
 import { truncate } from "./DetailParts";
 

@@ -1,17 +1,19 @@
-/**
- * Owns the memory_embeddings SQL: saving vectors, brute-force search over them, backfill and index status.
- *
- * Capa semántica opcional sobre las memorias. Sin extensiones nativas: los vectores
- * viven como BLOB (Float32Array) en `memory_embeddings` y la búsqueda es coseno
- * brute-force en JS, pensada para una memoria personal (miles de filas, no millones)
- * sin agregar fragilidad de instalación al paquete.
- */
+// Owns the memory_embeddings SQL: saving vectors, brute-force search over them, backfill and
+// index status. The vectors of traits and pending episodes live in `layers.ts`.
 import type { Database as DB } from "better-sqlite3";
-import { excludeNoiseSql } from "../noise.js";
-import { embedTexts, loadEmbeddingConfig, type EmbedFn } from "./provider.js";
+import { excludeNoiseSql } from "../store/rows.js";
+import {
+  embedInBatches,
+  resolveEmbedOptions,
+  type ResolveOptions,
+} from "./batch.js";
+import {
+  embedPendingLayersResolved,
+  layerIndexStatus,
+  type LayerIndexStatus,
+} from "./layers.js";
+import { loadEmbeddingConfig } from "./provider.js";
 import { cosine } from "./vector.js";
-
-const MAX_CONSECUTIVE_FAILURES = 2;
 
 export function saveMemoryEmbedding(
   db: DB,
@@ -36,7 +38,7 @@ export interface SemanticHit {
   score: number;
 }
 
-/** Coseno brute-force sobre todas las memorias embebidas (scope opcional). */
+/** Brute-force cosine over every embedded memory (optional scope). */
 export function semanticSearchMemories(
   db: DB,
   queryVec: Float32Array,
@@ -106,51 +108,34 @@ export interface BackfillStats {
   layers: { pending: number; embedded: number; failed: number };
 }
 
-export type LayerName = "trait" | "episode";
-
-interface BatchRow {
-  /** Non-zero when the item already had a vector, so the stats can count reindexes. */
-  had_embedding: number;
+/**
+ * True when a stored BLOB can still score: every component is finite and the norm is not zero.
+ * Rows written before validation existed can carry NaN, and `hasComparableVectors` ignores
+ * their content, so they would keep the lexical rescue off while matching nothing.
+ */
+function isValidStoredVector(vec: Buffer): boolean {
+  const values = new Float32Array(vec.buffer, vec.byteOffset, vec.byteLength / 4);
+  let squares = 0;
+  for (let i = 0; i < values.length; i++) {
+    const value = values[i] ?? 0;
+    if (!Number.isFinite(value)) return false;
+    squares += value * value;
+  }
+  return Number.isFinite(squares) && squares > 0;
 }
 
-/**
- * One batching loop for every layer: a batch that fails does not condemn the rest, two in
- * a row mean the embedder is down. Memories and layer items share it so a fix to the
- * failure policy cannot drift between them.
- */
-async function embedInBatches<T extends BatchRow>(
-  rows: readonly T[],
-  embedFn: EmbedFn,
-  batchSize: number,
-  textOf: (row: T) => string,
-  /** Returns false when the row changed while the embedder worked, so nothing was saved. */
-  save: (row: T, vec: Float32Array) => boolean,
-): Promise<{ embedded: number; reembedded: number; failed: number }> {
-  const stats = { embedded: 0, reembedded: 0, failed: 0 };
-  let consecutiveFailures = 0;
-  for (let i = 0; i < rows.length; i += batchSize) {
-    const batch = rows.slice(i, i + batchSize);
-    const vecs = await embedFn(batch.map(textOf));
-    if (!vecs) {
-      consecutiveFailures++;
-      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-        stats.failed += rows.length - i;
-        break;
-      }
-      stats.failed += batch.length;
-      continue;
-    }
-    consecutiveFailures = 0;
-    for (let j = 0; j < batch.length; j++) {
-      const vec = vecs[j];
-      const row = batch[j];
-      if (!vec || !row) continue;
-      if (!save(row, vec)) continue;
-      stats.embedded++;
-      if (row.had_embedding) stats.reembedded++;
-    }
-  }
-  return stats;
+/** Ids of the active model's rows that a previous version stored unusable. */
+function invalidEmbeddingIds(db: DB, model: string): string[] {
+  // Noise markers never reach the backfill, so counting their rows would keep `--status`
+  // reporting an invalid vector that nothing can cure.
+  const rows = db
+    .prepare(
+      `SELECT e.memory_id, e.vec
+       FROM memory_embeddings e JOIN memories m ON m.id = e.memory_id
+       WHERE e.model = ? AND ${excludeNoiseSql("m")}`,
+    )
+    .all(model) as Array<{ memory_id: string; vec: Buffer }>;
+  return rows.filter((row) => !isValidStoredVector(row.vec)).map((row) => row.memory_id);
 }
 
 /**
@@ -180,12 +165,20 @@ export async function embedPendingMemories(
     .filter((value): value is string => value !== null)
     .join(" OR ");
 
+  // Rows the previous version saved with NaN or a zero norm stay "compatible" for the SQL
+  // filter, so they are collected here and treated as pending. Only the backfill pays for
+  // walking these BLOBs; the recall path never does.
+  const invalidIds = opts.force ? [] : invalidEmbeddingIds(db, resolved.model);
   const pendingRows = db
     .prepare(
       `SELECT m.id, m.gist, m.details, e.memory_id IS NOT NULL AS had_embedding
        FROM memories m
        LEFT JOIN memory_embeddings e ON e.memory_id = m.id
-       WHERE (${opts.force ? "1 = 1" : needsEmbedding})
+       WHERE (${
+         opts.force
+           ? "1 = 1"
+           : `(${needsEmbedding} OR m.id IN (SELECT value FROM json_each(@invalidIds)))`
+       })
          AND ${excludeNoiseSql("m")}
          ${opts.scope ? "AND m.scope = @scope" : ""}`,
     )
@@ -193,6 +186,7 @@ export async function embedPendingMemories(
       scope: opts.scope,
       model: resolved.model,
       expectedDims: opts.expectedDims,
+      invalidIds: JSON.stringify(invalidIds),
     }) as Array<{
     id: string;
     gist: string;
@@ -211,301 +205,8 @@ export async function embedPendingMemories(
     },
   );
 
-  // Traits and pending episodes follow the same run: a caller that backfills memories
-  // never leaves the other two layers without vectors.
   const layers = await embedPendingLayersResolved(db, resolved);
-
   return { pending: pendingRows.length, ...memories, layers };
-}
-
-interface ResolveOptions {
-  scope?: string;
-  batchSize?: number;
-  embedFn?: EmbedFn;
-  model?: string;
-  timeoutMs?: number;
-  expectedDims?: number;
-  force?: boolean;
-}
-
-interface ResolvedEmbedOptions {
-  embedFn: EmbedFn;
-  model: string;
-  batchSize: number;
-  maxChars: number;
-  scope?: string;
-  expectedDims?: number;
-  force?: boolean;
-}
-
-function resolveEmbedOptions(
-  opts: ResolveOptions,
-  cfg: ReturnType<typeof loadEmbeddingConfig>,
-): ResolvedEmbedOptions {
-  return {
-    embedFn:
-      opts.embedFn ??
-      ((texts: string[]) => embedTexts(texts, { ...cfg, timeoutMs: opts.timeoutMs ?? cfg.timeoutMs })),
-    model: opts.model ?? cfg.model,
-    batchSize: opts.batchSize ?? 32,
-    maxChars: cfg.maxChars,
-    scope: opts.scope,
-    expectedDims: opts.expectedDims,
-    force: opts.force,
-  };
-}
-
-async function embedPendingLayersResolved(
-  db: DB,
-  opts: ResolvedEmbedOptions,
-): Promise<{ pending: number; embedded: number; failed: number }> {
-  const needsEmbedding = [
-    "e.item_id IS NULL",
-    "e.model <> @model",
-    opts.expectedDims !== undefined ? "e.dims <> @expectedDims" : null,
-  ]
-    .filter((value): value is string => value !== null)
-    .join(" OR ");
-  const predicate = opts.force ? "1 = 1" : needsEmbedding;
-  const params = {
-    model: opts.model,
-    expectedDims: opts.expectedDims,
-    scope: opts.scope,
-  };
-
-  const traitRows = db
-    .prepare(
-      `SELECT t.id, t.name AS text, e.item_id IS NOT NULL AS had_embedding
-       FROM traits t
-       LEFT JOIN layer_embeddings e ON e.layer = 'trait' AND e.item_id = t.id
-       WHERE (${predicate}) ${opts.scope ? "AND t.scope = @scope" : ""}`,
-    )
-    .all(params) as Array<{ id: string; text: string; had_embedding: number }>;
-  const episodeRows = db
-    .prepare(
-      `SELECT ep.id, ep.body AS text, e.item_id IS NOT NULL AS had_embedding
-       FROM episodes ep
-       LEFT JOIN layer_embeddings e ON e.layer = 'episode' AND e.item_id = ep.id
-       WHERE ep.consolidated_into IS NULL
-         AND (${predicate}) ${opts.scope ? "AND ep.scope = @scope" : ""}`,
-    )
-    .all(params) as Array<{ id: string; text: string; had_embedding: number }>;
-
-  const stats: { pending: number; embedded: number; failed: number } = {
-    pending: traitRows.length + episodeRows.length,
-    embedded: 0,
-    failed: 0,
-  };
-  const layers = [
-    { layer: "trait" as const, rows: traitRows },
-    { layer: "episode" as const, rows: episodeRows },
-  ];
-  for (const { layer, rows } of layers) {
-    const batch = await embedInBatches(
-      rows,
-      opts.embedFn,
-      opts.batchSize,
-      (row) => row.text.slice(0, opts.maxChars),
-      (row, vec) =>
-        saveLayerEmbeddingIfCurrent(db, layer, row.id, row.text, opts.model, vec),
-    );
-    stats.embedded += batch.embedded;
-    stats.failed += batch.failed;
-  }
-  return stats;
-}
-
-export function saveLayerEmbedding(
-  db: DB,
-  layer: LayerName,
-  itemId: string,
-  model: string,
-  vec: Float32Array,
-): void {
-  db.prepare(
-    `INSERT OR REPLACE INTO layer_embeddings (layer, item_id, model, dims, vec, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(
-    layer,
-    itemId,
-    model,
-    vec.length,
-    Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength),
-    Date.now(),
-  );
-}
-
-/** Text of a live layer item, or undefined when it no longer exists or is consolidated. */
-function liveLayerText(db: DB, layer: LayerName, itemId: string): string | undefined {
-  const row =
-    layer === "trait"
-      ? db.prepare("SELECT name AS text FROM traits WHERE id = ?").get(itemId)
-      : db
-          .prepare("SELECT body AS text FROM episodes WHERE id = ? AND consolidated_into IS NULL")
-          .get(itemId);
-  return (row as { text: string } | undefined)?.text;
-}
-
-/**
- * The embedder answers asynchronously, so the item can be renamed, consolidated or deleted
- * meanwhile. The existence, pending state and text are checked in the same transaction as
- * the save: a vector for text that no longer exists would match the wrong thing until the
- * next force backfill.
- */
-function saveLayerEmbeddingIfCurrent(
-  db: DB,
-  layer: LayerName,
-  itemId: string,
-  expectedText: string,
-  model: string,
-  vec: Float32Array,
-): boolean {
-  return db.transaction(() => {
-    if (liveLayerText(db, layer, itemId) !== expectedText) return false;
-    saveLayerEmbedding(db, layer, itemId, model, vec);
-    return true;
-  })();
-}
-
-// The write path already committed the item; this cap only bounds how long the caller waits
-// for its vector. The backfill runs without it because there the wait is the job.
-const WRITE_EMBED_TIMEOUT_MS = 1_000;
-
-/**
- * Embeds one freshly written trait or episode, best effort. `capture` and `crystallize`
- * go through here so the item is searchable by meaning at once; a dead embedder returns
- * false and the next backfill picks it up, never breaking the write.
- */
-export async function embedLayerItem(
-  db: DB,
-  layer: LayerName,
-  itemId: string,
-  opts: { embedFn?: EmbedFn; model?: string; timeoutMs?: number } = {},
-): Promise<boolean> {
-  const cfg = loadEmbeddingConfig();
-  if (!cfg.enabled && !opts.embedFn) return false;
-  const row =
-    layer === "trait"
-      ? (db.prepare("SELECT name AS text FROM traits WHERE id = ?").get(itemId) as
-          | { text: string }
-          | undefined)
-      : (db
-          .prepare("SELECT body AS text FROM episodes WHERE id = ? AND consolidated_into IS NULL")
-          .get(itemId) as { text: string } | undefined);
-  if (!row) return false;
-
-  const timeoutMs =
-    opts.timeoutMs ?? Math.min(cfg.timeoutMs, WRITE_EMBED_TIMEOUT_MS);
-  const embedFn =
-    opts.embedFn ??
-    ((texts: string[]) => embedTexts(texts, { ...cfg, timeoutMs }));
-  const vecs = await embedFn([row.text.slice(0, cfg.maxChars)]);
-  const vec = vecs?.[0];
-  if (!vec) return false;
-  const model = opts.model ?? cfg.model;
-
-  // The item can be renamed, consolidated or deleted while the embedder responds. The
-  // helper checks and saves in one transaction so a stale vector cannot outlive its text.
-  return saveLayerEmbeddingIfCurrent(db, layer, itemId, row.text, model, vec);
-}
-
-export interface LayerSemanticHit {
-  id: string;
-  scope: string;
-  text: string;
-  created_at: number;
-  score: number;
-}
-
-/**
- * Brute-force cosine over the stored vectors of one layer. Pending episodes are filtered
- * by `consolidated_into IS NULL`: the trigger removes their vector on consolidation, but
- * a DB restored from an older backup may still carry one and it must not compete.
- */
-export function semanticSearchLayer(
-  db: DB,
-  layer: LayerName,
-  queryVec: Float32Array,
-  opts: { scope?: string; limit: number; minScore?: number; model?: string },
-): LayerSemanticHit[] {
-  const minScore = opts.minScore ?? 0.5;
-  const scopeColumn = layer === "trait" ? "t.scope" : "ep.scope";
-  const filters = [
-    opts.scope ? `${scopeColumn} = @scope` : null,
-    opts.model ? "e.model = @model" : null,
-    "e.dims = @dims",
-  ].filter((value): value is string => value !== null);
-  const source =
-    layer === "trait"
-      ? `SELECT t.id, t.scope, t.name AS text, t.created_at, e.vec
-         FROM layer_embeddings e JOIN traits t ON t.id = e.item_id
-         WHERE e.layer = 'trait'`
-      : `SELECT ep.id, ep.scope, ep.body AS text, ep.created_at, e.vec
-         FROM layer_embeddings e JOIN episodes ep ON ep.id = e.item_id
-         WHERE e.layer = 'episode' AND ep.consolidated_into IS NULL`;
-  const rows = db
-    .prepare(`${source} AND ${filters.join(" AND ")}`)
-    .all({ scope: opts.scope, model: opts.model, dims: queryVec.length }) as Array<{
-    id: string;
-    scope: string;
-    text: string;
-    created_at: number;
-    vec: Buffer;
-  }>;
-
-  const hits: LayerSemanticHit[] = [];
-  for (const row of rows) {
-    const vec = new Float32Array(row.vec.buffer, row.vec.byteOffset, row.vec.byteLength / 4);
-    const score = cosine(queryVec, vec);
-    if (score >= minScore) {
-      hits.push({
-        id: row.id,
-        scope: row.scope,
-        text: row.text,
-        created_at: row.created_at,
-        score,
-      });
-    }
-  }
-  hits.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
-  return hits.slice(0, opts.limit);
-}
-
-/** True when some trait or pending episode has a vector this query can compare against. */
-export function hasComparableLayerVectors(
-  db: DB,
-  opts: { model?: string; dims: number; scope?: string },
-): boolean {
-  const params = { scope: opts.scope, model: opts.model, dims: opts.dims };
-  const filters = [
-    opts.model ? "e.model = @model" : null,
-    "e.dims = @dims",
-  ].filter((value): value is string => value !== null);
-  const trait = db
-    .prepare(
-      `SELECT 1 FROM layer_embeddings e JOIN traits t ON t.id = e.item_id
-       WHERE e.layer = 'trait' AND ${filters.join(" AND ")}
-         ${opts.scope ? "AND t.scope = @scope" : ""} LIMIT 1`,
-    )
-    .get(params);
-  if (trait !== undefined) return true;
-  return (
-    db
-      .prepare(
-        `SELECT 1 FROM layer_embeddings e JOIN episodes ep ON ep.id = e.item_id
-         WHERE e.layer = 'episode' AND ep.consolidated_into IS NULL
-           AND ${filters.join(" AND ")} ${opts.scope ? "AND ep.scope = @scope" : ""} LIMIT 1`,
-      )
-      .get(params) !== undefined
-  );
-}
-
-interface LayerIndexStatus {
-  items: number;
-  embedded: number;
-  missing: number;
-  compatible: number;
-  stale_model: number;
 }
 
 export interface EmbeddingIndexStatus {
@@ -515,40 +216,9 @@ export interface EmbeddingIndexStatus {
   compatible: number;
   stale_model: number;
   layers: { trait: LayerIndexStatus; episode: LayerIndexStatus };
+  /** Active-model rows a previous version stored with a non-finite component or a zero norm. */
+  invalid: number;
   models: Array<{ model: string; dims: number; count: number }>;
-}
-
-function layerIndexStatus(
-  db: DB,
-  layer: LayerName,
-  activeModel: string,
-): LayerIndexStatus {
-  const source =
-    layer === "trait"
-      ? `FROM traits t
-         LEFT JOIN layer_embeddings e ON e.layer = 'trait' AND e.item_id = t.id`
-      : `FROM episodes ep
-         LEFT JOIN layer_embeddings e ON e.layer = 'episode' AND e.item_id = ep.id
-         WHERE ep.consolidated_into IS NULL`;
-  const row = db
-    .prepare(
-      `SELECT COUNT(*) AS items,
-              COALESCE(SUM(CASE WHEN e.item_id IS NOT NULL THEN 1 ELSE 0 END), 0) AS embedded,
-              COALESCE(SUM(CASE WHEN e.model = @model THEN 1 ELSE 0 END), 0) AS compatible
-       ${source}`,
-    )
-    .get({ model: activeModel }) as {
-    items: number;
-    embedded: number;
-    compatible: number;
-  };
-  return {
-    items: row.items,
-    embedded: row.embedded,
-    missing: row.items - row.embedded,
-    compatible: row.compatible,
-    stale_model: row.embedded - row.compatible,
-  };
 }
 
 export function getEmbeddingIndexStatus(
@@ -592,6 +262,7 @@ export function getEmbeddingIndexStatus(
       trait: layerIndexStatus(db, "trait", activeModel),
       episode: layerIndexStatus(db, "episode", activeModel),
     },
+    invalid: invalidEmbeddingIds(db, activeModel).length,
     models,
   };
 }

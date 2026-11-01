@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkBasicAuth } from "../src/http-guard.js";
+import { checkBasicAuth } from "../src/http/guard.js";
 
 const auth = { user: "brain", pass: "s3cret:with:colons" };
 const header = (user: string, pass: string): string =>

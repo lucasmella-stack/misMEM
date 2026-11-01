@@ -2,16 +2,16 @@
 
 ## Sin publicar
 
-- Sin servidor de embeddings, el recall léxico pasa de 221/432 a 253/432 en el eval dorado (MRR de 0,48 a 0,54),
+- Sin servidor de embeddings, el recall léxico pasa de 222/432 a 254/432 en el eval dorado (MRR de 0,49 a 0,54),
   con las preguntas largas de 5/36 a 17/36 y las coloquiales de 24/36 a 26/36; ningún tipo baja y las ajenas
-  siguen en 8/48 (9 recuerdos frente a 10). El rescate ya no exige el 30 % de todas las palabras: descarta las
+  se quedan en 4/48 (5 recuerdos frente a 6). El rescate ya no exige el 30 % de todas las palabras: descarta las
   que no aparecen en ningún candidato, ordena por IDF y pide dos coincidencias con al menos una informativa, así
   que una pregunta llena de contexto ("oye", "ayer") puede rescatar su memoria. Ignora además un relleno
   coloquial propio ("podemos", "antes", "cada", "todo"...), en una lista aparte de la compartida: esa sigue
   mandando en la consulta estricta y en la medida de sustancia del prefiltro Pareto, que con las palabras nuevas
   descartaba hechos cortos como ruido. La puerta del 30 % se mide sobre la consulta entera y no sobre las
-  palabras que caben en el tope de doce, y el suelo de dos coincidencias ya no finge crecer con la pregunta. Los
-  suelos de `engine/eval/golden/floor.json` suben por tipo y la mitad de validación pasa de 104/216 a 123/216.
+  palabras que caben en el tope de doce, y el suelo de dos coincidencias ya no finge crecer con la pregunta. El
+  suelo de `engine/eval/golden/floor.json` sube por tipo (rasgo, de 9/24 a 10/24).
   Tests nuevos en `engine/tests/recall-relaxed.test.ts` (pregunta larga, puerta del 30 % a ambos lados y tope de
   doce), `engine/tests/terms.test.ts` y `engine/tests/pareto.test.ts`; la línea base nueva está en
   `docs/recall.md`.
@@ -53,6 +53,432 @@
   `expect` o `evidence` nombren un id de pregunta y falla si el corpus no está. El corpus es público y
   reproducible, no viaja en el paquete npm, y quien mejora el recall sube el suelo en el mismo PR. La línea
   base y los comandos están en `docs/recall.md`.
+
+### Un solo proveedor de embeddings, con EmbeddingGemma 2 por defecto y sin nomic (#229)
+
+- **Un protocolo**: el `/v1/embeddings` de OpenAI, que sirven llama-server y Ollama. Fuera el camino `/api/embed`,
+  `MISMEM_EMBEDDING_PROVIDER` y `MISMEM_OLLAMA_URL`; otro servidor u otro modelo se eligen con
+  `MISMEM_EMBEDDING_URL` y `MISMEM_EMBEDDING_MODEL`, y cambiar de modelo sigue reindexando solo.
+- **Sin configurar nada**, EmbeddingGemma 2 en `http://127.0.0.1:8080`, el puerto del instalador. Con un modelo
+  de la familia EmbeddingGemma (su id contiene `embeddinggemma`) van solos sus prefijos y el corte de 0,65, el
+  mayor que no pierde aciertos en el golden eval (PR #181, que esto sustituye); otro modelo arranca sin prefijos
+  y con 0,5. Quien configuró EmbeddingGemma a mano sin prefijos tiene que reindexar con `mismem-embed --force`.
+- **El instalador** monta sólo EmbeddingGemma 2: `--embeddings gemma|off`. Una instalación con nomic en el Ollama local pasa
+  a EmbeddingGemma 2 al re-ejecutarlo si hay `llama-server` (si no, conserva nomic); nomic en otro servidor u otro modelo se conservan, y una búsqueda apagada
+  con `MISMEM_EMBEDDINGS=off` sigue apagada.
+- **Rompe** a quien use nomic o el proveedor `ollama`, a mano o con el instalador anterior, hasta que re-ejecute el
+  instalador: el motor ya no lee `MISMEM_EMBEDDING_PROVIDER` ni `MISMEM_OLLAMA_URL`, así que la URL pasa a
+  `http://127.0.0.1:8080`, el modelo por defecto a EmbeddingGemma 2 y el corte de nomic de 0,65 a 0,5. Para conservar lo
+  que tenía, que escriba `MISMEM_EMBEDDING_URL=http://127.0.0.1:11434`,
+  `MISMEM_EMBEDDING_MODEL=nomic-embed-text` y `MISMEM_EMBEDDING_MIN_SCORE=0.65`; para pasarse a EmbeddingGemma 2,
+  que re-ejecute el instalador.
+- El comentario del umbral de aristas `related` del grafo se rehace con EmbeddingGemma 2 medido sobre una base
+  real: el par mediano da 0,673 y el vecino más cercano 0,822; el 0,75 se mantiene.
+
+### Un vector inválido ya no esconde una memoria de la búsqueda (#155)
+
+- Cada vector se valida y se normaliza a norma 1 al entrar, venga del servidor de embeddings o de un
+  `embedFn` inyectado: `NaN`, `Infinity`, un componente nulo o no numérico y la norma cero dejan de
+  guardarse. Un vector malo sólo se pierde a sí mismo, sin arrastrar a sus compañeros de lote; un lote con
+  menos vectores que textos o con dimensiones mezcladas cuenta como fallido.
+- El backfill reescribe los vectores que una versión anterior guardó inválidos, y `mismem-embed --status`
+  los cuenta en `invalid`. La consulta degrada a búsqueda por palabras cuando su propio vector no es válido.
+- `--status` no cuenta los marcadores de ruido, que el backfill nunca reescribe, y una tanda entera de
+  vectores inválidos cuenta como fallida: dos seguidas abortan la corrida como si el servidor estuviera caído.
+
+### La suite de tests ya no llama al servidor de embeddings de quien la corre, y hay una suite que sí lo prueba
+
+- Tras consolidar, `runConsolidation` rellena los vectores con la configuración real, así que cada corrida de
+  `pnpm test` hacía 24 peticiones a `127.0.0.1:11434` que ningún test comprobaba: cargaba un modelo en el Ollama
+  de la máquina y, con ese Ollama ocupado, un test de consolidación pasaba de 5 s y fallaba de forma intermitente.
+  `pnpm test` arranca ahora con `MISMEM_EMBEDDINGS=off`, y un test falla si consolidar vuelve a llamar a `fetch`.
+  Medido en un espacio de red propio con un servidor falso que anota cada petición: 24 antes, 0 después.
+- **`pnpm test:integration`** prueba el servidor de embeddings real, por defecto EmbeddingGemma 2 en `:8080` con
+  los prefijos y el corte que escribe el instalador: vectores válidos, una paráfrasis en castellano que la
+  búsqueda por palabras no encuentra, una consulta de otro tema que no trae nada, el indexado y el backfill de la
+  consolidación. Sin servidor falla en vez de saltarse. No corre en CI.
+
+### La pantalla de entrada perdía su logo al instalar desde npm
+
+- El logo se leía de `"dist/ui"`, una ruta **relativa al directorio de trabajo**. Dentro del repo
+  resolvía porque el servidor arranca desde `engine/`; instalado desde npm y arrancado desde
+  cualquier otra carpeta, daba 404 y la pantalla quedaba sin imagen.
+- Pasa a resolverse contra el propio módulo, como ya hacía `serveUi` para el resto de la interfaz,
+  y el único dueño de dónde vive `dist/ui` vuelve a ser `viewer-static.ts`.
+- Encontrado empaquetando con `pnpm pack` e instalando en un directorio limpio, que es lo que hace
+  cualquiera: dentro del repo el fallo era invisible.
+
+
+### Salir del visor desde la propia interfaz
+
+- Un botón de icono al lado de *Consolidar ahora*, para poder cerrar la sesión sin borrar cookies a mano
+  —que es lo único que había— cuando el visor queda guardado como aplicación.
+- **Sólo aparece si hay sesión que cerrar.** `GET /api/session` dice si hay credenciales configuradas: sin
+  ellas el visor es abierto y el botón prometería algo que no existe.
+- No usa un formulario: la CSP del visor fija `form-action 'none'`, así que el botón llama a `POST /logout`
+  y luego navega.
+
+
+### El refuerzo escribía pocos pares, y la capa lateral sólo aprende de pares
+
+- Medido sobre 565 turnos reales de ocho días: sólo el **6,7 %** escribía un par, que es lo único que alimenta
+  `co_use`. Con 42 pares repartidos sobre 1.414 coincidencias posibles, que ninguno se repitiera era **cara o
+  cruz** (47 % por simulación): `max(n) = 1` en producción no era un fallo, era poco volumen.
+- **El piso de palabras compartidas baja de 3 a 2.** Es el umbral que de verdad decide: con recuerdos de ~17
+  palabras, un piso de 3 equivale a una fracción de 0,18, así que bajar la fracción por debajo de 0,12 no hacía
+  nada. De 147 pares a **187**, con la señal sobre el azar casi intacta: de 3,0× a 2,9×.
+- **La inyección pasa de 3 recuerdos a 5.** Los pares crecen al cuadrado de lo que hay delante: 3 dan 3 pares
+  como mucho, 5 dan 10. El presupuesto de caracteres sigue acotando el costo.
+- La fracción **no se toca**: de 0,20 a 0,10 la señal cae de 3,0× a 2,1×, casi la mitad por casualidad.
+- Calibrado contra un modelo nulo —la misma respuesta comparada con recuerdos de otros turnos, 25 barajadas—
+  y comprobado que no aparece sesgo por longitud ni concentración en unos pocos recuerdos. Las cifras, en
+  [`docs/hooks.md`](docs/hooks.md).
+
+### El visor tiene su propia pantalla de entrada
+
+- Hasta ahora el visor pedía la contraseña con el diálogo del navegador. Ahora `GET /viewer` sin
+  sesión lleva a `/login`, una pantalla con el logo y los tokens del visor. **La API sigue
+  respondiendo 401**: un script tiene que leer un error, no una página.
+- **`/mcp` no acepta la cookie.** Un cliente MCP manda `Basic` y no puede rellenar un formulario;
+  una sesión del visor no es una llave de las herramientas. El `Basic` también sigue valiendo en el
+  visor, para quien ya lo tenga puesto.
+- La cookie va firmada con HMAC, `HttpOnly`, `SameSite=Strict` y `Secure` cuando la petición llega
+  por TLS —en claro no, o el navegador la tiraría sin decir nada—. La clave se **deriva** de
+  `MISMEM_AUTH_*` y no se guarda: cambiar la contraseña cierra todas las sesiones vivas, que es lo
+  que tiene que pasar cuando se cambia porque se filtró.
+- Tope de intentos fallidos por ventana: pasado el tope deja de comparar la contraseña y responde
+  429, antes incluso de leer el cuerpo.
+- **El formulario no usa JavaScript**: la CSP del visor prohíbe los scripts en línea, y un
+  formulario que no depende de JS no se puede romper. La página lleva su propia CSP, más estrecha
+  que la del visor salvo por el `form-action 'self'` que necesita para poder enviarse.
+- Dos variables nuevas en [`DEPLOY.md`](DEPLOY.md): `MISMEM_SESSION_HOURS` y
+  `MISMEM_LOGIN_MAX_BODY_BYTES`.
+
+### La calibración del dibujo deja de estar en números sueltos
+
+- `graphData` hacía cinco cosas en 112 líneas; la capa lateral sale a su propia función por el corte
+  que ya marcaba su retorno temprano, y baja a 84.
+- Los números que deciden cómo se ve el grafo —el peso de un rasgo frente al de una memoria, cuánto
+  crece el halo, el suelo y el techo del trazo lateral, cuánto se apaga lo que no está iluminado—
+  pasan a constantes con nombre y con el porqué de **ese** valor, no de que exista el umbral.
+
+### La forma del grafo estaba escrita tres veces y nada ataba las copias
+
+- `GraphNode`, `GraphLink` y el resumen se declaran en el motor, **a mano otra vez** en la interfaz
+  (que no puede importar de `src/`) y una tercera en los tests. Justo `label`, `scope` y `salience`
+  —los tres que la pantalla dibuja— no los miraba ningún test. Comprobado: renombrar `label` en todo
+  el motor dejaba `tsc` del motor **en cero errores** y la suite en verde, con el visor roto.
+- `tests/graph-contract.test.ts` asigna lo que devuelve el motor al tipo que declara la interfaz, así
+  que la divergencia falla en `pnpm typecheck` antes de que nadie abra el visor, y comprueba que esos
+  tres campos viajen poblados.
+- `paint.ts` tenía cinco funciones exportadas y **cero tests**, y `scopePalette` ninguno: su rama de
+  más ámbitos que colores nunca se había ejecutado. Cubiertas las puras; el componente del panel sigue
+  sin poder probarse porque el proyecto no tiene renderizador.
+
+### Documentación que el código dejó mintiendo
+
+- `docs/architecture.md` enmarcaba la degeneración como problema de pocos datos. Es del estimador: con
+  `n = useA = useB` el NPMI da 1 con 20 turnos y con 10.000. Ahora lo dice, y documenta `max_n`, la
+  ponderación por soporte, la diferencia entre `pairs` y `shown`, los parámetros `?scope=` y
+  `?episodes=1`, y el bloque `truncated`.
+- El `0` del NPMI está sobrecargado —"azar" y "no sé"— y los documentos se leían al revés entre sí.
+- `AGENTS.md` no listaba la tabla `meta`, de la que depende el denominador del conectoma, y describía
+  de menos a `connectome.ts` y a `relations.ts`.
+
+### El panel del conectoma y el lienzo no miraban lo mismo
+
+- `Pares: X de Y` contaba **Y sólo entre las memorias dibujadas** mientras `Turnos medidos` era
+  global. Con 3.885 memorias y un tope de 400, el panel podía decir «0 de 0» habiendo pares
+  medidos, y aconsejar bajar el soporte cuando lo que los dejaba fuera era el tope. Ahora `pairs`
+  cuenta sobre toda la base, con un `COUNT` en el módulo que posee `co_use` en vez de materializar
+  cada arista para leerle el `.length`, y el texto distingue los tres casos.
+- `filterGraph` filtraba el conjunto de nodos pero **no recalculaba** su `co_use`: un vecino
+  conservaba la fuerza de aristas que ya no se dibujaban y llevaba halo de hub con una sola arista
+  en pantalla. Se reacumula sobre lo que queda, con la misma regla que el motor.
+- **Dos máximos para el mismo brillo**: el lienzo normalizaba sobre lo filtrado y el panel sobre lo
+  que mandó el servidor, así que el mismo nodo iba con halo lleno en el dibujo y punto apagado al
+  lado. Ahora se mide una vez y se pasa a los dos.
+- «Por dónde entrar» ofrecía nodos que la búsqueda o el grafo local habían dejado fuera; al pulsarlos
+  la cámara perseguía un nodo inexistente y se rendía en silencio. La lista se limita a lo dibujado.
+- Con las aristas por parecido **apagadas** se pedían igual: `relatedLinks` es O(n²) cosenos sobre
+  hasta 400 memorias, unos 160.000 por petición, para descartarlos en el cliente. Van condicionadas
+  como las demás capas.
+- Dos pares de topes sin relación declarada —20 hubs del servidor contra 10 del panel, 120 caracteres
+  de etiqueta contra 48 del lienzo— quedan nombrados y atados por un test.
+- El grafo pedía `details` y `source_episode_ids` de **todas** las memorias del ámbito para dibujar un
+  `gist` recortado a 120: el pico de memoria por petición crecía con el texto de la base. Lee sólo las
+  columnas que dibuja.
+- `co_use_min_n=1e400` llegaba como `Infinity` y salía en la respuesta como `null`, dejando un hueco
+  donde el panel imprime el soporte mínimo. Y `escapeHtml` no cubría la comilla simple: basta para el
+  cuerpo del tooltip de hoy, no para un atributo el día que alguien lo reutilice.
+
+### El conectoma dejaba de avisar justo cuando más mentía
+
+- Medido en producción el 2026-10-31: 3.885 memorias, 37 pares en `co_use`, **todos con `n = 1`** y
+  ningún par repetido nunca, con el contador de turnos en 23. En ese estado NPMI vale **1 exacto**
+  para los 37 —`log(T)/log(T)`, para cualquier `T`—, así que el ruido se dibujaba con el alfa y el
+  grosor **máximos**: el triple que una arista por parecido, y más del doble que una asociación real
+  medida (`n = 8` sobre 200 turnos puntúa 0,40).
+- El aviso de muestra fina miraba `turns`, que es la variable equivocada: acumular turnos no diluye
+  la degeneración, y al pasar de 20 el aviso **se apagó solo** mientras los datos seguían vacíos.
+  Ahora mira el soporte, y el resumen viaja con `max_n` para que la interfaz pueda decirlo.
+- La fuerza no se lee sin su soporte, que es lo que el tipo de la arista decía desde siempre y
+  ningún consumidor leía. Lo leen los cuatro: el trazo, el halo, el aviso y el ranking de hubs.
+  Un par visto una vez cae al suelo del trazo, que es no decir nada.
+- `hubs()` ponderaba la suma sin soporte, así que un nodo con tres coincidencias le ganaba a un par
+  repetido: "ordenados por asociación acumulada, no por vecinos" era falso en los datos reales. Cada
+  `Hub` lleva ahora su `support` y la suma va ponderada.
+- La regla vive en `engine/src/domain/support.ts`; la interfaz no puede importar de `src/`, así que
+  conserva su copia y `tests/support.test.ts` falla si las dos dejan de coincidir.
+- De paso, `queries/graph.ts` deja de reimplementar el acumulador de `store/connectome.ts`: el halo
+  del lienzo y la lista del panel responden ya a una sola definición de hub.
+### El logo oficial encabeza el README
+
+- `docs/assets/logo.webp` y `logo-dark.webp`, el mismo logo con el fondo blanco quitado y la tinta en
+  `#141311` o `#e8e4dc` según el tema; el rosa de marca no cambia. Un `<picture>` con
+  `prefers-color-scheme` elige cuál, así que se lee igual en claro y en oscuro.
+- Van encima del `<h1>`, que se conserva: el logo encabeza y el título sigue siendo texto, que es lo
+  que leen el índice de GitHub y quien no ve la imagen.
+
+### Capturas nuevas del visor en el README
+
+- Las dos capturas pasan a ser del grafo: la vista entera con los ajustes abiertos y el grafo local
+  alrededor de una memoria con su detalle al costado.
+- Sin la barra del navegador, que al 48 % de ancho tapaba lo que la captura muestra.
+- En `webp` en vez de `png`: **72 kB y 115 kB** frente a los 127 kB y 160 kB de las anteriores, con el
+  texto igual de nítido.
+
+### Los tests de uso de los CLI dejan de depender de la carga de la máquina (#213)
+
+- `cli-usage-exit.test.ts` lanzaba el CLI con `npx tsx`: resolver el binario costaba más que la
+  corrida, **1,6 s de 1,6 s**. El caso que lanza dos procesos se iba a 6 s con la máquina cargada y
+  se pasaba del límite de 5 s de vitest, tumbando un `pnpm publish` entero desde `prepublishOnly`.
+- Pasa a lanzar por `process.execPath` con `--import tsx`, como ya hacía `obsidian-cli.test.ts`:
+  **de 6,0 s a 1,3 s** el caso que fallaba, y de 2,8 s a 0,7 s el otro. Además cada caso recibe el
+  mismo presupuesto que ya le concedía a su subproceso, 60 s, en vez de los 5 s por defecto: el
+  test se daba a sí mismo doce veces menos tiempo del que le daba al proceso que lanzaba.
+
+
+## 0.7.0 — 2026-10-31
+
+### La exportación a Obsidian no escribe fuera de `<bóveda>/misMEM/` (#206)
+
+- Las rutas se comparan por su ruta real: una nota que es un enlace simbólico, o una carpeta enlazada que
+  lleva fuera de `<bóveda>/misMEM/`, se omite y cuenta en `skipped`, y la pasada de borrado no la atraviesa.
+  Un manifiesto que es un enlace detiene el export sin tocar la bóveda. Una carpeta enlazada colgante o en
+  bucle cuenta como fuera, en vez de abortar la corrida a medias. Que la propia `misMEM/` sea un enlace sigue
+  valiendo.
+
+### Las dos variables de embeddings que quedaban fuera de `env.ts` (#187)
+
+- `MISMEM_EMBEDDING_MIN_SCORE` y `MISMEM_EMBEDDING_MAX_CHARS` pasan por `envNonNegativeNumber` y
+  `envPositiveNumber`, la convención de `engine/src/env.ts`.
+- Sólo cambia un caso: con `MISMEM_EMBEDDING_MIN_SCORE` en blanco (`" "`) el corte quedaba en `0` y cualquier
+  memoria con vector competía en los candidatos; ahora vuelve al default del modelo. El `0` explícito sigue
+  valiendo como elección, y `MAX_CHARS` no cambia para ningún valor.
+
+### `.env.example` remite a la guía que existe (#203)
+
+- El comentario del servidor compatible con OpenAI apunta a `DEPLOY.md`, «Búsqueda por significado», en vez de a
+  una sección del README que no existe, y el ejemplo de EmbeddingGemma 2 usa el corte de 0,65 que recomienda la guía.
+
+### La documentación dice lo que hace el código (#186)
+
+- `DEPLOY.md` daba a entender que EmbeddingGemma 2 arranca en 0,65: sólo `nomic-embed-text` sube el default a 0,65;
+  cualquier otro modelo, EmbeddingGemma 2 incluido, arranca en 0,5 y hay que fijarlo a mano.
+- `latest` sí se mueve al republicar a mano un tag viejo: el workflow lo habilita para `workflow_dispatch`,
+  y la guía ahora avisa de despachar sólo el release vigente. Los ejemplos de tag pasan a `X.Y.Z` / `X.Y`
+  para no envejecer con cada release.
+- La arquitectura pierde la sección «Pendiente» (un binario con `bun --compile`, que no existe) y la
+  validación menciona la excepción de los hooks, que se parsean a la defensiva.
+- Salen de la guía de operación el relato del incidente de GHCR y las cifras sin base: los 310 MB que el
+  instalador cifra en 296, y la medición del rescate en `docs/recall.md`, sin fecha ni versión. La historia
+  ya está en las versiones anteriores de este fichero.
+- Las tareas programadas se cuentan como son (tres tareas, cuatro entradas de cron) y
+  `docs/standards/tests.md` ubica `distillFn` donde se define.
+- Los tres documentos de operación pasan a formas impersonales, como pide la convención de español neutro, y el comentario del
+  trinquete de tamaño deja de narrar PRs.
+
+### La norma de comentarios se aplica a todo el código fuente (#171)
+
+- Los comentarios de `engine/src`, `engine/ui/src` (sin `components/ui`, que es shadcn) y `engine/tests` están
+  en inglés, con la cabecera y los bloques dentro de sus límites y sin historia ni notas de PR. Las
+  descripciones de `it()` y `describe()`, los textos de la interfaz y los mensajes de error siguen en castellano.
+- El registro de excepciones de `engine/tests/comments.test.ts` queda vacío: el mecanismo sigue ahí para una
+  excepción justificada, pero el test ya no perdona ninguna violación.
+- La calibración del rescate laxo que vivía en `recall/rescue.ts` pasa a `docs/recall.md`, y el comentario
+  enlaza la sección. Los razonamientos largos que quedaban en tests van con el código que explican.
+- Sólo cambian comentarios: el texto sin comentarios es idéntico antes y después. `docs/standards/comments.md`
+  y `AGENTS.md` dejan de describir una lista de excepciones pendiente.
+
+### Los comentarios tienen forma, y un test la comprueba (#171)
+
+- `docs/standards/comments.md` fija la norma: todos los comentarios de `engine/src`, `engine/ui/src` y
+  `engine/tests` en inglés; cabecera de módulo de tres líneas como mucho y sin inventarios; cualquier otro
+  bloque de cinco como mucho, con la calibración en `docs/`; JSDoc de una o dos líneas sólo si la firma no
+  dice el contrato; y nada de código comentado, historia, `TODO` sin issue ni `biome-ignore` sin motivo,
+  cada regla con su ejemplo. `AGENTS.md` recoge lo mismo en sus convenciones.
+- `engine/tests/comments.test.ts` extrae los comentarios y aplica seis reglas con etiqueta: `header`, `block`,
+  `lang`, `todo`, `dead` y `sup`. Cada regla tiene su caso sintético, incluido el límite: tres líneas de
+  cabecera pasan y cuatro no. El escáner vive en `engine/tests/support/source-scan.ts` y es el mismo que usa
+  `architecture.test.ts`: entiende texto JSX con comillas, expresiones `${...}` anidadas y la diferencia entre
+  división y expresión regular.
+- `lang` ignora URLs y texto entrecomillado, exige dos palabras funcionales o un acento en una palabra en
+  minúscula, y ya no basta con `sin` o `los`; `dead` reconoce llamadas, condicionales, funciones, `await`,
+  asignaciones y `console.`, sin marcar prosa que acaba en punto y coma. `sup` exige motivo en cada
+  `biome-ignore`.
+- Las excepciones son un `Record<"ruta (regla)", { motivo, count }>` calculado ejecutando el test sobre el
+  código actual: 173 entradas y 648 violaciones (49 de cabecera, 12 de bloque, 112 de idioma), ninguna de
+  `TODO`, código comentado ni `biome-ignore`. Sólo encogen: el test falla si aparece una violación nueva en un
+  fichero ya exceptuado, si sobra una excepción o si su cuenta cambia. Ningún comentario del código cambia en
+  esta PR; la siguiente aplica la norma y vacía el registro.
+- La norma corrige dos ejemplos que describían mal el código (el contrato de `isMismemDb` y el peso de la
+  saliencia en RRF), alarga el ejemplo "Mal" de bloque a seis líneas, deja de usar `#171` como issue de
+  `TODO`, y dice qué mide el test y qué queda en revisión (la longitud del JSDoc y el porqué).
+
+### La interfaz parte `GraphView.tsx` y `MemoryView.tsx` (#170)
+
+- El grafo deja en `GraphView.tsx` la consulta, el estado y la composición: los colores leídos del tema pasan a `lib/graph-tokens.ts` y el pintado de nodos y aristas a `components/graph/paint.ts`. La ficha de memoria saca el formulario de edición a `components/memory/EditForm.tsx`, los dos pasos de deshacer y olvidar a `hooks/use-memory-actions.ts` y sus textos a `lib/memory-text.ts`, que ahora tiene test. Nada visible cambia.
+
+### La corrida de consolidación recibe un contexto y deja su estado aparte (#168)
+
+- `engine/src/consolidation/run.ts` queda en `runConsolidation`: lee el entorno, arma el contexto de la
+  corrida, recorre los ámbitos y cierra el resumen. `processScope` pasa a
+  `engine/src/consolidation/scope.ts` con dos objetos con nombre, `RunContext` (db, cutoff, limits, llm,
+  distillFn, dryRun, paretoPrefilter, log y uncitedStrikes) y `RunState` (llamadas gastadas, tope de la
+  tanda y episodios saltados o aplazados), en vez de catorce posicionales.
+- El presupuesto del prompt y el recorte pasan a `engine/src/consolidation/budget.ts`: `truncateEpisode`,
+  `PROMPT_OVERHEAD_PER_EPISODE`, `TRUNCATION_MARK` y `fitPrompt`, que arma la tanda.
+- Mismos episodios leídos, mismas llamadas al LLM en el mismo orden, mismos topes, mismos registros de log y
+  mismo `RunSummary`. `engine/tests/architecture.test.ts` pierde la excepción de tamaño de
+  `consolidation/run.ts`; `engine/tests/consolidation-budget.test.ts` fija el presupuesto como pieza pura.
+
+### La exportación a Obsidian separa sus lecturas, su formato y su bóveda (#167)
+
+- `engine/src/export/obsidian.ts` queda en `exportObsidian`, que orquesta: lee, arma los mapas de enlaces y
+  entrega los ficheros al escritor. Las cuatro lecturas (memorias, rasgos, episodios consolidados y ámbitos)
+  pasan a `engine/src/queries/export.ts`; el formato puro de cada nota (nombres, enlaces, frontmatter y
+  cuerpo) a `engine/src/export/notes.ts`; y el manifiesto, la propiedad por frontmatter y la escritura o
+  borrado a `engine/src/export/vault.ts`. `EXPORT_ROOT` sigue exportándose desde `obsidian.ts`.
+- `mismem-obsidian` comprueba que el fichero es una base de misMEM con `engine/src/store/probe.ts`, que la abre
+  en sólo lectura antes de que `openDb` migre el esquema o pase el journal a WAL.
+- Mismos ficheros, mismos bytes, mismo manifiesto y mismas negativas. `engine/tests/export-notes.test.ts` fija el
+  formato sin disco; `engine/tests/architecture.test.ts` pierde las dos excepciones de SQL y la de tamaño de la
+  exportación, y `AGENTS.md` y `docs/architecture.md` describen el corte.
+
+### Los alias de Engram y su migración dejan de escribir SQL (#166)
+
+- `engine/src/mcp/engram-tools.ts` reúne `ENGRAM_TOOLS` y `EngramToolDef`; `engram-compat.ts` queda en el
+  despacho y los helpers de argumentos. `mem_get_observation` lee por `engine/src/queries/observation.ts` y
+  `mem_update` escribe por `engine/src/memory/engram-update.ts`: la memoria y el borrado de su vector, o el
+  nombre de un rasgo, con el mismo fallback al episodio de siempre.
+- `engine/src/migrate-engram-cli.ts` queda en argumentos, ayuda, llamada y salida. `engine/src/ingest/engram.ts`
+  abre la base de Engram en sólo lectura, la lee entera y la migra en una transacción, con el mismo mapeo, los
+  mismos ids determinísticos, la misma idempotencia y los mismos mensajes.
+- `engine/tests/ingest-engram.test.ts` cubre la lectura, el mapeo, la idempotencia y la salida del CLI; los
+  alias siguen fijados por `engine/tests/engram-compat.test.ts` sin cambios. `engine/tests/architecture.test.ts`
+  pierde las dos excepciones de SQL de `mcp/engram-compat.ts` y `migrate-engram-cli.ts`, y `AGENTS.md` y
+  `docs/architecture.md` describen el corte.
+
+### El SQL del visor y de los CLI sale de la entrega (#165)
+
+- Las lecturas de `engine/src/http/viewer/read.ts` y `api.ts` pasan a `engine/src/queries/`: `stats.ts` (los
+  conteos del visor y el resumen de los dos CLI, con una función por forma), `recent.ts`, `scopes.ts`,
+  `memories.ts` (lista y detalle), `traits.ts` (detalle), `graph.ts` y `forget-impact.ts`, más `views.ts` con
+  la forma de una memoria y un rasgo. Las escrituras de `actions.ts` pasan a `engine/src/memory/edit.ts`.
+- Los handlers y `mismem-stats` / `mismem-ingest` quedan en validar, llamar y responder. Las consultas, el
+  orden de las operaciones, las claves y los códigos de las respuestas y la salida de los CLI se mueven sin
+  editarlos.
+- `engine/tests/queries.test.ts` cubre cada módulo, y `engine/tests/architecture.test.ts` pierde las cinco
+  excepciones de SQL que ya no hacen falta. `AGENTS.md` y `docs/architecture.md` describen el corte.
+
+### El despacho HTTP se prueba sin abrir un puerto (#164)
+
+- `engine/src/server-http.ts` queda en leer el entorno, abrir la base, componer y escuchar. El despacho
+  (Host, `/healthz`, `/mcp`, el POST del visor, los GET, 404 y 405) pasa a `engine/src/http/routes.ts`, que
+  recibe por parámetro la base, la auth, los Hosts permitidos, el tope del cuerpo, el job de consolidación,
+  las opciones de borrado, el transporte del MCP y la interfaz compilada.
+- `engine/src/http/respond.ts` reúne `json` (que sale de `viewer/read.ts`) y las respuestas de texto que se
+  repetían: 401 con su reto, 404, 405 y 413. Códigos, cabeceras, cuerpos y el orden de las comprobaciones no
+  cambian.
+- `engine/tests/http-routes.test.ts` llama al handler con peticiones y respuestas simuladas y fija ese orden;
+  `server-http.test.ts` sigue lanzando el proceso real para bind, auth y Host.
+
+### Una herramienta por fichero (#163)
+
+- `engine/src/memory/tools.ts` (419 líneas) queda en `capture.ts`, `pending.ts` (la lista de episodios
+  pendientes), `reinforce.ts` (con el registro de uso), `consolidate.ts`, `crystallize.ts` y `forget.ts`, y
+  el camino del recall se muda a `recall/recall.ts` con `recall`, `recallHybrid` y la forma del hit. No hay
+  barril: cada import nombra el fichero que lo exporta.
+- `memory/` deja de importar de `recall/`: desaparece el único ciclo entre carpetas y, con él, las dos
+  excepciones de capa y la de tamaño de `engine/tests/architecture.test.ts`.
+- Sólo cambian rutas, imports y los nombres de las variables locales en castellano (`registrarUso` pasa a
+  `recordUse`); las consultas y el orden de las operaciones se mueven sin editarlos, y `server-core.ts`
+  sólo cambia sus imports.
+
+### El ranking del recall se parte por política (#162)
+
+- `engine/src/recall/search.ts` (510 líneas) queda en `fts.ts` (sintaxis de la consulta FTS5), `rescue.ts`
+  (rescate laxo y sus constantes), `lexical.ts` (candidatos léxicos y sus tipos) y `fuse.ts` (RRF con la
+  saliencia). No hay barril: cada import nombra el fichero que lo exporta.
+- Sólo cambian rutas e imports: las constantes, las consultas y el orden de las operaciones se mueven sin
+  editarlas, así que el ranking es el mismo.
+
+### Una sola definición de las formas de fila (#161)
+
+- `engine/src/store/rows.ts` reúne `MemoryRow`, `TraitRow` y `EpisodeRow` con los tipos del esquema de `db.ts`,
+  además de `MEMORY_COLUMNS` y `SalienceRow`. El visor y la exportación a Obsidian dejan de declarar sus copias,
+  que ya discrepaban en la anulabilidad de `consolidated_into`; quien selecciona menos columnas las deriva con
+  `Omit` en vez de repetirlas, así que dos lectores ya no pueden discrepar sobre una columna.
+- `excludeNoiseSql` pasa de `domain/noise.ts` a `store/rows.ts`, porque construye SQL: el dominio se queda con
+  `isNoiseGist` y los prefijos. No cambia ninguna consulta ni el comportamiento.
+
+### La interfaz parte `App.tsx` y `Lists.tsx` (#169)
+
+- `App.tsx` (470 líneas) queda en composición: la cabecera, el diálogo de cristalizar, la barra de selección y los hooks de tema, atajos y debounce viven en sus propios ficheros. Las cuatro listas y sus primitivas pasan a `components/list/`, y el tipo `Selection` a `lib/selection.ts`, que rompe el ciclo de imports entre `App` y las listas. Nada visible cambia.
+
+### engine/src se organiza por capacidad (#160)
+
+- `engine/src` deja de ser plano: `hash.ts`, `terms.ts` y `noise.ts` pasan a `domain/`; `db.ts` y
+  `connectome.ts` a `store/`; `tools.ts` y `salience.ts` a `memory/`; `search.ts` y `bench.ts` a `recall/`;
+  `relations.ts` a `queries/`; `obsidian.ts` a `export/`; `engram-compat.ts` a `mcp/`; `inject.ts`, `usage.ts`,
+  `hook-client.ts` y `hook-readiness.ts` a `hooks/`; y los módulos del servidor HTTP a `http/` y
+  `http/viewer/`, con `pareto/classifier.ts` en `consolidation/pareto.ts`. Sólo cambian rutas e imports: no
+  se parte ningún fichero ni cambia lógica.
+- `engine/tests/architecture.test.ts` fija la lista de ficheros de la raíz, la matriz de dependencias entre
+  carpetas, la pureza de `domain/`, la ausencia de SQL en la entrega y el trinquete de 400 líneas, con
+  excepciones explícitas que sólo encogen.
+- Nada de eso cambia lo que se publica: `dist/server.js`, `dist/server-http.js` y `dist/*-cli.js` conservan
+  su ruta y su nombre.
+
+### El conectoma se puede ver (#208)
+
+- El visor gana un modo de iluminación sobre el mismo grafo: en *Ajustes del grafo* → **Conectoma**
+  se encienden las aristas por co-uso, y los caminos y los nodos se alumbran según su asociación.
+  El dibujo que abre no cambia: el modo nace apagado y lo que ya había se pinta igual.
+- La luz sale de la fuerza, no del conteo. Una arista se vuelve más viva y más gruesa cuanto más
+  arriba de lo que predice el azar aparece el par; en 0 o por debajo no se ilumina, porque un par
+  que se evita no es un camino. Cada nodo lleva un halo con su asociación acumulada, normalizado
+  contra el más fuerte a la vista: un grafo de asociaciones flojas se lee solo, sin quedar negro.
+- El costado deja de ser decorativo: dice **cuántos turnos** se midieron, cuántos pares hay y
+  cuántos se dibujan, y lista *por dónde entrar* — los nodos ordenados por asociación acumulada y
+  no por vecinos, cada uno clicable. Un control de soporte mínimo filtra los pares de poca
+  evidencia, y viaja al servidor para que los hubs describan las mismas aristas que se pintan.
+- **Por debajo de 20 turnos medidos el panel lo dice en vez de dejar que el dibujo mienta**: con
+  pocos datos, dos recuerdos usados una vez y juntos esa vez dan el máximo. Comprobado con una
+  base de un solo turno, que es como se ve una instalación recién actualizada.
+
+### El paquete que se publica es el que compilan las fuentes (#210)
+
+- `pnpm build` borra `dist/` antes de compilar. `tsc` sólo añade, así que un módulo borrado de
+  `src/` seguía compilado en disco y viajaba dentro del tarball: medido sobre este repositorio,
+  **81 ficheros sobrantes y 27 módulos muertos** de la estructura anterior a la reorganización
+  (`viewer.js`, `search.js`, `salience.js`, `tools/`, `pareto/`…). Lo que se publicaba dependía de
+  lo que el publicador tuviera en disco, no de las fuentes.
+- El job `packaging` de CI lo vigila con dos comprobaciones nuevas: que un fichero plantado en
+  `dist/` no sobreviva al siguiente `build`, y que el tarball lleve `dist/ui/index.html`. Sin la
+  interfaz compilada, `/viewer` responde 503 sólo a quien instala desde npm, porque en el
+  repositorio siempre está construida al lado.
 
 ## 0.6.0 — 2026-10-29
 

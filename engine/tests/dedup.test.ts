@@ -3,9 +3,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Database as DB } from "better-sqlite3";
-import { openDb } from "../src/db.js";
-import { contentHash } from "../src/hash.js";
-import { capture, recall } from "../src/tools.js";
+import { openDb } from "../src/store/db.js";
+import { contentHash } from "../src/domain/hash.js";
+import { capture } from "../src/memory/capture.js";
+import { recall } from "../src/recall/recall.js";
 
 let db: DB;
 
@@ -58,7 +59,7 @@ describe("content_hash migration", () => {
   it("backfillea hashes de filas legacy al reabrir la DB", () => {
     const path = join(dir, "mem.db");
 
-    // Fila "legacy": insertada sin hash (como las anteriores a v0.2).
+    // "legacy" row: inserted without a hash (like those before v0.2).
     const first = openDb(path);
     first.prepare(
       "INSERT INTO episodes (id, scope, body, created_at) VALUES ('legacy1', 's', 'cuerpo legacy', 1)",
@@ -74,7 +75,7 @@ describe("content_hash migration", () => {
         .get() as { content_hash: string };
       expect(row.content_hash).toBe(contentHash("cuerpo legacy"));
 
-      // Y capture del mismo body dedupea contra la fila migrada.
+      // And capture of the same body dedupes against the migrated row.
       const r = capture(reopened, { scope: "s", body: "cuerpo legacy" });
       expect(r.deduped).toBe(true);
       expect(r.id).toBe("legacy1");

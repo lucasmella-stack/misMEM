@@ -1,7 +1,5 @@
-/**
- * Arguments for mismem-embed, kept apart from the CLI because the CLI runs on import.
- * A typo like `--scop daimon` used to reindex every scope instead of one.
- */
+// Arguments for mismem-embed, kept apart from the CLI because the CLI runs on import.
+// Strict: a mistyped `--scope` must reindex nothing instead of every scope.
 import { ArgsError, flagNumber, flagValue } from "./cli-args.js";
 
 export interface EmbedArgs {

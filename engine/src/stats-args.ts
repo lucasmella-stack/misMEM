@@ -1,7 +1,5 @@
-/**
- * Arguments for mismem-stats, kept apart from the CLI because the CLI runs on import.
- * A typo like `--scop engram/` used to report every scope instead of filtering.
- */
+// Arguments for mismem-stats, kept apart from the CLI because the CLI runs on import.
+// Strict: a mistyped `--scop` must fail instead of reporting every scope.
 import { ArgsError, flagValue } from "./cli-args.js";
 
 export interface StatsArgs {

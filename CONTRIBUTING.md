@@ -136,7 +136,7 @@ Modificadores, opcionales y acumulables:
 |---|---|
 | `needs-decision` | Espera una decisión de los responsables; el issue dice cuál |
 | `blocked` | No puede avanzar hasta que ocurra algo externo; el issue dice qué |
-| `needs-bench` | Toca el ranking del recall o los embeddings: correr mismem-bench antes y después |
+| `needs-bench` | Toca el ranking del recall o los embeddings: correr mismem-bench y pnpm eval --mode lexico antes y después |
 | `breaking` | Cambia un flag, una variable, una herramienta MCP o una respuesta HTTP |
 
 Áreas, cero o más:

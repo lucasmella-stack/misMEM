@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { searchTerms } from "../src/terms.js";
+import { searchTerms } from "../src/domain/terms.js";
 
 describe("palabras de la consulta estricta", () => {
   it("quita las vacías y conserva la que da el tema", () => {

@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Selection } from "../App";
+import type { Selection } from "@/lib/selection";
 import { errorMessage } from "../lib/errors";
 import { inkPercent } from "../lib/ink";
 

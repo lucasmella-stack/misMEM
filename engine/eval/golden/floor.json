@@ -12,7 +12,7 @@
     "clave": { "hits": 24 },
     "ambito": { "hits": 17 },
     "episodio": { "hits": 21 },
-    "rasgo": { "hits": 9 }
+    "rasgo": { "hits": 10 }
   },
-  "lexico_ajenas_max": 8
+  "lexico_ajenas_max": 4
 }

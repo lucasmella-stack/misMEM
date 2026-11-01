@@ -1,7 +1,5 @@
-/**
- * Arguments for mismem-ingest, kept apart from the CLI because the CLI runs on import.
- * A typo in the subcommand used to print help and exit 1 with no hint of what was wrong.
- */
+// Arguments for mismem-ingest, kept apart from the CLI because the CLI runs on import.
+// Strict: a mistyped subcommand must be named in the error, not answered with bare help.
 import { ArgsError } from "./cli-args.js";
 
 export type IngestArgs =
@@ -36,7 +34,7 @@ export function parseIngestArgs(argv: readonly string[]): IngestArgs {
   if (args.length > expected) throw new ArgsError(`argumento desconocido: ${args[expected]}`);
 
   args.forEach((arg, i) => {
-    // Igual que flagValue: un posicional en blanco es un valor ausente, y `resolve("")` es el cwd.
+    // As in flagValue, a blank positional is a missing value, and `resolve("")` is the cwd.
     if (arg.trim() === "") throw new ArgsError(`${command}: el argumento ${i + 1} está vacío`);
   });
 
