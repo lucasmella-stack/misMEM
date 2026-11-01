@@ -85,7 +85,7 @@ embedder responde. Los datos viven en `engine/eval/golden/`, un `.jsonl` por dom
 `lexico_ajenas_max`, y que ningún marcador de ruido llegue al resultado. También comprueba el reparto del
 corpus (doce dominios, 40 preguntas por dominio y los tipos esperados) y que `expect` o `evidence` no nombren
 un id de pregunta; si el corpus no está, el test falla. Quien mejora el recall sube el suelo en el mismo PR.
-No viaja en el paquete npm: se corre desde el repositorio.
+El corpus no viaja en el paquete npm (el ejecutor sí, en `dist/`): se corre desde el repositorio.
 
 Línea base del 2026-11-01 (tope 5, aciertos dentro del tope; caduca cuando cambia el corpus):
 

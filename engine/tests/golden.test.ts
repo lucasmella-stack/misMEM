@@ -218,6 +218,9 @@ describe("loadGolden", () => {
   it("inserta las memorias con su antigüedad, su saliencia y un episodio consolidado", () => {
     const corpus = parseGolden(FILES);
     const ids = loadGolden(db, corpus, AT);
+    // Ids derive from the key, never ulid(): fused recall breaks ties by id, so random ids would make the gate flaky.
+    expect(ids.get("dev-01")).toBe("golden-dev-01");
+    expect(db.prepare("SELECT 1 FROM episodes WHERE id = ?").get("golden-dev-01-source")).toBeDefined();
     const memoryId = ids.get("dev-01");
     const episodeId = ids.get("dev-e1");
     if (!memoryId || !episodeId) throw new Error("faltan ids en el mapa");
