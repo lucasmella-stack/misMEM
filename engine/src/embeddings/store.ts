@@ -117,8 +117,14 @@ function isValidStoredVector(vec: Buffer): boolean {
 
 /** Ids of the active model's rows that a previous version stored unusable. */
 function invalidEmbeddingIds(db: DB, model: string): string[] {
+  // Noise markers never reach the backfill, so counting their rows would keep `--status`
+  // reporting an invalid vector that nothing can cure.
   const rows = db
-    .prepare("SELECT memory_id, vec FROM memory_embeddings WHERE model = ?")
+    .prepare(
+      `SELECT e.memory_id, e.vec
+       FROM memory_embeddings e JOIN memories m ON m.id = e.memory_id
+       WHERE e.model = ? AND ${excludeNoiseSql("m")}`,
+    )
     .all(model) as Array<{ memory_id: string; vec: Buffer }>;
   return rows.filter((row) => !isValidStoredVector(row.vec)).map((row) => row.memory_id);
 }
@@ -204,7 +210,10 @@ export async function embedPendingMemories(
     // vectors are validated here too. A short response is a failed batch; inside a batch
     // with the right shape, each bad vector is counted alone and its neighbours are saved.
     const vecs = raw && raw.length === batch.length ? checkedUnitVectors(raw) : null;
-    if (!vecs) {
+    // A batch whose vectors are all unusable is as dead as a null response. Without this the
+    // guard never trips and a broken embedder walks the whole backlog; each memory still
+    // counts as failed once.
+    if (!vecs || vecs.every((vec) => vec === null)) {
       // A slow or odd batch does not doom the rest; two in a row do: the embedder is down.
       consecutiveFailures++;
       if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {

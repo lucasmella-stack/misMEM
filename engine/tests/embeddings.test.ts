@@ -252,7 +252,21 @@ describe("embedPendingMemories", () => {
     expect(r).toMatchObject({ embedded: 0, failed: 4 });
   });
 
-  it("un vector inválido no cuenta como lote nulo para el aborto", async () => {
+  it("una tanda entera de vectores inválidos cuenta como fallida y aborta a la segunda", async () => {
+    for (const gist of ["a", "b", "c", "d", "e"]) makeMemory("vida", gist);
+    let calls = 0;
+    const zero: EmbedFn = async () => {
+      calls++;
+      return [new Float32Array([0, 0, 0])];
+    };
+
+    const r = await embedPendingMemories(db, { embedFn: zero, model: "fake", batchSize: 1 });
+
+    expect(calls).toBe(2);
+    expect(r).toMatchObject({ embedded: 0, failed: 5 });
+  });
+
+  it("una tanda entera de NaN también cuenta como fallida", async () => {
     for (const gist of ["a", "b", "c"]) makeMemory("vida", gist);
     let calls = 0;
     const poisoned: EmbedFn = async () => {
@@ -262,8 +276,17 @@ describe("embedPendingMemories", () => {
 
     const r = await embedPendingMemories(db, { embedFn: poisoned, model: "fake", batchSize: 1 });
 
-    expect(calls).toBe(3);
+    expect(calls).toBe(2);
     expect(r).toMatchObject({ embedded: 0, failed: 3 });
+  });
+
+  it("el recuento de inválidos ignora el ruido, que el backfill nunca reescribe", () => {
+    const noiseId = makeMemory("vida", "[noise] episodio descartado");
+    saveMemoryEmbedding(db, noiseId, "fake", new Float32Array([0, 0, 0]));
+    const memoryId = makeMemory("vida", "cashflow del mes");
+    saveMemoryEmbedding(db, memoryId, "fake", new Float32Array([Number.NaN, 0, 0]));
+
+    expect(getEmbeddingIndexStatus(db, "fake").invalid).toBe(1);
   });
 
   it("el backfill cura una fila inválida que guardó una versión anterior", async () => {
