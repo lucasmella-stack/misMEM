@@ -100,7 +100,11 @@ async function main(): Promise<void> {
     const at = Date.now();
     const ids = loadGolden(db, corpus, at);
     const chosen = await chooseMode(args.mode, {
-      embed: () => embedPendingMemories(db),
+      // Layer failures count too: since the layers have vectors, a failed trait batch skews semantic.
+      embed: async () => {
+        const stats = await embedPendingMemories(db);
+        return { failed: stats.failed + stats.layers.failed };
+      },
       embedded: () => getEmbeddingIndexStatus(db, loadEmbeddingConfig().model).embedded,
     });
     const embedFn = chosen.mode === "lexico" ? lexicalOnly : undefined;
