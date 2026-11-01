@@ -16,6 +16,7 @@ import { reinforce } from "./memory/reinforce.js";
 import { embedPendingMemories } from "./embeddings/store.js";
 import { dispatchEngramTool, isEngramTool } from "./mcp/engram-compat.js";
 import { ENGRAM_TOOLS } from "./mcp/engram-tools.js";
+import type { EmbedFn } from "./embeddings/provider.js";
 
 // The advertised inputSchemas are hand-written mirrors of the Zod schemas in schema.ts, which
 // are what actually validates calls. tests/tool-schemas.test.ts fails if the two drift.
@@ -140,7 +141,13 @@ const { version } = createRequire(import.meta.url)("../package.json") as {
   version: string;
 };
 
-export function createServer(db: DB): Server {
+// The embedder is injectable for tests: the write path must store a vector even when
+// MISMEM_EMBEDDINGS is off, and production keeps the default of none.
+export function createServer(
+  db: DB,
+  options: { embedFn?: EmbedFn; embeddingModel?: string } = {},
+): Server {
+  const embedOpts = { embedFn: options.embedFn, model: options.embeddingModel };
   const server = new Server(
     { name: "mismem", version },
     { capabilities: { tools: {} } },
@@ -156,7 +163,7 @@ export function createServer(db: DB): Server {
       let result: unknown;
       switch (name) {
         case "capture": {
-          result = await captureAndEmbed(db, args);
+          result = await captureAndEmbed(db, args, embedOpts);
           break;
         }
         case "recall":
@@ -179,7 +186,7 @@ export function createServer(db: DB): Server {
         case "crystallize": {
           const trait = crystallize(db, args);
           result = trait;
-          await embedWrittenLayer(db, "trait", trait.trait_id);
+          await embedWrittenLayer(db, "trait", trait.trait_id, embedOpts);
           break;
         }
         case "forget":
@@ -187,7 +194,7 @@ export function createServer(db: DB): Server {
           break;
         default:
           if (isEngramTool(name)) {
-            result = await dispatchEngramTool(db, name, args);
+            result = await dispatchEngramTool(db, name, args, options);
             break;
           }
           throw new Error(`Herramienta desconocida: ${name}`);
