@@ -1,11 +1,12 @@
 // Presentational half of the memory detail: it takes plain data so tests can render it without
-// a query client. The active model only decides whether the stored vector is still searchable.
+// a query client. The active model and its width decide whether the stored vector is searchable.
 import { when } from "../format";
 import { embeddingSummary } from "../lib/embeddings";
 
 export function MemoryFacts({
   memory,
   activeModel,
+  activeDims,
 }: {
   memory: {
     scope: string;
@@ -15,6 +16,7 @@ export function MemoryFacts({
     embedding: { model: string; dims: number; created_at: number } | null;
   };
   activeModel?: string;
+  activeDims?: number;
 }) {
   return (
     <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
@@ -27,7 +29,7 @@ export function MemoryFacts({
       <dt className="text-ink-muted">Usos</dt>
       <dd className="text-ink-soft">{memory.use_count}</dd>
       <dt className="text-ink-muted">Vector</dt>
-      <dd className="text-ink-soft">{embeddingSummary(memory.embedding, undefined, activeModel)}</dd>
+      <dd className="text-ink-soft">{embeddingSummary(memory.embedding, undefined, activeModel, activeDims)}</dd>
     </dl>
   );
 }

@@ -5,7 +5,7 @@ import type { EmbeddingStatus, MemoryDetail } from "../ui/src/api";
 import { EmbeddingNoticeView } from "../ui/src/components/EmbeddingNoticeView";
 import { MemoryFacts } from "../ui/src/components/MemoryFacts";
 import { exact } from "../ui/src/format";
-import { embeddingSummary, embeddingWarning } from "../ui/src/lib/embeddings";
+import { embeddingSummary, embeddingWarning, activeModelDims, vectorIsCurrent } from "../ui/src/lib/embeddings";
 
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 9, 25, 12, 0, 0);
@@ -72,6 +72,42 @@ describe("embeddingWarning", () => {
   });
 });
 
+describe("vectorIsCurrent", () => {
+  it("da por vigente el vector con el modelo activo y su ancho", () => {
+    expect(vectorIsCurrent({ model: "embeddinggemma-2", dims: 768 }, "embeddinggemma-2", 768)).toBe(true);
+  });
+
+  it("marca obsoleto el vector del modelo activo con otro ancho: la búsqueda no lo lee", () => {
+    expect(vectorIsCurrent({ model: "embeddinggemma-2", dims: 512 }, "embeddinggemma-2", 768)).toBe(false);
+  });
+
+  it("marca obsoleto el vector de otro modelo aunque coincida el ancho", () => {
+    expect(vectorIsCurrent({ model: "viejo", dims: 768 }, "embeddinggemma-2", 768)).toBe(false);
+  });
+});
+
+describe("activeModelDims", () => {
+  it("toma el ancho más frecuente del modelo activo, como el estado del servidor", () => {
+    const dims = activeModelDims(
+      status({
+        models: [
+          { model: "embeddinggemma-2", dims: 768, count: 8 },
+          { model: "embeddinggemma-2", dims: 512, count: 2 },
+          { model: "viejo", dims: 1024, count: 9 },
+        ],
+      }),
+    );
+
+    expect(dims).toBe(768);
+  });
+
+  it("no inventa un ancho cuando el modelo activo no tiene vectores", () => {
+    expect(
+      activeModelDims(status({ models: [{ model: "viejo", dims: 1024, count: 9 }] })),
+    ).toBeUndefined();
+  });
+});
+
 describe("embeddingSummary", () => {
   it("sin vector lo dice con todas las letras", () => {
     expect(embeddingSummary(null)).toBe("Sin vector: no aparece en la búsqueda por significado");
@@ -107,6 +143,17 @@ describe("embeddingSummary", () => {
     );
 
     expect(summary).not.toContain("obsoleto");
+  });
+
+  it("marca como obsoleto el vector del modelo activo con otro ancho", () => {
+    const summary = embeddingSummary(
+      { model: "nuevo", dims: 3, created_at: NOW },
+      NOW,
+      "nuevo",
+      4,
+    );
+
+    expect(summary).toContain("obsoleto: no lo usa la búsqueda");
   });
 });
 
@@ -180,6 +227,18 @@ describe("MemoryFacts", () => {
       createElement(MemoryFacts, {
         memory: memory({ embedding: { model: "viejo", dims: 3, created_at: NOW } }),
         activeModel: "nuevo",
+      }),
+    );
+
+    expect(html).toContain("obsoleto: no lo usa la búsqueda");
+  });
+
+  it("marca como obsoleto el vector del modelo activo con otras dimensiones", () => {
+    const html = renderToStaticMarkup(
+      createElement(MemoryFacts, {
+        memory: memory({ embedding: { model: "embeddinggemma-2", dims: 512, created_at: NOW } }),
+        activeModel: "embeddinggemma-2",
+        activeDims: 768,
       }),
     );
 

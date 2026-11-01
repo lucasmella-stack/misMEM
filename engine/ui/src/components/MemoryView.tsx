@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useMemoryActions } from "@/hooks/use-memory-actions";
 import { actions, api, isMissing, type MemoryDetail } from "../api";
 import { percent, when } from "../format";
+import { activeModelDims } from "../lib/embeddings";
 import { errorMessage } from "../lib/errors";
 import { inkPercent } from "../lib/ink";
 import { forgetText, unconsolidateText } from "../lib/memory-text";
@@ -110,7 +111,11 @@ export function MemoryView({ id, onSelect, onChanged, onAnnounce }: DetailViewPr
         )}
       </div>
 
-      <MemoryFacts memory={memory} activeModel={embeddings.data?.model} />
+      <MemoryFacts
+        memory={memory}
+        activeModel={embeddings.data?.model}
+        activeDims={activeModelDims(embeddings.data)}
+      />
 
       {!editing && (
         <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Acciones sobre la memoria">

@@ -7,7 +7,8 @@
 - El visor avisa cuando el índice semántico tiene memorias sin vector, con vectores de otro modelo o con
   vectores de otras dimensiones, con las cifras y la orden que lo resuelve (`mismem-embed` para lo
   pendiente y `mismem-embed --force` para reindexar al ancho actual). `GET /api/embeddings` lo lee de la
-  base, sin hablar con el proveedor.
+  base, sin hablar con el proveedor. Sólo avisa si algo se indexó alguna vez: con el servidor de
+  embeddings sin usar nunca, no hay nada que arreglar y el aviso sobra.
 - El detalle de cada memoria enseña sus usos, su modelo y sus dimensiones, marca como obsoleto el vector que
   la búsqueda no usa y muestra las fechas absolutas junto a las relativas.
 - `mismem-embed --status` cambia de significado: ya no cuenta los marcadores de ruido como memorias, sólo
