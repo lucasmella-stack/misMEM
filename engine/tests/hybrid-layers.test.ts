@@ -384,7 +384,7 @@ describe("backfill de rasgos y episodios", () => {
 
     const stats = await embedPendingMemories(db, { embedFn: embed, model: "fake" });
 
-    expect(stats.layers).toEqual({ pending: 2, embedded: 2, failed: 0 });
+    expect(stats.layers).toEqual({ pending: 2, embedded: 2, failed: 0, discarded: 0 });
     expect(seen).toContain("rotar la clave del proxy");
     expect(seen).toContain("Prefiere rotar credenciales");
     const rows = db
@@ -396,7 +396,26 @@ describe("backfill de rasgos y episodios", () => {
     ]);
 
     const again = await embedPendingMemories(db, { embedFn: embed, model: "fake" });
-    expect(again.layers).toEqual({ pending: 0, embedded: 0, failed: 0 });
+    expect(again.layers).toEqual({ pending: 0, embedded: 0, failed: 0, discarded: 0 });
+  });
+
+  it("cuenta como descartado el item que cambió mientras se calculaba su vector", async () => {
+    const episode = capture(db, { scope: "dev", body: "episodio que se consolida" }).id;
+    // The rows are read before the embedder answers, so consolidating here reproduces the
+    // race that makes the layer save refuse the vector: the text it was computed from is no
+    // longer a pending episode. The run must report it apart from a dead embedder.
+    const embed: EmbedFn = async (texts) => {
+      consolidate(db, {
+        scope: "dev",
+        gist: "absorbe el episodio",
+        source_episode_ids: [episode],
+      });
+      return texts.map(() => axis(1));
+    };
+
+    const stats = await embedPendingMemories(db, { embedFn: embed, model: "fake" });
+
+    expect(stats.layers).toEqual({ pending: 1, embedded: 0, failed: 0, discarded: 1 });
   });
 
   it("embeber un item recién escrito es opcional y un embedder caído no lanza", async () => {
@@ -442,6 +461,48 @@ describe("vectores de capa y ciclo de vida", () => {
         .prepare("SELECT COUNT(*) AS n FROM layer_embeddings WHERE layer = 'episode' AND item_id = ?")
         .get(episode),
     ).toEqual({ n: 0 });
+  });
+
+  it("borrar un episodio pendiente retira su vector por disparador", () => {
+    const episode = capture(db, { scope: "dev", body: "episodio que se borra" }).id;
+    saveLayerEmbedding(db, "episode", episode, "fake", axis(1));
+    expect(
+      db
+        .prepare("SELECT model FROM layer_embeddings WHERE layer = 'episode' AND item_id = ?")
+        .get(episode),
+    ).toEqual({ model: "fake" });
+
+    // The trigger is the only thing that removes the vector: nothing in the delete path
+    // cleans layer_embeddings, so a missing one would leave a row pointing at gone text.
+    db.prepare("DELETE FROM episodes WHERE id = ?").run(episode);
+
+    expect(
+      db
+        .prepare("SELECT 1 FROM layer_embeddings WHERE layer = 'episode' AND item_id = ?")
+        .get(episode),
+    ).toBeUndefined();
+  });
+
+  it("un embedder inyectado que no responde no retiene la escritura más que el tope", async () => {
+    const episode = capture(db, { scope: "dev", body: "nota con embedder colgado" }).id;
+    const started = Date.now();
+
+    const saved = await embedLayerItem(db, "episode", episode, {
+      embedFn: () => new Promise(() => undefined),
+      model: "fake",
+      timeoutMs: 20,
+    });
+    const elapsed = Date.now() - started;
+
+    // Without the cap the race never settles and this await never returns, which is the
+    // hang that blocked capture, crystallize and the viewer.
+    expect(saved).toBe(false);
+    expect(elapsed).toBeLessThan(1_000);
+    expect(
+      db
+        .prepare("SELECT 1 FROM layer_embeddings WHERE layer = 'episode' AND item_id = ?")
+        .get(episode),
+    ).toBeUndefined();
   });
 
   it("no deja vector huérfano si el episodio se consolida mientras se embebe", async () => {
@@ -616,7 +677,7 @@ describe("vectores de capa y ciclo de vida", () => {
           embedFn: async (texts) => texts.map(() => axis(1)),
           model: "fake",
         });
-        expect(stats.layers).toEqual({ pending: 2, embedded: 2, failed: 0 });
+        expect(stats.layers).toEqual({ pending: 2, embedded: 2, failed: 0, discarded: 0 });
 
         reopened.prepare("DELETE FROM traits WHERE id = ?").run(trait);
         expect(
