@@ -384,7 +384,7 @@ describe("backfill de rasgos y episodios", () => {
 
     const stats = await embedPendingMemories(db, { embedFn: embed, model: "fake" });
 
-    expect(stats.layers).toEqual({ pending: 2, embedded: 2, failed: 0 });
+    expect(stats.layers).toEqual({ pending: 2, embedded: 2, failed: 0, discarded: 0 });
     expect(seen).toContain("rotar la clave del proxy");
     expect(seen).toContain("Prefiere rotar credenciales");
     const rows = db
@@ -396,7 +396,26 @@ describe("backfill de rasgos y episodios", () => {
     ]);
 
     const again = await embedPendingMemories(db, { embedFn: embed, model: "fake" });
-    expect(again.layers).toEqual({ pending: 0, embedded: 0, failed: 0 });
+    expect(again.layers).toEqual({ pending: 0, embedded: 0, failed: 0, discarded: 0 });
+  });
+
+  it("cuenta como descartado el item que cambió mientras se calculaba su vector", async () => {
+    const episode = capture(db, { scope: "dev", body: "episodio que se consolida" }).id;
+    // The rows are read before the embedder answers, so consolidating here reproduces the
+    // race that makes the layer save refuse the vector: the text it was computed from is no
+    // longer a pending episode. The run must report it apart from a dead embedder.
+    const embed: EmbedFn = async (texts) => {
+      consolidate(db, {
+        scope: "dev",
+        gist: "absorbe el episodio",
+        source_episode_ids: [episode],
+      });
+      return texts.map(() => axis(1));
+    };
+
+    const stats = await embedPendingMemories(db, { embedFn: embed, model: "fake" });
+
+    expect(stats.layers).toEqual({ pending: 1, embedded: 0, failed: 0, discarded: 1 });
   });
 
   it("embeber un item recién escrito es opcional y un embedder caído no lanza", async () => {
@@ -616,7 +635,7 @@ describe("vectores de capa y ciclo de vida", () => {
           embedFn: async (texts) => texts.map(() => axis(1)),
           model: "fake",
         });
-        expect(stats.layers).toEqual({ pending: 2, embedded: 2, failed: 0 });
+        expect(stats.layers).toEqual({ pending: 2, embedded: 2, failed: 0, discarded: 0 });
 
         reopened.prepare("DELETE FROM traits WHERE id = ?").run(trait);
         expect(

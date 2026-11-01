@@ -240,7 +240,7 @@ export function layerIndexStatus(
 export async function embedPendingLayersResolved(
   db: DB,
   opts: ResolvedEmbedOptions,
-): Promise<{ pending: number; embedded: number; failed: number }> {
+): Promise<{ pending: number; embedded: number; failed: number; discarded: number }> {
   const needsEmbedding = [
     "e.item_id IS NULL",
     "e.model <> @model",
@@ -273,10 +273,11 @@ export async function embedPendingLayersResolved(
     )
     .all(params) as Array<{ id: string; text: string; had_embedding: number }>;
 
-  const stats: { pending: number; embedded: number; failed: number } = {
+  const stats: { pending: number; embedded: number; failed: number; discarded: number } = {
     pending: traitRows.length + episodeRows.length,
     embedded: 0,
     failed: 0,
+    discarded: 0,
   };
   const layers: Array<{ layer: LayerName; rows: Array<{ id: string; text: string } & BatchRow> }> = [
     { layer: "trait", rows: traitRows },
@@ -292,6 +293,7 @@ export async function embedPendingLayersResolved(
     );
     stats.embedded += batch.embedded;
     stats.failed += batch.failed;
+    stats.discarded += batch.discarded;
   }
   return stats;
 }

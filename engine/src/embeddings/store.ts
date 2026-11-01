@@ -105,7 +105,7 @@ export interface BackfillStats {
   reembedded: number;
   failed: number;
   /** Traits and pending episodes share the same run, reported apart. */
-  layers: { pending: number; embedded: number; failed: number };
+  layers: { pending: number; embedded: number; failed: number; discarded: number };
 }
 
 /**
@@ -153,7 +153,7 @@ export async function embedPendingMemories(
       embedded: 0,
       reembedded: 0,
       failed: 0,
-      layers: { pending: 0, embedded: 0, failed: 0 },
+      layers: { pending: 0, embedded: 0, failed: 0, discarded: 0 },
     };
   }
   const resolved = resolveEmbedOptions(opts, cfg);
@@ -206,7 +206,15 @@ export async function embedPendingMemories(
   );
 
   const layers = await embedPendingLayersResolved(db, resolved);
-  return { pending: pendingRows.length, ...memories, layers };
+  // Memory rows always save, so the top-level shape carries no discarded counter: only the
+  // layers can refuse a vector that went stale while the embedder worked.
+  return {
+    pending: pendingRows.length,
+    embedded: memories.embedded,
+    reembedded: memories.reembedded,
+    failed: memories.failed,
+    layers,
+  };
 }
 
 export interface EmbeddingIndexStatus {
