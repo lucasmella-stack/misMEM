@@ -83,7 +83,8 @@ porque un ámbito mal escrito y una memoria vacía se parecen demasiado:
 - `scopes`: los ámbitos que sí tienen memorias, rasgos o episodios pendientes, de más a menos contenido y
   como mucho 20. Los marcadores de ruido no cuentan.
 - `hint`: sólo cuando se pidió un `scope`. Dice que ese ámbito no tiene nada que coincida, y que se repita la
-  búsqueda sin él o con otro de los de `scopes`.
+  búsqueda sin él o con otro de los de `scopes`; si `scopes` está vacío, dice que la memoria aún no guarda
+  contenido.
 
 Con resultados la respuesta no cambia: no lleva `scopes` ni `hint`.
 
