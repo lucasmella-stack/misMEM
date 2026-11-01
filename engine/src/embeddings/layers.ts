@@ -64,6 +64,26 @@ function saveLayerEmbeddingIfCurrent(
 const WRITE_EMBED_TIMEOUT_MS = 1_000;
 
 /**
+ * Resolves to `undefined` when `work` outlasts `ms`: an injected `embedFn` skips the
+ * `AbortSignal` of `embedTexts`, so a hanging one would hold capture and the viewer open.
+ * The timer is cleared so a fast answer leaves nothing scheduled.
+ */
+async function withDeadline<T>(work: Promise<T>, ms: number): Promise<T | undefined> {
+  // The cancel closure avoids typing the handle: the DOM and Node declarations of
+  // `setTimeout` disagree on its return type and this file compiles against both.
+  let cancel: () => void = () => undefined;
+  const deadline = new Promise<undefined>((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    cancel = () => clearTimeout(timer);
+  });
+  try {
+    return await Promise.race([work, deadline]);
+  } finally {
+    cancel();
+  }
+}
+
+/**
  * Embeds one freshly written trait or episode, best effort. `capture` and `crystallize`
  * go through here so the item is searchable by meaning at once; a dead embedder returns
  * false and the next backfill picks it up, never breaking the write.
@@ -90,8 +110,11 @@ export async function embedLayerItem(
   const embedFn =
     opts.embedFn ?? ((texts: string[]) => embedTexts(texts, { ...cfg, timeoutMs }));
   // An injected embedFn does not go through `embedTexts`, so the same check the backfill
-  // applies is applied here: a non-finite or zero vector is never stored.
-  const vec = checkedUnitVectors((await embedFn([row.text.slice(0, cfg.maxChars)])) ?? [])?.[0];
+  // applies is applied here: a non-finite or zero vector is never stored. The cap covers
+  // both paths, so a server that hangs and an embedFn that never resolves end the same way.
+  const vec = checkedUnitVectors(
+    (await withDeadline(embedFn([row.text.slice(0, cfg.maxChars)]), timeoutMs)) ?? [],
+  )?.[0];
   if (!vec) return false;
   const model = opts.model ?? cfg.model;
 

@@ -463,6 +463,48 @@ describe("vectores de capa y ciclo de vida", () => {
     ).toEqual({ n: 0 });
   });
 
+  it("borrar un episodio pendiente retira su vector por disparador", () => {
+    const episode = capture(db, { scope: "dev", body: "episodio que se borra" }).id;
+    saveLayerEmbedding(db, "episode", episode, "fake", axis(1));
+    expect(
+      db
+        .prepare("SELECT model FROM layer_embeddings WHERE layer = 'episode' AND item_id = ?")
+        .get(episode),
+    ).toEqual({ model: "fake" });
+
+    // The trigger is the only thing that removes the vector: nothing in the delete path
+    // cleans layer_embeddings, so a missing one would leave a row pointing at gone text.
+    db.prepare("DELETE FROM episodes WHERE id = ?").run(episode);
+
+    expect(
+      db
+        .prepare("SELECT 1 FROM layer_embeddings WHERE layer = 'episode' AND item_id = ?")
+        .get(episode),
+    ).toBeUndefined();
+  });
+
+  it("un embedder inyectado que no responde no retiene la escritura más que el tope", async () => {
+    const episode = capture(db, { scope: "dev", body: "nota con embedder colgado" }).id;
+    const started = Date.now();
+
+    const saved = await embedLayerItem(db, "episode", episode, {
+      embedFn: () => new Promise(() => undefined),
+      model: "fake",
+      timeoutMs: 20,
+    });
+    const elapsed = Date.now() - started;
+
+    // Without the cap the race never settles and this await never returns, which is the
+    // hang that blocked capture, crystallize and the viewer.
+    expect(saved).toBe(false);
+    expect(elapsed).toBeLessThan(1_000);
+    expect(
+      db
+        .prepare("SELECT 1 FROM layer_embeddings WHERE layer = 'episode' AND item_id = ?")
+        .get(episode),
+    ).toBeUndefined();
+  });
+
   it("no deja vector huérfano si el episodio se consolida mientras se embebe", async () => {
     const episode = capture(db, { scope: "dev", body: "episodio en vuelo" }).id;
     let release: (vectors: Float32Array[] | null) => void = () => undefined;
