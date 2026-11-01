@@ -103,11 +103,15 @@
   —`consolidated_into` guarda un id—, así que la primera se lo queda y la segunda busca otra evidencia;
   sin ninguna, se salta con su línea de log y la corrida sigue.
 
+### El servidor MCP dice cuándo usar cada herramienta y cómo recuperarse de un fallo
+
+- El servidor MCP le dice al modelo cuándo usar cada herramienta y qué hacer cuando algo falla. Al inicializar anuncia unas `instructions` de menos de 1.500 caracteres con las tres capas, el formato del ámbito (`<persona o equipo>/<proyecto>`, el mismo al guardar y al buscar), cuándo capturar (una decisión con su porqué, la causa raíz de un fallo, una corrección del usuario, una idea por llamada, nunca secretos ni datos de terceros), buscar antes de preguntar al usuario algo que quizá ya esté guardado, reforzar con los ids que de verdad se usaron y leer entero con `mem_get_observation` un hit `truncated`. Las seis descripciones dicen en una frase "Use when"; un `recall` o un `mem_search` sin resultados añaden `scopes` (los ámbitos que tienen contenido, 20 como mucho) y, si se pidió un `scope`, un `hint` que lo nombra; y un `ZodError` llega como una línea por campo (`Error en capture: body: se esperaba un texto`) en vez del JSON de Zod, con el entero dicho como entero y el mínimo exclusivo como "tiene que ser mayor que 0".
+
 ### `recall` por MCP le da al modelo la fecha, los detalles y la polaridad (#153)
 
 - Cada resultado trae `date` legible en UTC, los `details` de una memoria, la `polarity` de un rasgo cuando
   no es neutra y `truncated` si un texto se recortó (2.000 caracteres de `text`, 1.200 de `details`). Las
-  respuestas MCP van sin indentación. Los alias `mem_*` conservan sus campos y también van sin indentación; el visor y su API no cambian.
+  respuestas MCP van sin indentación. Los alias `mem_*` conservan sus campos y también van sin indentación (salvo `mem_search`, que ante un vacío añade `scopes` y `hint`, como `recall`); el visor y su API no cambian.
 
 ## 0.8.0 — 2026-11-01
 

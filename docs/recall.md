@@ -76,6 +76,17 @@ Dos topes, en puntos de código y con los puntos suspensivos dentro del tope: 2.
 `details`. Cuando alguno se recorta, el hit lleva `truncated: true` sin decir cuál. La copia entera, que no
 se recorta, se lee con `mem_get_observation` y el id del hit.
 
+Una búsqueda sin resultados añade dos campos, tanto en `recall` como en el alias `mem_search`,
+porque un ámbito mal escrito y una memoria vacía se parecen demasiado:
+
+- `scopes`: los ámbitos que sí tienen memorias, rasgos o episodios pendientes, de más a menos contenido y
+  como mucho 20. Los marcadores de ruido no cuentan.
+- `hint`: sólo cuando se pidió un `scope`. Dice que ese ámbito no tiene nada que coincida, y que se repita la
+  búsqueda sin él o con otro de los de `scopes`; si `scopes` está vacío, dice que la memoria aún no guarda
+  contenido.
+
+Con resultados la respuesta no cambia: no lleva `scopes` ni `hint`.
+
 ## Medirlo
 
 `mismem-bench` informa la posición del acierto (MRR, 1ª, entre las 3), los recuerdos devueltos por

@@ -5,6 +5,7 @@ import {
   MAX_DETAILS_CHARS,
   MAX_TEXT_CHARS,
   recallForModel,
+  recallMissForModel,
   type RecallHitView,
 } from "../src/queries/recall-view.js";
 import type { RecallHit } from "../src/schema.js";
@@ -15,27 +16,34 @@ const AT = Date.UTC(2026, 9, 30, 23, 30);
 
 function insertMemory(
   db: DB,
-  memory: { id: string; gist: string; details?: string | null; salience?: number },
+  memory: {
+    id: string;
+    gist: string;
+    details?: string | null;
+    salience?: number;
+    scope?: string;
+  },
 ): void {
   db.prepare(
     `INSERT INTO memories (id, scope, gist, details, source_episode_ids, salience, created_at)
-     VALUES (?, 'p/a', ?, ?, '[]', ?, ?)`,
-  ).run(memory.id, memory.gist, memory.details ?? null, memory.salience ?? 1, AT);
+     VALUES (?, ?, ?, ?, '[]', ?, ?)`,
+  ).run(memory.id, memory.scope ?? "p/a", memory.gist, memory.details ?? null, memory.salience ?? 1, AT);
 }
 
-function insertTrait(db: DB, id: string, name: string, polarity: string): void {
+function insertTrait(db: DB, id: string, name: string, polarity: string, scope = "p/a"): void {
   db.prepare(
     `INSERT INTO traits (id, scope, name, evidence_memory_ids, polarity, created_at, updated_at)
-     VALUES (?, 'p/a', ?, '[]', ?, ?, ?)`,
-  ).run(id, name, polarity, AT, AT);
+     VALUES (?, ?, ?, '[]', ?, ?, ?)`,
+  ).run(id, scope, name, polarity, AT, AT);
 }
 
-function insertEpisode(db: DB, id: string, body: string): void {
-  db.prepare("INSERT INTO episodes (id, scope, body, created_at) VALUES (?, 'p/a', ?, ?)").run(
-    id,
-    body,
-    AT,
-  );
+function insertEpisode(
+  db: DB,
+  episode: { id: string; body: string; scope?: string; consolidatedInto?: string },
+): void {
+  db.prepare(
+    `INSERT INTO episodes (id, scope, body, created_at, consolidated_into) VALUES (?, ?, ?, ?, ?)`,
+  ).run(episode.id, episode.scope ?? "p/a", episode.body, AT, episode.consolidatedInto ?? null);
 }
 
 const hit = (partial: Partial<RecallHit> & Pick<RecallHit, "layer" | "id">): RecallHit => ({
@@ -72,7 +80,7 @@ describe("recallForModel", () => {
       const db = openDb(":memory:");
       insertMemory(db, { id: "m1", gist: "gist", salience: 0.834 });
       insertTrait(db, "t1", "prefers small PRs", "shadow");
-      insertEpisode(db, "e1", "raw note");
+      insertEpisode(db, { id: "e1", body: "raw note" });
 
       const hits: RecallHitView[] = recallForModel(db, [
         hit({ layer: "memory", id: "m1", salience: 0.834, via: "semantic" }),
@@ -195,6 +203,85 @@ describe("recallForModel", () => {
     expect(hits[0]?.polarity).toBe("shadow");
     expect(hits[1]).not.toHaveProperty("polarity");
     expect(hits[2]?.polarity).toBe("light");
+    db.close();
+  });
+});
+
+describe("recallMissForModel", () => {
+  it("lists the scopes with memories, traits or pending episodes, most populated first", () => {
+    const db = openDb(":memory:");
+    insertMemory(db, { id: "m1", gist: "one", scope: "p/a" });
+    insertMemory(db, { id: "m2", gist: "two", scope: "p/a" });
+    insertMemory(db, { id: "m3", gist: "three", scope: "p/a" });
+    // What consolidation leaves behind: the noise memory plus the episodes tied to it. The
+    // scope still shows up in the counts with nothing but consolidated episodes, so only the
+    // `total > 0` filter keeps it out of the list.
+    insertMemory(db, { id: "n1", gist: "[noise] dropped", scope: "p/noise" });
+    insertEpisode(db, {
+      id: "e4",
+      scope: "p/noise",
+      body: "chatter nobody cited",
+      consolidatedInto: "n1",
+    });
+    insertTrait(db, "t1", "prefers small PRs", "neutral", "p/b");
+    insertEpisode(db, { id: "e1", scope: "p/b", body: "pending note" });
+    insertEpisode(db, {
+      id: "e2",
+      scope: "p/a",
+      body: "already distilled",
+      consolidatedInto: "m1",
+    });
+    insertEpisode(db, { id: "e3", scope: "p/c", body: "lone pending" });
+
+    expect(recallMissForModel(db)).toEqual({ scopes: ["p/a", "p/b", "p/c"] });
+    db.close();
+  });
+
+  it("caps the list at 20 scopes and keeps the most populated ones", () => {
+    const db = openDb(":memory:");
+    // Distinct counts per scope, so which one falls outside the cap does not depend on collation.
+    for (let i = 0; i <= 20; i++) {
+      const scope = `p/s${String(i).padStart(2, "0")}`;
+      for (let n = 0; n <= i; n++) insertMemory(db, { id: `${scope}-${n}`, gist: "g", scope });
+    }
+
+    const { scopes } = recallMissForModel(db);
+
+    expect(scopes).toHaveLength(20);
+    expect(scopes[0]).toBe("p/s20");
+    expect(scopes).not.toContain("p/s00");
+    db.close();
+  });
+
+  it("says that the scope it was asked for has nothing, and points at the scopes that do", () => {
+    const db = openDb(":memory:");
+    insertMemory(db, { id: "m1", gist: "one", scope: "p/a" });
+
+    const view = recallMissForModel(db, "p/typo");
+
+    expect(view.scopes).toEqual(["p/a"]);
+    expect(view.hint).toContain("p/typo");
+    expect(view.hint).toMatch(/no tiene/);
+    expect(view.hint).toContain("con otro de los que aparecen en scopes");
+    db.close();
+  });
+
+  it("no remite a una lista de ámbitos vacía cuando la memoria todavía no guarda nada", () => {
+    const db = openDb(":memory:");
+
+    const view = recallMissForModel(db, "p/typo");
+
+    expect(view.scopes).toEqual([]);
+    expect(view.hint).toContain("p/typo");
+    expect(view.hint).toMatch(/no tiene/);
+    expect(view.hint).toMatch(/no guarda contenido/);
+    expect(view.hint).not.toContain("scopes");
+    db.close();
+  });
+
+  it("adds no hint when no scope was asked for, even with nothing stored", () => {
+    const db = openDb(":memory:");
+    expect(recallMissForModel(db)).toEqual({ scopes: [] });
     db.close();
   });
 });
