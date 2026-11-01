@@ -2,6 +2,16 @@
 
 ## Sin publicar
 
+### El instalador dice por qué falló, y sus tests dejan de llenar /tmp
+
+- `scripts/install.sh` corría `pnpm install --frozen-lockfile >/dev/null` y `pnpm build >/dev/null`.
+  **pnpm escribe sus errores en stdout**, así que una instalación que abortaba por un lockfile que no
+  cuadra moría sin imprimir una sola línea útil. La salida se guarda y se imprime sólo si el comando
+  falla.
+- `tests/installer.test.ts` creaba un directorio temporal por sandbox y no borraba ninguno: había 248
+  acumulados, 380 MB. Se borran en el `afterEach`, como pide
+  [docs/standards/tests.md](docs/standards/tests.md).
+
 ### El log de la consolidación deja de llevar el texto de una memoria
 
 - Al descartar una memoria destilada por quedarse sin evidencia, el log imprimía sesenta caracteres
