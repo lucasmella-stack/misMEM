@@ -104,6 +104,22 @@ export interface ConnectomeSummary {
   hubs: Array<{ id: string; degree: number; strength: number; support: number }>;
 }
 
+/** One semantic island: memories that talk about the same thing. */
+interface Topic {
+  size: number;
+  scopes: Array<{ scope: string; n: number }>;
+  entry: { id: string; gist: string; salience: number };
+  members: string[];
+}
+
+export interface TopicsResult {
+  topics: Topic[];
+  /** Looked at and left out of every island. */
+  alone: number;
+  considered: number;
+  minScore: number;
+}
+
 export interface GraphData {
   nodes: GraphNode[];
   links: GraphLink[];
@@ -255,6 +271,8 @@ export const api = {
       },
       signal,
     ),
+  // Its cost is a cosine per pair, so the server caps how many memories it looks at.
+  topics: (scope: string | undefined, signal?: AbortSignal) => get<TopicsResult>("topics", { scope }, signal),
   memory: (id: string, signal?: AbortSignal) => get<MemoryDetail>(`memory/${encodeURIComponent(id)}`, {}, signal),
   trait: (id: string, signal?: AbortSignal) => get<TraitDetail>(`trait/${encodeURIComponent(id)}`, {}, signal),
 };

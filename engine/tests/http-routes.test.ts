@@ -145,6 +145,52 @@ describe("http/routes: orden y respuestas", () => {
 });
 
 // The two 413s cannot move to another file: they share the `request` the handler builds.
+describe("http/routes: /api/topics", () => {
+  const onAngle = (degrees: number): Float32Array => {
+    const r = (degrees * Math.PI) / 180;
+    return new Float32Array([Math.cos(r), Math.sin(r), 0, 0]);
+  };
+
+  it("devuelve las islas semánticas con su puerta de entrada", async () => {
+    for (const [id, gist, deg, sal] of [
+      ["a", "arquitectura de Daimon", 0, 0.5],
+      ["b", "Daimon en traefik", 8, 0.9],
+      ["c", "llevar el gato al veterinario", 90, 0.5],
+    ] as const) {
+      db.prepare(
+        "INSERT INTO memories (id, scope, gist, source_episode_ids, salience, created_at) VALUES (?,'s',?,'[]',?,0)",
+      ).run(id, gist, sal);
+      const vec = onAngle(deg);
+      db.prepare(
+        "INSERT INTO memory_embeddings (memory_id, model, dims, vec, created_at) VALUES (?,'m',4,?,0)",
+      ).run(id, Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength));
+    }
+
+    const res = await request(makeHandler({ auth: null }), "/api/topics?min_score=0.9");
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as {
+      topics: Array<{ size: number; entry: { id: string } }>;
+      alone: number;
+      considered: number;
+    };
+    expect(body.considered).toBe(3);
+    expect(body.alone).toBe(1);
+    expect(body.topics).toHaveLength(1);
+    expect(body.topics[0]?.size).toBe(2);
+    expect(body.topics[0]?.entry.id).toBe("b");
+  });
+
+  it("un min_score fuera de rango o ilegible cae al valor por defecto", async () => {
+    const handler = makeHandler({ auth: null });
+    for (const raw of ["abc", "-1", "9"]) {
+      const res = await request(handler, `/api/topics?min_score=${raw}`);
+      expect(res.statusCode, raw).toBe(200);
+      expect((JSON.parse(res.body) as { minScore: number }).minScore, raw).toBe(0.85);
+    }
+  });
+});
+
 describe("http/routes: cuerpo demasiado grande (413)", () => {
   it("cierra la conexión en /mcp y manda el texto de respond.payloadTooLarge", async () => {
     // The cap is lowered so it does not depend on makeHandler's default.
