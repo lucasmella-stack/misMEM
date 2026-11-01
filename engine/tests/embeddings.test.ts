@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Database as DB } from "better-sqlite3";
 import { openDb } from "../src/store/db.js";
 import { capture } from "../src/memory/capture.js";
 import { consolidate } from "../src/memory/consolidate.js";
+import { crystallize } from "../src/memory/crystallize.js";
 import { recallHybrid } from "../src/recall/recall.js";
-import {
-  saveMemoryEmbedding,
-  semanticSearchMemories,
-  embedPendingMemories,
-  getEmbeddingIndexStatus,
-} from "../src/embeddings/store.js";
-import type { EmbedFn } from "../src/embeddings/provider.js";
+import { saveMemoryEmbedding, semanticSearchMemories, embedPendingMemories } from "../src/embeddings/store.js";
+import { getEmbeddingIndexStatus } from "../src/embeddings/status.js";
+import { loadEmbeddingConfig, type EmbedFn } from "../src/embeddings/provider.js";
 
 let db: DB;
 
@@ -77,6 +77,26 @@ describe("embedPendingMemories", () => {
     const second = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
     expect(second.pending).toBe(0);
     expect(second.embedded).toBe(0);
+    expect(second.reembedded).toBe(0);
+  });
+
+  it("los ids prioritarios entran en el presupuesto antes que el resto", async () => {
+    makeMemory("vida", "cashflow uno");
+    makeMemory("vida", "cashflow dos");
+    const priority = makeMemory("vida", "mezcla nueva");
+
+    const r = await embedPendingMemories(db, {
+      embedFn: fakeEmbed,
+      model: "fake",
+      maxRows: 1,
+      priorityIds: [priority],
+    });
+
+    expect(r).toMatchObject({ pending: 3, embedded: 1 });
+    const embedded = db.prepare("SELECT memory_id FROM memory_embeddings").all() as Array<{
+      memory_id: string;
+    }>;
+    expect(embedded.map((row) => row.memory_id)).toEqual([priority]);
   });
 
   it("corta temprano si el embedder está caído", async () => {
@@ -319,6 +339,69 @@ describe("embedPendingMemories", () => {
     expect(Array.from(stored).map((v) => Number(v.toFixed(3)))).toEqual([0.6, 0.8, 0]);
   });
 
+  it("el backfill acotado reparte el tope entre las tres capas y deja el resto pendiente", async () => {
+    const memoryId = makeMemory("vida", "cashflow uno");
+    makeMemory("vida", "cashflow dos");
+    crystallize(db, { scope: "vida", name: "rasgo de dinero uno", evidence_memory_ids: [memoryId] });
+    crystallize(db, { scope: "vida", name: "rasgo de dinero dos", evidence_memory_ids: [memoryId] });
+
+    const first = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake", maxRows: 3 });
+    const second = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake", maxRows: 3 });
+
+    expect(first).toMatchObject({ pending: 2, embedded: 2 });
+    expect(first.layers).toEqual({ pending: 2, embedded: 1, failed: 0, discarded: 0 });
+    expect(second).toMatchObject({ pending: 0, embedded: 0 });
+    expect(second.layers).toEqual({ pending: 1, embedded: 1, failed: 0, discarded: 0 });
+  });
+
+  it("con un backlog de memorias que llena el tope, los rasgos conservan su reserva", async () => {
+    const source = makeMemory("vida", "cashflow fuente");
+    for (let i = 0; i < 99; i++) makeMemory("vida", `cashflow pendiente ${i}`);
+    for (let i = 0; i < 10; i++) {
+      crystallize(db, { scope: "vida", name: `rasgo de dinero ${i}`, evidence_memory_ids: [source] });
+    }
+
+    const r = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake", maxRows: 64 });
+
+    // The reservation is a quarter of the cap, capped by what the layers actually need:
+    // memories keep the other 54 rows, so the run still stops at 64.
+    expect(r).toMatchObject({ pending: 100, embedded: 54 });
+    expect(r.layers).toEqual({ pending: 10, embedded: 10, failed: 0, discarded: 0 });
+    expect(r.embedded + r.layers.embedded).toBe(64);
+  });
+
+  it("con rasgos y episodios pendientes, el reparto reservado no deja a ninguna capa sin filas", async () => {
+    const source = makeMemory("vida", "cashflow fuente");
+    for (let i = 0; i < 100; i++) makeMemory("vida", `cashflow pendiente ${i}`);
+    for (let i = 0; i < 100; i++) {
+      crystallize(db, { scope: "vida", name: `rasgo de dinero ${i}`, evidence_memory_ids: [source] });
+    }
+    for (let i = 0; i < 30; i++) capture(db, { scope: "vida", body: `episodio pendiente ${i} con dinero` });
+
+    const r = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake", maxRows: 64 });
+
+    // The 16 rows of the reservation split 8 and 8: traits used to take all 16 first and a
+    // pending episode never saw a row while there were traits left.
+    expect(r.layers).toEqual({ pending: 130, embedded: 16, failed: 0, discarded: 0 });
+    const byLayer = db
+      .prepare("SELECT layer, COUNT(*) AS n FROM layer_embeddings GROUP BY layer ORDER BY layer")
+      .all();
+    expect(byLayer).toEqual([
+      { layer: "episode", n: 8 },
+      { layer: "trait", n: 8 },
+    ]);
+    expect(r.embedded + r.layers.embedded).toBe(64);
+  });
+
+  it("sin rasgos ni episodios pendientes, las memorias gastan el tope entero", async () => {
+    for (let i = 0; i < 100; i++) makeMemory("vida", `cashflow pendiente ${i}`);
+
+    const r = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake", maxRows: 64 });
+
+    expect(r).toMatchObject({ pending: 100, embedded: 64 });
+    expect(r.layers).toEqual({ pending: 0, embedded: 0, failed: 0, discarded: 0 });
+  });
+
   it("permite reindexar explícitamente el mismo modelo con --force", async () => {
     makeMemory("vida", "cashflow del mes");
     await embedPendingMemories(db, {
@@ -338,6 +421,132 @@ describe("embedPendingMemories", () => {
   });
 });
 
+describe("huella del texto embebido", () => {
+  it("reembebe cuando cambia el prefijo de documento", async () => {
+    makeMemory("vida", "cashflow del mes");
+    await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+    const saved = process.env.MISMEM_EMBEDDING_DOC_PREFIX;
+    process.env.MISMEM_EMBEDDING_DOC_PREFIX = "search_document: ";
+    try {
+      const again = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+      expect(again).toMatchObject({ pending: 1, embedded: 1, reembedded: 1 });
+    } finally {
+      if (saved === undefined) delete process.env.MISMEM_EMBEDDING_DOC_PREFIX;
+      else process.env.MISMEM_EMBEDDING_DOC_PREFIX = saved;
+    }
+  });
+
+  it("una edición de los detalles deja la fila pendiente", async () => {
+    const memoryId = makeMemory("vida", "cashflow del mes");
+    await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+
+    db.prepare("UPDATE memories SET details = ? WHERE id = ?").run("detalle nuevo", memoryId);
+    const again = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+
+    expect(again).toMatchObject({ pending: 1, embedded: 1, reembedded: 1 });
+  });
+
+  it("una fila antigua sin huella se reembebe una sola vez", async () => {
+    makeMemory("vida", "cashflow del mes");
+    await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+    // Rows written before the column existed carry no fingerprint.
+    db.prepare("UPDATE memory_embeddings SET fingerprint = NULL").run();
+
+    const once = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+    const twice = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+
+    expect(once).toMatchObject({ pending: 1, embedded: 1, reembedded: 1 });
+    expect(twice).toMatchObject({ pending: 0, embedded: 0, reembedded: 0 });
+  });
+
+  it("la huella usa la configuración con la que se guardó el vector, no la del entorno", () => {
+    const memoryId = makeMemory("vida", "cashflow del mes");
+    const cfg = { ...loadEmbeddingConfig(), docPrefix: "doc: ", maxChars: 8 };
+
+    saveMemoryEmbedding(db, memoryId, "fake", fakeVec("cashflow"), undefined, cfg);
+
+    expect(getEmbeddingIndexStatus(db, "fake", cfg).outdated).toBe(0);
+    expect(
+      getEmbeddingIndexStatus(db, "fake", { ...cfg, docPrefix: "otro: " }).outdated,
+    ).toBe(1);
+  });
+
+  it("el contador de desactualizados excluye los marcadores de ruido", async () => {
+    const noise = makeMemory("vida", "[noise] 3 episodios sin señal");
+    makeMemory("vida", "cashflow del mes");
+    await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+    // Legacy base: the marker already had a vector, written before the fingerprint column.
+    saveMemoryEmbedding(db, noise, "fake", fakeVec("finanzas"));
+    db.prepare("UPDATE memory_embeddings SET fingerprint = NULL").run();
+
+    const status = getEmbeddingIndexStatus(db, "fake");
+
+    expect(status.outdated).toBe(1);
+  });
+
+  it("añade la huella a una base creada antes, conserva los vectores y la migración se puede repetir", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mismem-fingerprint-"));
+    const path = join(dir, "mem.db");
+    const columns = (open: DB, table: string): string[] =>
+      (open.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map(
+        (c) => c.name,
+      );
+    try {
+      const before = openDb(path);
+      const source = capture(before, { scope: "vida", body: "episodio heredado" });
+      const memoryId = consolidate(before, {
+        scope: "vida",
+        gist: "cashflow del mes",
+        source_episode_ids: [source.id],
+      }).memory_id;
+      const pending = capture(before, { scope: "vida", body: "episodio todavía pendiente" });
+      // The vectors are the data the migration must not cost: recreating a table instead
+      // of adding a column would pass the column check below and lose both.
+      const vec = Buffer.from(new Float32Array([0.6, 0.8]).buffer);
+      before
+        .prepare(
+          `INSERT INTO memory_embeddings (memory_id, model, dims, vec, created_at, fingerprint)
+           VALUES (?, 'fake', 2, ?, 1, 'huella')`,
+        )
+        .run(memoryId, vec);
+      before
+        .prepare(
+          `INSERT INTO layer_embeddings (layer, item_id, model, dims, vec, created_at, fingerprint)
+           VALUES ('episode', ?, 'fake', 2, ?, 1, 'huella')`,
+        )
+        .run(pending.id, vec);
+      before.exec("ALTER TABLE memory_embeddings DROP COLUMN fingerprint");
+      before.exec("ALTER TABLE layer_embeddings DROP COLUMN fingerprint");
+      before.close();
+
+      for (let run = 0; run < 2; run++) {
+        const reopened = openDb(path);
+        try {
+          expect(columns(reopened, "memory_embeddings")).toContain("fingerprint");
+          expect(columns(reopened, "layer_embeddings")).toContain("fingerprint");
+          expect(reopened.prepare("SELECT gist FROM memories WHERE id = ?").get(memoryId)).toEqual({
+            gist: "cashflow del mes",
+          });
+          const stored = reopened
+            .prepare("SELECT memory_id, vec FROM memory_embeddings")
+            .all() as Array<{ memory_id: string; vec: Buffer }>;
+          expect(stored.map((row) => row.memory_id)).toEqual([memoryId]);
+          expect(stored[0]?.vec.equals(vec)).toBe(true);
+          const layer = reopened
+            .prepare("SELECT item_id, vec FROM layer_embeddings WHERE layer = 'episode'")
+            .all() as Array<{ item_id: string; vec: Buffer }>;
+          expect(layer.map((row) => row.item_id)).toEqual([pending.id]);
+          expect(layer[0]?.vec.equals(vec)).toBe(true);
+        } finally {
+          reopened.close();
+        }
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("getEmbeddingIndexStatus", () => {
   it("una base vacía no tiene nada que indexar", () => {
     expect(getEmbeddingIndexStatus(db, "m")).toEqual({
@@ -347,12 +556,14 @@ describe("getEmbeddingIndexStatus", () => {
       compatible: 0,
       stale_model: 0,
       stale_dims: 0,
+      // The fingerprint catches changed text or prefix; dims catch a new width.
+      outdated: 0,
       invalid: 0,
       active_dims: null,
       // Layers share the status: a trait and a pending episode are indexed too.
       layers: {
-        trait: { items: 0, embedded: 0, missing: 0, compatible: 0, stale_model: 0 },
-        episode: { items: 0, embedded: 0, missing: 0, compatible: 0, stale_model: 0 },
+        trait: { items: 0, embedded: 0, missing: 0, compatible: 0, stale_model: 0, outdated: 0 },
+        episode: { items: 0, embedded: 0, missing: 0, compatible: 0, stale_model: 0, outdated: 0 },
       },
       models: [],
     });
@@ -377,7 +588,7 @@ describe("getEmbeddingIndexStatus", () => {
       active_dims: 5,
     });
     // An explicit width still wins over the recorded one.
-    expect(getEmbeddingIndexStatus(db, "m", 3)).toMatchObject({
+    expect(getEmbeddingIndexStatus(db, "m", undefined, 3)).toMatchObject({
       compatible: 2,
       stale_model: 0,
       stale_dims: 1,
@@ -419,7 +630,7 @@ describe("getEmbeddingIndexStatus", () => {
       stale_dims: 1,
     });
     // With an expected width of 5 the 3-dimension vector is the one search cannot read.
-    expect(getEmbeddingIndexStatus(db, "m", 5)).toMatchObject({
+    expect(getEmbeddingIndexStatus(db, "m", undefined, 5)).toMatchObject({
       active_dims: 5,
       compatible: 1,
       stale_model: 0,

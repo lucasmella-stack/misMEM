@@ -134,6 +134,39 @@
 - `mismem-embed --status` cambia de significado: ya no cuenta los marcadores de ruido como memorias, sólo
   cuenta como `compatible` los vectores del modelo activo con su ancho activo (`active_dims`) y añade `stale_dims` para
   los del modelo activo con otro ancho, de modo que `stale_model` queda para los de otro modelo.
+- Con EmbeddingGemma 2 y sin `MISMEM_EMBEDDING_MIN_SCORE`, el corte por defecto pasa de 0,5 a 0,65: en el
+  golden eval, las preguntas ajenas que traen algo bajan de 48/48 a 11/48 sin perder ningún acierto (#158).
+  Vale para cualquier id de la familia (`google/embeddinggemma-300m`, una ruta GGUF). Tests en
+  `engine/tests/embeddings-provider.test.ts`; `DEPLOY.md` y `docs/recall.md` recogen el valor nuevo.
+
+### El índice semántico detecta cambios de texto y de prefijo (#156)
+
+- Cada vector guarda ahora una huella (`fingerprint`) del texto exacto que se envió al servidor: el prefijo de
+  documento más el texto ya recortado por `MISMEM_EMBEDDING_MAX_CHARS`. El backfill trata como pendiente toda
+  fila cuya huella no coincida con el texto y la configuración actuales, además de las que ya trataba (sin
+  vector, otro modelo, otras dimensiones). Cambiar `MISMEM_EMBEDDING_DOC_PREFIX` o `MISMEM_EMBEDDING_MAX_CHARS`,
+  o editar el texto de una memoria, un rasgo o un episodio por un camino que no borre su vector, ya no deja
+  vectores que describen otro texto: se reembeben solos en el siguiente `mismem-embed`, sin `--force`. Las filas
+  anteriores a la columna se reembeben una sola vez, así que conviene correr `mismem-embed` una vez tras
+  actualizar. Los backfills que se disparan solos (la herramienta `consolidate`, una edición desde el visor y la
+  consolidación nocturna) procesan como mucho 64 filas por llamada y dejan el resto para la siguiente pasada.
+  Dentro de ese tope reservan hasta una cuarta parte para rasgos y episodios pendientes, de modo que un backlog
+  de memorias no los deje nunca sin vector; si no hay capas pendientes, las memorias gastan el tope entero.
+  `mismem-embed` no tiene tope. Cambiar `MISMEM_EMBEDDING_QUERY_PREFIX` no invalida ningún vector guardado.
+- Una edición desde el visor embebe su memoria antes que el resto del backlog, dentro del mismo tope de 64
+  filas, y sólo responde `reembedded: true` si el vector existe al terminar. Antes la respuesta daba `true`
+  sin comprobarlo, también con el embedder caído o sin configurar, cuando no se había guardado ningún vector.
+  Tests en `engine/tests/viewer-actions.test.ts` y `engine/tests/embeddings.test.ts`.
+- El backfill que sigue a la herramienta `consolidate` también embebe primero la memoria recién destilada: con
+  un backlog mayor que el tope de 64 filas, antes la memoria nueva se quedaba sin vector pasada tras pasada.
+  Test en `engine/tests/server-core.test.ts`.
+- `getEmbeddingIndexStatus` y `mismem-embed --status` cuentan en `outdated`, para memorias y para cada capa, las
+  filas del modelo activo con huella distinta o nula. El conteo de memorias excluye los marcadores de ruido, igual
+  que el backfill.
+- La migración es aditiva y repetible: `migrate()` añade la columna a `memory_embeddings` y a
+  `layer_embeddings` si falta, sin borrar nada. Tests en `engine/tests/embeddings.test.ts` (prefijo, edición de
+  `details`, fila sin huella, migración sobre una base anterior repetida dos veces) y
+  `engine/tests/hybrid-layers.test.ts` (renombrado de un rasgo y `outdated` por capa).
 
 ### Recall híbrido: las tres capas compiten en un solo ranking (#154)
 
@@ -201,7 +234,8 @@
 - **Sin configurar nada**, EmbeddingGemma 2 en `http://127.0.0.1:8080`, el puerto del instalador. Con un modelo
   de la familia EmbeddingGemma (su id contiene `embeddinggemma`) van solos sus prefijos y el corte de 0,65, el
   mayor que no pierde aciertos en el golden eval (PR #181, que esto sustituye); otro modelo arranca sin prefijos
-  y con 0,5. Quien configuró EmbeddingGemma a mano sin prefijos tiene que reindexar con `mismem-embed --force`.
+  y con 0,5. Quien configuró EmbeddingGemma a mano sin prefijos no tiene que forzar nada: el prefijo de
+  documento entra en la huella del vector, así que un `mismem-embed` normal reembebe lo afectado.
 - **El instalador** monta sólo EmbeddingGemma 2: `--embeddings gemma|off`. Una instalación con nomic en el Ollama local pasa
   a EmbeddingGemma 2 al re-ejecutarlo si hay `llama-server` (si no, conserva nomic); nomic en otro servidor u otro modelo se conservan, y una búsqueda apagada
   con `MISMEM_EMBEDDINGS=off` sigue apagada.

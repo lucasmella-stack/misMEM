@@ -214,6 +214,16 @@ function migrate(db: DB): void {
       SELECT m.id FROM memories m WHERE NOT (${excludeNoiseSql("m")})
     )`);
 
+  // A vector only knows its model and dims, so a prefix change or an edited text left it
+  // looking valid. The fingerprint (a hash of the exact text sent) makes that visible to
+  // the backfill; legacy rows start NULL and are re-embedded once. Additive and repeatable.
+  for (const table of ["memory_embeddings", "layer_embeddings"]) {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === "fingerprint")) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN fingerprint TEXT`);
+    }
+  }
+
   // Legacy triggers reindexed FTS on any UPDATE, even when only salience,
   // timestamps or strength changed.
   db.exec(`

@@ -3,7 +3,7 @@
 // salience is the effective one, as in recall; the stored one is the last checkpoint's.
 import type { ServerResponse } from "node:http";
 import type { Database as DB } from "better-sqlite3";
-import { getEmbeddingIndexStatus } from "../../embeddings/store.js";
+import { getEmbeddingIndexStatus } from "../../embeddings/status.js";
 import { loadEmbeddingConfig } from "../../embeddings/provider.js";
 import { topics } from "../../queries/topics.js";
 import { graphData, type GraphCaps } from "../../queries/graph.js";

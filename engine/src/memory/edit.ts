@@ -3,20 +3,30 @@
 // deletion only happens when it is called.
 import type { Database as DB } from "better-sqlite3";
 import { z } from "zod";
-import { embedPendingMemories } from "../embeddings/store.js";
+import { AUTO_BACKFILL_MAX_ROWS, embedPendingMemories } from "../embeddings/store.js";
 
-export type Reembed = (db: DB) => Promise<unknown>;
+export type Reembed = (db: DB, priorityIds: readonly string[]) => Promise<unknown>;
 
 const EditInput = z.object({
   gist: z.string().trim().min(1).max(2000),
   details: z.string().max(20_000).nullable().optional(),
 });
 
+/** Whether the memory has a vector: the only evidence that a reembed actually stored one. */
+function hasMemoryVector(db: DB, id: string): boolean {
+  return (
+    db.prepare("SELECT 1 FROM memory_embeddings WHERE memory_id = ? LIMIT 1").get(id) !== undefined
+  );
+}
+
 export async function editMemory(
   db: DB,
   id: string,
   raw: unknown,
-  reembed: Reembed = (db) => embedPendingMemories(db),
+  // Bounded: the viewer request cannot wait for a full reindex. The edited memory goes first so
+  // the cap cannot leave it at the tail of a long backlog.
+  reembed: Reembed = (db, priorityIds) =>
+    embedPendingMemories(db, { maxRows: AUTO_BACKFILL_MAX_ROWS, priorityIds }),
 ): Promise<{ id: string; reembedded: boolean }> {
   const input = EditInput.parse(raw);
   db.transaction(() => {
@@ -30,12 +40,13 @@ export async function editMemory(
     db.prepare("DELETE FROM memory_embeddings WHERE memory_id = ?").run(id);
   })();
   try {
-    await reembed(db);
-    return { id, reembedded: true };
+    await reembed(db, [id]);
   } catch {
     // Without an embedder the memory is still found by words; the backfill catches it up.
-    return { id, reembedded: false };
   }
+  // Not throwing is not the same as having stored the vector: a dead embedder or a full budget
+  // returns quietly, so the row itself answers whether the memory is searchable by meaning.
+  return { id, reembedded: hasMemoryVector(db, id) };
 }
 
 /** Undoes consolidation: the episodes become pending again through ON DELETE SET NULL. */

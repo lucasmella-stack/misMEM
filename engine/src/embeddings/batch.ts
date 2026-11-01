@@ -1,7 +1,12 @@
 // One batching loop and one failure policy for every backfilled layer, plus the options
 // the backfill resolves once. Memories, traits and pending episodes share it so a fix to
 // the policy cannot drift between them.
-import { embedTexts, type loadEmbeddingConfig, type EmbedFn } from "./provider.js";
+import {
+  embedTexts,
+  type EmbeddingConfig,
+  type loadEmbeddingConfig,
+  type EmbedFn,
+} from "./provider.js";
 import { checkedUnitVectors } from "./vector.js";
 
 const MAX_CONSECUTIVE_FAILURES = 2;
@@ -27,9 +32,12 @@ export interface ResolveOptions {
   timeoutMs?: number;
   expectedDims?: number;
   force?: boolean;
+  /** Rows this call may embed, shared by the three layers; omitted means everything. */
+  maxRows?: number;
 }
 
 export interface ResolvedEmbedOptions {
+  cfg: EmbeddingConfig;
   embedFn: EmbedFn;
   model: string;
   batchSize: number;
@@ -44,6 +52,7 @@ export function resolveEmbedOptions(
   cfg: ReturnType<typeof loadEmbeddingConfig>,
 ): ResolvedEmbedOptions {
   return {
+    cfg,
     embedFn:
       opts.embedFn ??
       ((texts: string[]) => embedTexts(texts, { ...cfg, timeoutMs: opts.timeoutMs ?? cfg.timeoutMs })),

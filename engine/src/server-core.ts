@@ -16,7 +16,7 @@ import { forget } from "./memory/forget.js";
 import { reinforce } from "./memory/reinforce.js";
 import { recallForModel, requestedScope, searchResponse } from "./queries/recall-view.js";
 import { MCP_INSTRUCTIONS } from "./mcp/guide.js";
-import { embedPendingMemories } from "./embeddings/store.js";
+import { AUTO_BACKFILL_MAX_ROWS, embedPendingMemories } from "./embeddings/store.js";
 import { dispatchEngramTool, isEngramTool } from "./mcp/engram-compat.js";
 import { ENGRAM_TOOLS } from "./mcp/engram-tools.js";
 import type { EmbedFn } from "./embeddings/provider.js";
@@ -246,11 +246,17 @@ export function createServer(
           break;
         }
         case "consolidate": {
-          result = consolidate(db, args);
+          const consolidated = consolidate(db, args);
+          result = consolidated;
           // Best effort: with a local embedder the new memory is embedded right away; the
-          // nightly backfill picks it up otherwise.
+          // nightly backfill picks it up otherwise. Bounded so the client never waits for a
+          // full reindex, and the new id is prioritised because a backlog longer than that
+          // cap would otherwise leave it unembedded pass after pass.
           try {
-            await embedPendingMemories(db);
+            await embedPendingMemories(db, {
+              maxRows: AUTO_BACKFILL_MAX_ROWS,
+              priorityIds: [consolidated.memory_id],
+            });
           } catch {
             /* semantics are optional and never break the write path */
           }
