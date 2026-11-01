@@ -35,6 +35,12 @@
   pendiente retira su vector por disparador, igual que consolidarlo; y `docs/recall.md` describe la saliencia
   como lo que hace el código, un peso pequeño sobre las memorias y no un desempate sólo entre ellas. Tests en
   `engine/tests/embed-cli.test.ts`, `engine/tests/hybrid-layers.test.ts` y `engine/tests/engram-compat.test.ts`.
+- Cierra los hallazgos de la séptima revisión: renombrar un rasgo o cambiar el cuerpo de un episodio
+  borra su vector por disparador cuando el texto cambia de verdad, no sólo al borrar o consolidar el item;
+  `docs/recall.md` ya no afirma que el rescate sólo entre cuando no hay nada que puntuar, porque sigue
+  entrando mientras las memorias no tengan vectores comparables; y hay tests que comprueban que la
+  escritura descarta un vector no finito del embedder y que `recall` por MCP puntúa con el embedder
+  inyectado. Tests en `engine/tests/hybrid-layers.test.ts` y `engine/tests/server-core.test.ts`.
 
 ### Un eval dorado público en castellano, con suelo en CI
 

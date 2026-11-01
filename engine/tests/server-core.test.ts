@@ -23,9 +23,9 @@ afterAll(() => {
 let db: DB;
 let client: Client;
 
-async function connect(embedFn?: EmbedFn): Promise<Client> {
+async function connect(embedFn?: EmbedFn, embeddingModel?: string): Promise<Client> {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  const server = createServer(db, { embedFn });
+  const server = createServer(db, { embedFn, embeddingModel });
   const connected = new Client({ name: "test", version: "0" });
   await Promise.all([server.connect(serverTransport), connected.connect(clientTransport)]);
   return connected;
@@ -186,10 +186,10 @@ describe("MCP tool dispatch: write-time layer embedding", () => {
 
   // MISMEM_EMBEDDINGS is off here, so a write only stores a vector because the injected
   // embedder reached it: an alias or a tool that skipped the embedding call leaves no row.
-  async function useEmbedder(): Promise<string[]> {
+  async function useEmbedder(model?: string): Promise<string[]> {
     const seen: string[] = [];
     await client.close();
-    client = await connect(fakeEmbedder(seen));
+    client = await connect(fakeEmbedder(seen), model);
     return seen;
   }
 
@@ -213,5 +213,24 @@ describe("MCP tool dispatch: write-time layer embedding", () => {
     expect(db.prepare("SELECT layer, item_id FROM layer_embeddings").all()).toEqual([
       { layer: "trait", item_id: r.trait_id },
     ]);
+  });
+
+  it("recall puntúa con el embedder inyectado, no sólo con el de la configuración", async () => {
+    // MISMEM_EMBEDDINGS is off, so a recall that ignored the injection would have no query
+    // vector and could not return a hit that shares no word with the episode.
+    const seen = await useEmbedder("fake");
+    const ep = await ok<{ id: string }>("capture", {
+      scope: "p/a",
+      body: "el proxy rota las credenciales por la noche",
+    });
+    seen.length = 0;
+
+    const r = await ok<{ hits: Array<{ id: string; layer: string; via?: string }> }>("recall", {
+      query: "cómo cambio la contraseña del servidor",
+    });
+
+    expect(seen).toContain("cómo cambio la contraseña del servidor");
+    expect(r.hits).toHaveLength(1);
+    expect(r.hits[0]).toMatchObject({ id: ep.id, layer: "episode", via: "semantic" });
   });
 });
