@@ -80,6 +80,17 @@ done
 
 say() { printf '%s\n' "$*"; }
 step() { printf '\n== %s\n' "$*"; }
+# pnpm escribe sus errores en stdout, así que mandar stdout a /dev/null descartaba justamente la
+# línea que explica por qué abortó: el guion moría sin decir nada. La salida se guarda y sólo se
+# imprime si el comando falla.
+run_quiet() {
+  local out
+  if ! out="$("$@" 2>&1)"; then
+    say "$out"
+    say "Falló: $*"
+    exit 1
+  fi
+}
 warn() { printf '  ! %s\n' "$*" >&2; }
 
 # ask PREGUNTA DEFECTO: con --yes, el defecto.
@@ -143,8 +154,8 @@ if [ "$FROM_SOURCE" = 1 ]; then
     say "Desde el repo hace falta pnpm: instálalo (npm install -g pnpm) o usa --from-npm."
     exit 1
   }
-  pnpm install --frozen-lockfile >/dev/null
-  pnpm build >/dev/null
+  run_quiet pnpm install --frozen-lockfile
+  run_quiet pnpm build
   cd - >/dev/null
   DIST="$REPO/engine/dist"
   say "  desde el repo: $REPO"

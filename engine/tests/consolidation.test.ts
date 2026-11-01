@@ -110,6 +110,31 @@ describe("runConsolidation", () => {
     expect(sourceless.n).toBe(0);
   });
 
+  it("el log de una memoria descartada no lleva su contenido", async () => {
+    const shared = captureOld("s", "decidimos migrar el hosting a Hetzner por costo", 48);
+    captureOld("s", "el presupuesto de infra baja un 40%", 48);
+    captureOld("s", "hay que avisar al equipo del cambio", 48);
+    const secreta = "Lo mismo visto de otra forma";
+    const distillFn = vi.fn(async () => [
+      { gist: "Hosting en Hetzner", evidence_episode_ids: [shared] },
+      { gist: secreta, evidence_episode_ids: [shared] },
+    ]);
+    const lines: string[] = [];
+
+    await runConsolidation(db, {
+      paretoPrefilter: false,
+      llm: llmCfg,
+      distillFn,
+      log: (line: string) => lines.push(line),
+    });
+
+    // The log reaches console.log from the CLI and job.log from the viewer, so a gist in it is
+    // user data in a log: AGENTS.md forbids it outright.
+    const skip = lines.find((l) => l.includes("skip memoria"));
+    expect(skip).toBeDefined();
+    expect(lines.join("\n")).not.toContain(secreta);
+  });
+
   it("un ámbito chico que lleva tiempo quieto se consolida igual: si no, queda pendiente para siempre", async () => {
     const lone = captureOld("charla-vieja", "decidimos migrar el hosting a Hetzner por costo", 24 * 20);
     captureOld("activo", "idea suelta de esta semana", 48);
