@@ -168,8 +168,8 @@ sin autenticación: así sólo en localhost.
 
 Dos funciones opcionales mandan texto fuera del proceso, y sólo si se configuran:
 
-- **Búsqueda por significado**: el servidor de embeddings recibe el texto de cada memoria y de cada
-  consulta. Conviene correrlo en la propia máquina o en la red interna.
+- **Búsqueda por significado**: el servidor de embeddings recibe el texto de cada memoria, de cada rasgo,
+  de cada episodio pendiente y de cada consulta. Conviene correrlo en la propia máquina o en la red interna.
 - **Consolidación con LLM**: los episodios viajan textuales al proveedor configurado (DeepSeek,
   OpenRouter, OpenAI o cualquier servidor compatible). Sin su clave no corre, y apuntándola a un servidor
   de la propia red no sale nada.

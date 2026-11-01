@@ -176,19 +176,13 @@ describe("capas semánticas en el recall", () => {
       name: "prefiere avisar antes",
       evidence_memory_ids: [memory],
     }).trait_id;
-    // The lexical trait is newer on purpose: on an RRF tie the newer row wins, so only a
-    // cap that runs before the fusion can keep it from displacing the closest one.
+    // Only this one matches the query's word, so the lexical list puts it ahead of the
+    // trait that is closer by meaning.
     const lexical = crystallize(db, {
       scope: "dev",
       name: "despliegue por la noche",
       evidence_memory_ids: [memory],
     }).trait_id;
-    db.prepare("UPDATE traits SET created_at = ? WHERE id IN (?, ?)").run(
-      1,
-      lexical,
-      closest,
-    );
-    db.prepare("UPDATE traits SET created_at = ? WHERE id = ?").run(2, lexical);
 
     const query = "despliegue";
     const embed = tableEmbed({
@@ -206,10 +200,62 @@ describe("capas semánticas en el recall", () => {
       { reinforce: false, embeddingModel: "fake" },
     );
 
-    // FTS put the lexical trait first in the fused list; the cap must still pick the
-    // closest trait by cosine, even though the query never names it.
+    // The quota keeps the trait closest by cosine even though the query only names the
+    // other one; the trim after the fusion is what removes it from the result. The trim
+    // before the fusion is observed in the next test.
     expect(hits.filter((hit) => hit.layer === "trait").map((hit) => hit.id)).toEqual([closest]);
     expect(hits.map((hit) => hit.id)).not.toContain(lexical);
+  });
+
+  it("el recorte previo a la fusión mantiene al recuerdo por delante del episodio léxico", async () => {
+    const source = capture(db, { scope: "dev", body: "origen de la memoria" });
+    const memory = consolidate(db, {
+      scope: "dev",
+      gist: "memoria de apoyo",
+      source_episode_ids: [source.id],
+    }).memory_id;
+    crystallize(db, {
+      scope: "dev",
+      name: "prefiere avisar antes",
+      evidence_memory_ids: [memory],
+    });
+    // Below the allowed trait in cosine, so the quota drops both and only the trim after the
+    // fusion would hide them. They still hold a place in the semantic ranking, and that
+    // place is what the trim before the fusion takes away.
+    crystallize(db, { scope: "dev", name: "rasgo segundo", evidence_memory_ids: [memory] });
+    crystallize(db, { scope: "dev", name: "rasgo tercero", evidence_memory_ids: [memory] });
+
+    const newer = capture(db, { scope: "dev", body: "despliegue del proxy" }).id;
+    const older = capture(db, { scope: "dev", body: "despliegue nocturno" }).id;
+    // Pending episodes are ranked by creation date, so the lexical order is fixed and the
+    // older one is the second lexical candidate.
+    db.prepare("UPDATE episodes SET created_at = ? WHERE id = ?").run(2, newer);
+    db.prepare("UPDATE episodes SET created_at = ? WHERE id = ?").run(1, older);
+
+    const query = "despliegue";
+    const embed = tableEmbed({
+      [query]: axis(1),
+      "memoria de apoyo": axis(0.88),
+      "prefiere avisar antes": axis(0.98),
+      "rasgo segundo": axis(0.96),
+      "rasgo tercero": axis(0.94),
+    });
+    await embedPendingMemories(db, { embedFn: embed, model: "fake" });
+
+    const { hits } = await recallHybrid(
+      db,
+      { query, limit: 5 },
+      embed,
+      { reinforce: false, embeddingModel: "fake" },
+    );
+
+    const order = hits.map((hit) => hit.id);
+    expect(order).toContain(memory);
+    expect(order).toContain(older);
+    // Trimmed before the fusion, the memory sits on the episode's RRF slot and its salience
+    // breaks the tie in its favour. Without the trim the two dropped traits keep the slots
+    // above it, the memory falls to the fourth place and the older episode passes it.
+    expect(order.indexOf(memory)).toBeLessThan(order.indexOf(older));
   });
 
   it("deja dos episodios, los de mayor coseno, en el resultado", async () => {
