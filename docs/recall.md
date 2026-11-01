@@ -9,7 +9,8 @@ y episodios no la llevan. Las constantes están en
 
 ## Por palabras (siempre)
 
-FTS5 exige que estén **todas** las palabras de la consulta, sin contar las vacías ("qué", "sobre", "the"...).
+FTS5 exige que estén **todas** las palabras de la consulta, sin contar las vacías ("qué", "sobre", "the"...);
+si todas son vacías, conserva las largas para no quedarse sin consulta.
 
 ### El rescate
 
@@ -19,7 +20,7 @@ recuerdo puede contener, y el rescate ignora además verbos y adverbios coloquia
 "todo"). Antes de puntuar descarta las palabras que no aparecen en ningún candidato: en una pregunta larga
 suelen ser contexto ("ayer", "oye") y antes contaban para exigir el 30 % de la frase entera. Conserva los
 candidatos que comparten al menos dos términos, uno de ellos informativo (los que aparecen en el 5 % de memorias
-más raras, con un mínimo de tres, o en todas); con una sola palabra de consulta basta una. Si las palabras
+más raras, con un mínimo de tres, o en todas); cuando tras quitar ese relleno queda una sola palabra de contenido, basta una. Si las palabras
 presentes no llegan al 30 % de las palabras de contenido de la consulta entera, antes del tope de doce términos
 del rescate, no hay rescate: la pregunta habla de otra cosa. Los candidatos se ordenan por la suma de IDF de los
 términos que comparten, y después por términos informativos y coincidencias. Devuelve hasta 3 por capa. El

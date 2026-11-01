@@ -27,7 +27,7 @@ const RELAXED_MIN_INFORMATIVE = 2;
 const RELAXED_MIN_PRESENT_RATIO = 0.3;
 // A record matched only by generic words proves nothing, so at least one rare word is
 // required. Two made no difference to off-topic questions once the added function words
-// were stopwords (8/48 with 9 hits either way), but cost two colloquial questions and nine
+// were stopwords (measured before the presence gate, which later brought them to 4/48), but cost two colloquial questions and nine
 // questions overall on the golden corpus, so one stays.
 const RELAXED_MIN_RARE_MATCHES = 1;
 // A term is rare when it appears in few memories; one that appears in many does not tell a
