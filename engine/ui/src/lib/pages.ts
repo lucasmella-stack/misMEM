@@ -26,8 +26,9 @@ export function pagesLostRows(pages: ReadonlyArray<ReadonlyArray<{ id: string }>
 
 /**
  * The offset of the next page, or nothing once the loaded rows reach the total. A short page
- * still continues while rows remain, because the total is the authority on what is left.
+ * still continues while rows remain, because the total is the authority on what is left; an
+ * empty one stops, or a delete between the count and the read would ask for the same page again.
  */
 export function nextPageOffset(lastOffset: number, loaded: number, total: number): number | undefined {
-  return lastOffset + loaded < total ? lastOffset + loaded : undefined;
+  return loaded > 0 && lastOffset + loaded < total ? lastOffset + loaded : undefined;
 }

@@ -1,7 +1,27 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SearchHeader } from "../ui/src/components/SearchHeader";
+import { SearchResults } from "../ui/src/components/list/SearchResults";
+
+describe("SearchResults", () => {
+  it("monta la región de estado también mientras busca, antes de que llegue el aviso", () => {
+    // A server render never runs the query, so the list stays in its pending state.
+    const html = renderToStaticMarkup(
+      createElement(
+        QueryClientProvider,
+        { client: new QueryClient() },
+        createElement(SearchResults, { term: "alpha", scope: undefined, selected: undefined, onSelect: () => {} }),
+      ),
+    );
+
+    expect(html).toContain("Buscando en la memoria");
+    // The loader is a status region too: what matters is the header's own region, present already.
+    expect(html).toContain("Resultados para");
+    expect(html.match(/role="status"/g)?.length).toBe(2);
+  });
+});
 
 describe("SearchHeader", () => {
   it("avisa del corte con cuántos resultados hay y qué hacer", () => {

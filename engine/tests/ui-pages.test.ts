@@ -64,6 +64,10 @@ describe("nextPageOffset", () => {
     expect(nextPageOffset(50, 1, 51)).toBeUndefined();
   });
 
+  it("una página vacía con un total viejo no vuelve a pedir el mismo offset", () => {
+    expect(nextPageOffset(50, 0, 51)).toBeUndefined();
+  });
+
   it("no pide otra página cuando la última ya trajo todo el total", () => {
     expect(nextPageOffset(0, 50, 50)).toBeUndefined();
   });
