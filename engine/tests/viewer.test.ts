@@ -232,6 +232,12 @@ describe("viewer: /api/search", () => {
       return JSON.parse(res.body);
     };
 
+    // Exactly the cap also reads as cut: the flag says the page filled, not that more exist
+    // (deciding that would mean recounting the fused recall on every search).
+    const full = await read("q=alpha&limit=3");
+    expect(full.hits).toHaveLength(3);
+    expect(full.truncated).toBe(true);
+
     const cut = await read("q=alpha&limit=2");
     expect(cut.hits).toHaveLength(2);
     expect(cut.limit).toBe(2);

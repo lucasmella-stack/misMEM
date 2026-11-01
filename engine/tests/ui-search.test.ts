@@ -23,6 +23,24 @@ describe("SearchResults", () => {
   });
 });
 
+describe("SearchResults con datos", () => {
+  it("pasa el corte de /api/search al aviso de la cabecera", () => {
+    const client = new QueryClient();
+    const hit = (id: string) => ({ layer: "memory", id, scope: "x", text: `alpha ${id}`, created_at: 0, salience: 1 });
+    client.setQueryData(["search", "", "alpha"], { hits: [hit("a"), hit("b")], limit: 2, truncated: true });
+
+    const html = renderToStaticMarkup(
+      createElement(
+        QueryClientProvider,
+        { client },
+        createElement(SearchResults, { term: "alpha", scope: undefined, selected: undefined, onSelect: () => {} }),
+      ),
+    );
+
+    expect(html).toContain("2 resultados, puede haber más");
+  });
+});
+
 describe("SearchHeader", () => {
   it("avisa del corte con cuántos resultados hay y qué hacer", () => {
     const html = renderToStaticMarkup(
