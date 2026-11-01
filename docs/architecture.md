@@ -118,19 +118,32 @@ arriba y dicen de dónde salió cada cosa. Las dos laterales unen memoria ↔ me
 | `related` | lo que cada memoria **dice** (coseno de sus vectores) | `?related=1` |
 | `co_use` | lo que un turno **hizo** (se usaron juntas) | `?co_use=1` |
 
+`/api/graph` acepta además `?scope=` (restringe a un ámbito) y `?episodes=1` (suma la capa de
+episodios pendientes), y toda respuesta trae `truncated` por capa: cada una tiene su tope y el grafo
+dice cuál recortó en vez de dibujar un subconjunto en silencio.
+
 El peso de `co_use` **no** es el conteo crudo, es NPMI: un recuerdo que se usa en todos los turnos
 co-ocurre con todo, así que por conteo sería el centro del grafo sin orientar a ninguno —el mismo error
-de la saliencia midiendo recencia—. En NPMI, `0` es "indistinguible del azar" y `1` es "nunca aparecen
-separados". El denominador es el total de turnos de uso medido, que vive en la tabla `meta`. Al abrir una base que
+de la saliencia midiendo recencia—. En NPMI, `1` es "nunca aparecen separados" y un valor negativo, "se evitan". El `0` está
+sobrecargado: es tanto "indistinguible del azar" como "no sé" —sin contador de turnos, o con un extremo
+sin uso registrado—, y por eso el dibujo no le da tinta. El denominador es el total de turnos de uso medido, que vive en la tabla `meta`. Al abrir una base que
 ya medía co-uso sin ese contador, se siembra con el uso más alto registrado: una cota inferior de los
 turnos que hubo, porque cada uso ocupó un turno. Sin esa cota, el cociente se acota a 1 y los pares
 heredados se leerían como asociación máxima.
 
-Con pocos datos la fuerza es ruido por construcción: dos recuerdos usados una sola vez, esa vez juntos,
-dan 1. Por eso cada arista viaja con su soporte (`n`), `?co_use_min_n=k` lo filtra y la respuesta incluye
-`connectome: { turns, pairs, shown, min_n, hubs }` para que quien dibuja pueda decir *"esto todavía no
-significa nada"* en vez de pintar ruido. `hubs` va ordenado por asociación acumulada y no por grado:
-el grado es popularidad.
+**La degeneración no es de pocos datos, es del estimador**: dos recuerdos usados una sola vez, esa vez
+juntos, dan 1 exacto con 20 turnos y con 10.000, porque NPMI sólo mira proporciones. Lo que separa la
+evidencia de la coincidencia es el **soporte** (`n`), que viaja con cada arista; acumular turnos no lo
+mueve. Por eso `?co_use_min_n=k` filtra por soporte, la respuesta incluye
+`connectome: { turns, pairs, shown, min_n, max_n, hubs }` —con `max_n` para que la interfaz pueda decir
+*"ningún par se repitió todavía"*— y tanto el trazo como el halo ponderan la fuerza por
+`supportConfidence(n)`, de modo que un par visto una vez cae al suelo del trazo. `hubs` va ordenado por
+asociación acumulada **ponderada por soporte** y no por grado: sin esa ponderación, un nodo con tres
+coincidencias le gana a un par que de verdad se repitió, que es el grado con otro nombre.
+
+`pairs` cuenta los pares de toda la base y `shown` los que el grafo dibuja: el tope por capa puede dejar
+fuera memorias con uso medido, y confundir los dos hacía que el panel aconsejara bajar el soporte cuando
+lo que faltaba era que esos nodos entraran en la ventana.
 
 ## Stack
 

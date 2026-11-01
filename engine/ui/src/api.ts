@@ -78,7 +78,7 @@ export interface GraphNode {
   salience?: number;
   strength?: number;
   /** Only with the connectome on: accumulated association and neighbours above the floor. */
-  co_use?: { degree: number; strength: number };
+  co_use?: { degree: number; strength: number; support: number };
 }
 
 export interface GraphLink {
@@ -99,7 +99,9 @@ export interface ConnectomeSummary {
   pairs: number;
   shown: number;
   min_n: number;
-  hubs: Array<{ id: string; degree: number; strength: number }>;
+  /** Best support among the edges drawn: with every pair at 1, no figure above means anything. */
+  max_n: number;
+  hubs: Array<{ id: string; degree: number; strength: number; support: number }>;
 }
 
 export interface GraphData {
@@ -215,6 +217,7 @@ export const actions = {
 };
 
 export const api = {
+  session: (signal?: AbortSignal) => get<{ active: boolean }>("session", {}, signal),
   scopes: (signal?: AbortSignal) => get<{ scopes: ScopeCount[] }>("scopes", {}, signal),
   consolidation: (signal?: AbortSignal) => get<ConsolidationState>("consolidate", {}, signal),
   memories: (scope: string | undefined, offset: number, signal?: AbortSignal) =>
@@ -235,6 +238,7 @@ export const api = {
   graph: (
     scope: string | undefined,
     episodes: boolean,
+    related: boolean,
     coUse: { enabled: boolean; minN: number },
     signal?: AbortSignal,
   ) =>
@@ -242,7 +246,9 @@ export const api = {
       "graph",
       {
         scope,
-        related: "1",
+        // Conditioned like every other layer: similarity is O(n²) cosines over the drawn
+        // memories, and asking for it to throw it away on the client was the whole cost.
+        related: related ? "1" : undefined,
         episodes: episodes ? "1" : undefined,
         co_use: coUse.enabled ? "1" : undefined,
         co_use_min_n: coUse.enabled ? String(coUse.minN) : undefined,

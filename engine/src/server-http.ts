@@ -8,9 +8,11 @@ import { openDefaultDb } from "./store/db.js";
 import { parseHostList } from "./http/host.js";
 import { loadMaxBodyBytes } from "./http/body.js";
 import { bindHost, httpPort, loadAuth } from "./http/guard.js";
+import { LoginAttempts } from "./http/login.js";
+import { LOGIN_CSS } from "./http/login-css.js";
 import { createRequestHandler } from "./http/routes.js";
 import { createServer } from "./server-core.js";
-import { serveUi } from "./viewer-static.js";
+import { loginAssets, serveUi } from "./viewer-static.js";
 import { ForgetConfirmations, loadAllowDelete } from "./http/viewer/actions.js";
 import { ConsolidationJob } from "./consolidation/job.js";
 
@@ -34,6 +36,9 @@ const ALLOW_DELETE = loadAllowDelete();
 const forgetConfirmations = new ForgetConfirmations();
 
 const handler = createRequestHandler({
+  attempts: new LoginAttempts(),
+  loginCss: LOGIN_CSS,
+  loginAssets: loginAssets(),
   db,
   auth: AUTH,
   allowedHosts: ALLOWED_HOSTS,
@@ -74,3 +79,4 @@ const shutdown = (): void => {
 
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
+

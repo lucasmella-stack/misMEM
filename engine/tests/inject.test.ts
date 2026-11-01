@@ -66,6 +66,13 @@ describe("selectForInjection", () => {
     expect(chosen.map((h) => h.id)).toEqual(["nuevo"]);
   });
 
+  it("por defecto pone cinco, porque los pares crecen al cuadrado con lo que hay delante", () => {
+    // Three memories give at most three pairs and five give ten, and `co_use` only learns from
+    // pairs. The character budget still caps what actually travels.
+    const hits = Array.from({ length: 8 }, (_, i) => hit({ id: `m${i}`, text: "x" }));
+    expect(selectForInjection(hits)).toHaveLength(5);
+  });
+
   it("respeta el tope de cantidad", () => {
     const hits = [hit({ id: "a" }), hit({ id: "b" }), hit({ id: "c" }), hit({ id: "d" })];
     expect(selectForInjection(hits, { maxMemories: 2 })).toHaveLength(2);

@@ -2,6 +2,7 @@
 // The weight is NPMI, not a raw count: see `docs/architecture.md#el-índice-hebbiano`.
 // `origin` and `evidence` stay vertical: episode -> memory -> trait.
 import type { Database as DB } from "better-sqlite3";
+import { integerFloor, supportConfidence } from "../domain/support.js";
 
 const TURNS_KEY = "connectome.turns";
 
@@ -21,6 +22,11 @@ export interface Hub {
   id: string;
   /** Sum of the positive associations. This is what orders hubs, not degree. */
   strength: number;
+  /**
+   * Turns behind its best edge. NPMI scores 1 both for "always together" and for "once, and
+   * that was the only turn either appeared in", so the sum above does not read without this.
+   */
+  support: number;
 }
 
 export interface EdgeQuery {
@@ -108,7 +114,7 @@ interface RawEdge {
 }
 
 function rawEdges(db: DB, query: EdgeQuery): RawEdge[] {
-  const minN = Math.max(1, query.minN ?? 1);
+  const minN = integerFloor(query.minN);
   const scoped = query.ids !== undefined;
   return db
     .prepare(
@@ -127,6 +133,16 @@ function rawEdges(db: DB, query: EdgeQuery): RawEdge[] {
       minN,
       scoped: scoped ? 1 : 0,
     }) as RawEdge[];
+}
+
+/**
+ * How many pairs the whole base has measured above the floor. A count, not a list: the caller
+ * only shows it next to how many are drawn, and materialising every edge to read its length
+ * made the figure grow with the base instead of with the answer.
+ */
+export function coUsePairs(db: DB, minN = 1): number {
+  const floor = integerFloor(minN);
+  return (db.prepare("SELECT COUNT(*) AS n FROM co_use WHERE n >= ?").get(floor) as { n: number }).n;
 }
 
 /** Lateral edges, most associated first. */
@@ -149,16 +165,19 @@ export function coUseEdges(db: DB, query: EdgeQuery = {}): CoUseEdge[] {
  */
 export function hubs(db: DB, query: EdgeQuery = {}): Hub[] {
   const acc = new Map<string, Hub>();
-  const bump = (id: string, strength: number): void => {
-    const current = acc.get(id) ?? { degree: 0, id, strength: 0 };
+  const bump = (id: string, strength: number, n: number): void => {
+    const current = acc.get(id) ?? { degree: 0, id, strength: 0, support: 0 };
     current.degree += 1;
-    if (strength > 0) current.strength += strength;
+    // Weighted by support: unweighted, a node with three pairs seen once each outranks a pair
+    // that actually repeated, which is popularity wearing the name of association.
+    if (strength > 0) current.strength += strength * supportConfidence(n);
+    current.support = Math.max(current.support, n);
     acc.set(id, current);
   };
 
   for (const edge of coUseEdges(db, query)) {
-    bump(edge.memory_a, edge.strength);
-    bump(edge.memory_b, edge.strength);
+    bump(edge.memory_a, edge.strength, edge.n);
+    bump(edge.memory_b, edge.strength, edge.n);
   }
 
   return [...acc.values()].sort((x, y) => y.strength - x.strength || y.degree - x.degree);
