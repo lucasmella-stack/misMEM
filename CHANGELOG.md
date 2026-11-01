@@ -2,6 +2,20 @@
 
 ## Sin publicar
 
+### El instalador ya no se queda sin búsqueda semántica porque el 8080 esté ocupado
+
+- El puerto de `llama-server` estaba fijo en 8080, donde viven igual de a menudo un panel de Traefik, un
+  Jenkins o un Tomcat. Con el puerto tomado por algo que no sirve embeddings, el instalador bajaba 296 MB de
+  modelo, escribía `MISMEM_EMBEDDING_URL` apuntando ahí y dejaba la búsqueda sólo por palabras. Ahora se
+  mueve al primer puerto libre y lo dice; un servidor de embeddings que ya responda en el puerto se sigue
+  reutilizando, y el puerto que escribió una instalación anterior manda, así que re-ejecutarlo no mueve un
+  servidor que ya anda. `MISMEM_INSTALL_GEMMA_PORT` fija el puerto preferido.
+- **`install.sh` desde el repo exige pnpm** y lo dice en una línea: el repo sólo trae `pnpm-lock.yaml`, así
+  que la alternativa `npm ci` no podía funcionar nunca y fallaba con un volcado de npm de veinte líneas.
+- `engine/tests/installer.test.ts` corre el instalador de verdad contra un `HOME` temporal, con
+  `llama-server` y `systemctl` simulados: es lo único que prueba sus decisiones, porque hasta ahora de
+  `scripts/` sólo se comprobaban la sintaxis y shellcheck.
+
 ### El conectoma deja de ser un panel aparte que tapaba los ajustes (#209)
 
 - **Los dos paneles del grafo se tapaban por debajo de 34rem.** A 375 px el del conectoma cubría
@@ -222,6 +236,7 @@
   conserva su copia y `tests/support.test.ts` falla si las dos dejan de coincidir.
 - De paso, `queries/graph.ts` deja de reimplementar el acumulador de `store/connectome.ts`: el halo
   del lienzo y la lista del panel responden ya a una sola definición de hub.
+
 ### El logo oficial encabeza el README
 
 - `docs/assets/logo.webp` y `logo-dark.webp`, el mismo logo con el fondo blanco quitado y la tinta en
