@@ -2,6 +2,20 @@
 
 ## Sin publicar
 
+### Tres tests que el visor no tenía, y uno que no probaba lo que decía
+
+- **El filtro por ámbito de los temas no lo ejercitaba nadie.** `queries/topics.ts` enciende una rama
+  del `WHERE` cuando se le pasa `scope`, y ninguno de sus ocho tests se lo pasaba: borrarla dejaba la
+  suite entera verde y la pestaña Temas ignorando el ámbito por el que navega el resto del visor.
+- **`respeta el orden en que el motor rankeó los hubs`**: el test que decía «ordena la entrada por
+  asociación» tenía un solo hub en su `summary`, así que con un orden invertido seguía pasando. Pasa a
+  llamarse por lo que comprueba y el orden se prueba aparte, con dos.
+- **El conjunto de claves de `/api/embeddings`** queda fijado: que la URL del proveedor no salga ya
+  estaba probado, pero un campo nuevo en el estado entraba a la respuesta sin que nadie lo decidiera.
+- Los temporizadores falsos se restauran en un `afterEach` y no dentro del cuerpo del test: si ese test
+  fallaba antes de llegar a su última línea, se filtraban al siguiente y lo colgaban por una razón
+  ajena.
+
 ### El instalador dice por qué falló, y sus tests dejan de llenar /tmp
 
 - `scripts/install.sh` corría `pnpm install --frozen-lockfile >/dev/null` y `pnpm build >/dev/null`.
