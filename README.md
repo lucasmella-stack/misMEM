@@ -21,8 +21,8 @@
 
 ## Qué es y por qué
 
-Cada instancia de un LLM nace sin memoria, y cada cliente (Copilot, Claude Desktop, Claude Code,
-ChatGPT) guarda lo suyo en silos incompatibles: hay que repetir el contexto y la continuidad muere entre
+Cada instancia de un LLM nace sin memoria, y cada herramienta (Claude Code, Codex, Cursor, VS Code,
+opencode...) guarda lo suyo en silos incompatibles: hay que repetir el contexto y la continuidad muere entre
 sesiones. misMEM lo resuelve con **una base SQLite (`~/.mismem/mem.db`) y un protocolo MCP de seis
 invocaciones**, accesible desde cualquier cliente que hable MCP. *La cooperatividad hace a la persistencia
 de la información.*
@@ -32,7 +32,7 @@ destilado persiste, lo cristalizado permanece.
 
 ```mermaid
 flowchart LR
-    C["Clientes MCP<br/>Claude Code, opencode, Cursor,<br/>VS Code, Claude Desktop"]
+    C["Cualquier cliente MCP<br/>Claude Code, Codex, Cursor,<br/>VS Code, opencode..."]
 
     subgraph E["engine (Node 22)"]
         S["server.ts<br/>MCP por stdio"]
@@ -44,8 +44,8 @@ flowchart LR
     end
 
     N["Consolidación nocturna<br/>mismem-consolidate"]
-    L["LLM<br/>DeepSeek, OpenRouter, OpenAI o compatible"]
-    V["Servidor de embeddings<br/>Ollama o llama-server"]
+    L["LLM<br/>cualquiera con API compatible con OpenAI"]
+    V["Servidor de embeddings<br/>cualquier modelo, por /v1/embeddings"]
 
     C -->|stdio| S
     C -->|HTTP| H
@@ -67,9 +67,11 @@ git clone https://github.com/lucasmella-stack/misMEM.git && bash misMEM/scripts/
 
 Instala misMEM desde el repo clonado, pregunta dónde guardar la memoria y con qué proveedor consolidar
 (DeepSeek, OpenRouter, OpenAI, un servidor compatible o ninguno), guarda la clave en
-`~/.config/mismem/env` con permisos 600 y configura los clientes que encuentra: Claude Code (MCP y hooks de
-inyección y refuerzo), opencode, Claude Desktop, VS Code y Cursor. Para la búsqueda por significado ofrece EmbeddingGemma 2 si hay
-`llama-server`, o `nomic-embed-text` si hay Ollama ([qué modelo elegir](docs/recall.md#por-significado-opcional)), y si se quiere deja la consolidación nocturna como timer de systemd. Los clientes llaman a
+`~/.config/mismem/env` con permisos 600 y configura los clientes MCP que encuentra en la máquina (en Claude
+Code, también los hooks de inyección y refuerzo; `--help` da la lista). Para la búsqueda por significado
+deja montado un servidor de embeddings local si hay `llama-server`; el modelo se cambia con dos variables
+([cómo](docs/recall.md#por-significado-opcional)). Si se quiere, deja la consolidación nocturna como timer de
+systemd. Los clientes llaman a
 `~/.local/bin/mismem-run`, así que ninguna clave queda en su configuración. Volver a ejecutarlo actualiza
 sin duplicar, y no pisa a ciegas una configuración de misMEM hecha a mano: los hooks de Claude Code que
 ya estén configurados de otra forma y un MCP `mismem` de opencode con otro comando se respetan, y este
@@ -92,7 +94,7 @@ en `/mcp`. Para exponerlo con Traefik y TLS, o para construirla en el servidor, 
 
 ### npm: sin clonar nada
 
-En el `mcp.json` del cliente (VS Code, Claude Code, Claude Desktop):
+En la configuración MCP del cliente (el nombre del fichero y de la clave cambian de uno a otro):
 
 ```json
 {

@@ -2,6 +2,14 @@
 
 ## Sin publicar
 
+### El README describe el sistema, no modelos ni clientes concretos
+
+- La búsqueda por significado funciona con cualquier modelo detrás de un servidor de embeddings, y la
+  consolidación con cualquier LLM de API compatible con OpenAI: el README deja de presentar modelos concretos
+  como si fueran parte del sistema.
+- misMEM sirve a cualquier cliente MCP: los ejemplos pasan a ser las herramientas de código (Claude Code,
+  Codex, Cursor, VS Code, opencode), y la lista exacta de lo que configura el instalador queda en su `--help`.
+
 ### La pantalla de entrada perdía su logo al instalar desde npm
 
 - El logo se leía de `"dist/ui"`, una ruta **relativa al directorio de trabajo**. Dentro del repo
