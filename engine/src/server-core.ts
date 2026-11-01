@@ -167,7 +167,8 @@ export function createServer(
           break;
         }
         case "recall":
-          result = await recallHybrid(db, args);
+          // Same embedder as the writes, so what capture stored is what recall compares against.
+          result = await recallHybrid(db, args, options.embedFn, { embeddingModel: options.embeddingModel });
           break;
         case "consolidate": {
           result = consolidate(db, args);

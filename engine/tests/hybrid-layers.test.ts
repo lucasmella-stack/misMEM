@@ -292,6 +292,22 @@ describe("capas semánticas en el recall", () => {
     expect(hits.map((hit) => hit.id)).toContain(memory);
   });
 
+  it("en modo léxico, sin vectores, no hay tope de rasgos ni de episodios", async () => {
+    const source = capture(db, { scope: "dev", body: "origen de la memoria" });
+    const memory = consolidate(db, { scope: "dev", gist: "nota de cocina", source_episode_ids: [source.id] }).memory_id;
+    for (const name of ["despliegue nocturno", "despliegue con aviso"]) {
+      crystallize(db, { scope: "dev", name, evidence_memory_ids: [memory] });
+    }
+    for (const body of ["despliegue uno", "despliegue dos", "despliegue tres"]) capture(db, { scope: "dev", body });
+
+    const { hits } = await recallHybrid(db, { query: "despliegue", limit: 10 }, async () => null, {
+      reinforce: false,
+    });
+
+    expect(hits.filter((hit) => hit.layer === "trait")).toHaveLength(2);
+    expect(hits.filter((hit) => hit.layer === "episode")).toHaveLength(3);
+  });
+
   it("sin vector en la capa, el tope se queda con los primeros candidatos léxicos", async () => {
     // Memories are indexed, so the semantic layer is on, but the trait and the episodes were
     // never embedded. The quota then has no cosine order to keep and falls back to the
