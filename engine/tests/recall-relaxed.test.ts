@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import type { Database as DB } from "better-sqlite3";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import type { Database as DB, Statement } from "better-sqlite3";
 import { openDb } from "../src/store/db.js";
 import { capture } from "../src/memory/capture.js";
 import { consolidate } from "../src/memory/consolidate.js";
 import { crystallize } from "../src/memory/crystallize.js";
 import { recall, recallHybrid } from "../src/recall/recall.js";
+import { RELAXED_PRESENCE_MAX_TERMS } from "../src/recall/rescue.js";
 import { embedPendingMemories, saveMemoryEmbedding } from "../src/embeddings/store.js";
 import type { EmbedFn } from "../src/embeddings/provider.js";
 
@@ -156,6 +157,48 @@ describe("recall léxico: frases normales", () => {
     expect(memoryIds(words.join(" "))).toEqual([id]);
   });
 
+  it("una pregunta de quinientas palabras no gasta un recuento de presencia por palabra", () => {
+    // The inject hook passes the whole prompt and nothing caps RecallInput.query: one
+    // prepared FTS count per content word made the gate's cost grow with the prompt. It now
+    // reads at most RELAXED_PRESENCE_MAX_TERMS words and prepares its count once.
+    const words = [
+      "servidor", "teclado", "pantalla", "impresora", "contrato", "factura",
+      "recibo", "cliente", "proyecto", "modulo", "funcion", "prueba", "error",
+      "registro", "alerta", "informe", "reunion", "correo", "fichero", "carpeta",
+      "variable", "endpoint", "comando", "usuario", "sesion", "token", "script",
+      "columna", "tabla", "consulta", "repositorio", "commit", "despliegue",
+      "contenedor", "orquestador", "balanceador", "certificado", "dominio",
+      "proveedor", "pasarela", "auditoria", "presupuesto",
+    ];
+    const id = memory(
+      "dev",
+      words.map((word) => (/[aeiou]$/.test(word) ? `${word}s` : `${word}es`)).join(" "),
+    );
+    // Under the bound the answer does not change: the plurals force the rescue.
+    expect(memoryIds(words.join(" "))).toEqual([id]);
+
+    const filler = Array.from({ length: 460 }, (_, i) => `z${i.toString(36)}`);
+    // What costs is each execution of the count, so the spy watches them: with the bound
+    // removed this reaches five hundred and the test fails on the number, not only on the
+    // answer.
+    const statement = Object.getPrototypeOf(db.prepare("SELECT 1")) as Statement;
+    const get = vi.spyOn(statement, "get");
+    let hits: string[] = [];
+    let counts = 0;
+    try {
+      hits = memoryIds([...words, ...filler].join(" "));
+      counts = (get.mock.contexts as Statement[]).filter(
+        (context) =>
+          context.source.includes("count(*) AS n") &&
+          context.source.includes("memories_fts MATCH"),
+      ).length;
+    } finally {
+      get.mockRestore();
+    }
+    expect(hits).toEqual([id]);
+    expect(counts).toBeLessThanOrEqual(RELAXED_PRESENCE_MAX_TERMS);
+  });
+
   it("al relajar, dos términos raros adelantan a tres comunes", () => {
     // The ordering case above is nested: one candidate contains every word of the other,
     // so dropping the IDF key still leaves the longer match first. Here the matched sets
@@ -220,6 +263,27 @@ describe("recall léxico: frases normales", () => {
     const two = memory("dev", "despliegue de kubernetes con traefik en el ingress");
 
     expect(memoryIds("sistema equipo kubernetes traefik")).toEqual([two]);
+  });
+
+  it("una palabra rara junto a una común basta para rescatar", () => {
+    // This record shares one common word ("sistema") and one rare one ("kubernetes"). With
+    // RELAXED_MIN_RARE_MATCHES at 2 it stops being rescued, so this test pins the calibrated
+    // value of one: the previous case passes with either value.
+    for (const gist of [
+      "sistema de archivos del servidor",
+      "sistema de energía del portátil",
+      "sistema de notificaciones del móvil",
+      "receta de masa madre",
+      "el clima de A Coruña",
+      "equipo de fútbol del barrio",
+      "equipo de diseño de la oficina",
+      "equipo de música del salón",
+    ]) {
+      memory("pc", gist);
+    }
+    // The plural keeps the strict AND from matching, so only the rescue can find it.
+    const id = memory("dev", "sistemas de kubernetes en producción");
+    expect(memoryIds("sistema kubernetes")).toEqual([id]);
   });
 
   it("el rescate devuelve como mucho tres recuerdos", () => {

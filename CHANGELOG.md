@@ -5,13 +5,16 @@
 - Sin servidor de embeddings, el recall léxico pasa de 222/432 a 254/432 en el eval dorado (MRR de 0,49 a 0,54),
   con las preguntas largas de 5/36 a 17/36 y las coloquiales de 24/36 a 26/36; ningún tipo baja y las ajenas
   se quedan en 4/48 (5 recuerdos frente a 6). El rescate ya no exige el 30 % de todas las palabras: descarta las
-  que no aparecen en ningún candidato, ordena por IDF y pide dos coincidencias con al menos una informativa, así
-  que una pregunta llena de contexto ("oye", "ayer") puede rescatar su memoria. Ignora además un relleno
+  que no aparecen en ninguna memoria de la base ni en ningún candidato, ordena por IDF y pide dos coincidencias
+  con al menos una informativa, así que una pregunta llena de contexto ("oye", "ayer") puede rescatar su memoria.
+  Ignora además un relleno
   coloquial propio ("podemos", "antes", "cada", "todo"...), en una lista aparte de la compartida: esa sigue
   mandando en la consulta estricta y en la medida de sustancia del prefiltro Pareto, que con las palabras nuevas
   descartaba hechos cortos como ruido. La puerta del 30 % se mide sobre la consulta entera y no sobre las
-  palabras que caben en el tope de doce, y el suelo de dos coincidencias ya no finge crecer con la pregunta. El
-  suelo de `engine/eval/golden/floor.json` sube por tipo (rasgo, de 9/24 a 10/24).
+  palabras que caben en el tope de doce, y el suelo de dos coincidencias ya no finge crecer con la pregunta. La
+  puerta lee como mucho las primeras 64 palabras de contenido y prepara su recuento una vez, así que un prompt
+  entero no dispara un recuento por palabra. El suelo de `engine/eval/golden/floor.json` sube por tipo (rasgo,
+  de 9/24 a 10/24).
   Tests nuevos en `engine/tests/recall-relaxed.test.ts` (pregunta larga, puerta del 30 % a ambos lados y tope de
   doce), `engine/tests/terms.test.ts` y `engine/tests/pareto.test.ts`; la línea base nueva está en
   `docs/recall.md`.
@@ -30,7 +33,7 @@
   desplazaban a la memoria concreta. En
   el eval dorado (tope 5) el modo semántico pasa de 368/432 a 411/432, con episodio de 0/24 a 23/24 y rasgo
   de 0/24 a 19/24; el acierto en primera posición sube de 329 a 355, el MRR de 0,796 a 0,871 y las preguntas
-  ajenas siguen en 11/48 con 32 recuerdos. Las preguntas que esperan una memoria aciertan en primera 328/384
+  ajenas siguen en 12/48 con 32 recuerdos. Las preguntas que esperan una memoria aciertan en primera 328/384
   frente a 329/384 de la línea base, y ningún tipo de pregunta pierde más de un acierto frente a ella.
 - Los vectores de rasgos y episodios pendientes viven en la tabla aditiva `layer_embeddings`, con borrado por
   disparador al consolidar o borrar el item. `mismem-embed`, `consolidate` y el backfill los reindexan igual

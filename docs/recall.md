@@ -17,14 +17,18 @@ si todas son vacías, conserva las largas para no quedarse sin consulta.
 Si esa consulta estricta no devuelve nada y no hay capa semántica, `recall` reintenta con una consulta OR
 sobre las mismas palabras menos un relleno más amplio: la estricta conserva las palabras de función que un
 recuerdo puede contener, y el rescate ignora además verbos y adverbios coloquiales ("podemos", "antes", "cada",
-"todo"). Antes de puntuar descarta las palabras que no aparecen en ningún candidato: en una pregunta larga
-suelen ser contexto ("ayer", "oye") y antes contaban para exigir el 30 % de la frase entera. Conserva los
+"todo"). Antes de puntuar descarta las palabras que no aparecen en ninguna memoria de la base ni en
+ningún candidato: en una pregunta larga suelen ser contexto ("ayer", "oye") y antes contaban para exigir el
+30 % de la frase entera. La presencia se mide sobre las memorias sin mirar el ámbito y con el prefijo del
+rescate, así que una palabra cuenta aunque el candidato luego no la puntúe. Conserva los
 candidatos que comparten al menos dos términos, uno de ellos informativo (los que aparecen en el 5 % de memorias
 más raras, con un mínimo de tres, o en todas); cuando tras quitar ese relleno queda una sola palabra de contenido, basta una. Si las palabras
 presentes no llegan al 30 % de las palabras de contenido de la consulta entera, antes del tope de doce términos
-del rescate, no hay rescate: la pregunta habla de otra cosa. Los candidatos se ordenan por la suma de IDF de los
-términos que comparten, y después por términos informativos y coincidencias. Devuelve hasta 3 por capa. El
-rescate alcanza a rasgos, episodios y memorias, y no altera una búsqueda que ya encontró algo.
+del rescate, no hay rescate: la pregunta habla de otra cosa. La puerta compara como mucho las primeras 64
+palabras de contenido, para que el prompt entero de un hook no gaste un recuento por palabra. Los candidatos
+se ordenan por la suma de IDF de los términos que comparten, y después por términos informativos y coincidencias.
+Devuelve hasta 3 por capa. El rescate alcanza a rasgos, episodios y memorias, y no altera una búsqueda que ya
+encontró algo.
 
 Con capa semántica el rescate apenas suma aciertos, empuja hacia abajo la respuesta buena y trae
 memorias de preguntas que no vienen al caso; sin ella es lo que hace aparecer la paráfrasis que la
@@ -110,7 +114,7 @@ Línea base del 2026-11-01 (tope 5, aciertos dentro del tope; caduca cuando camb
 | Modo | Global | MRR | Paráfrasis | Episodio | Rasgo | Ajenas con algo | Recuerdos por pregunta |
 |---|---|---|---|---|---|---|---|
 | Léxico | 254/432 | 0,54 | 2/72 | 21/24 | 10/24 | 4/48 | 1,6 |
-| Semántico (`embeddinggemma-2`, corte 0,65) | 411/432 | 0,87 | 64/72 | 23/24 | 19/24 | 11/48 | 4,87 |
+| Semántico (`embeddinggemma-2`, corte 0,65) | 411/432 | 0,87 | 64/72 | 23/24 | 19/24 | 12/48 | 4,87 |
 
 En el semántico, las tres capas compiten en el mismo ranking: rasgos y episodios pendientes pasan de 0/24 a
 19/24 y 23/24. El acierto en primera posición es 355/432 y el de las preguntas que esperan una memoria,

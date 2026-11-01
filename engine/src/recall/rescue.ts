@@ -41,9 +41,15 @@ const RELAXED_RARE_FRACTION = 0.05;
 // own candidate pool.
 const RELAXED_MAX_RESULTS = 3;
 // Word cap so the rescue query does not grow without bound. It only limits what the
-// candidate query searches: the presence gate still counts every word of the question, or
-// a question of 41 content words could never reach 30 % however much of it is in a memory.
+// candidate query searches: the presence gate still reads the whole question, or a question
+// of 41 content words could never reach 30 % however much of it is in a memory.
 const RELAXED_MAX_TERMS = 12;
+// The presence gate runs one FTS count per word it inspects, and nothing caps the query: the
+// inject hook passes the whole prompt. Sixty-four content words is far above any real
+// question, so the count stays bounded while the gate still sees all of a long one. Both
+// sides of the ratio stop at this same bound, or the denominator would grow past what the
+// numerator can ever reach.
+export const RELAXED_PRESENCE_MAX_TERMS = 64;
 
 export interface RelaxedTerm {
   word: string;
@@ -54,11 +60,12 @@ export interface RelaxedTerm {
 export interface RelaxedQuery {
   /** Terms searched by the candidate query, repeated prefixes already merged and capped. */
   terms: RelaxedTerm[];
-  /** Every rescue term before the cap: the presence gate counts over the whole question. */
+  /** Every rescue term before the term cap: the presence gate reads the first
+   * RELAXED_PRESENCE_MAX_TERMS of them. */
   allTerms: RelaxedTerm[];
   /** Distinct words before merging prefixes and before the term cap: it says whether the
-   * query has a single word, and it is the denominator of the presence gate, which is
-   * measured over the whole question and not over what the rescue actually searches. */
+   * query has a single word, and it is the denominator of the presence gate, which reads
+   * the whole question up to RELAXED_PRESENCE_MAX_TERMS and not what the rescue searches. */
   wordCount: number;
 }
 
@@ -133,16 +140,17 @@ export function relaxedFts(terms: RelaxedTerm[]): string {
 // `memories_fts` and not on the rescued layer: memories are where generic vocabulary piles
 // up, while traits and episodes are sparse and would make almost anything look rare.
 // Unscoped, because the vocabulary is the person's, and free of noise like the search.
-function documentFrequency(db: DB, term: RelaxedTerm): number {
-  const q = term.prefix ? `${quoteFts(term.prefix)}*` : quoteFts(term.word);
-  const row = db
-    .prepare(
-      `SELECT count(*) AS n
-       FROM memories_fts f JOIN memories m ON m.rowid = f.rowid
-       WHERE memories_fts MATCH ? AND ${excludeNoiseSql("m")}`,
-    )
-    .get(q) as { n: number };
-  return row.n;
+// Prepared once: the gate runs up to RELAXED_PRESENCE_MAX_TERMS counts per recall.
+function documentFrequencyCounter(db: DB): (term: RelaxedTerm) => number {
+  const statement = db.prepare(
+    `SELECT count(*) AS n
+     FROM memories_fts f JOIN memories m ON m.rowid = f.rowid
+     WHERE memories_fts MATCH ? AND ${excludeNoiseSql("m")}`,
+  );
+  return (term) => {
+    const q = term.prefix ? `${quoteFts(term.prefix)}*` : quoteFts(term.word);
+    return (statement.get(q) as { n: number }).n;
+  };
 }
 
 /**
@@ -161,21 +169,22 @@ interface PlannedTerm {
 }
 
 /**
- * What the rescue may demand: `present` and `wordCount` count the whole question before the
- * cap, so the gate compares like with like; `terms` is the capped set a candidate is scored
- * against, without the words no record has.
+ * What the rescue may demand: `present` and `wordCount` stop at the same
+ * RELAXED_PRESENCE_MAX_TERMS words, so the gate compares like with like; `terms` is the
+ * capped set a candidate is scored against, without the words no record has.
  */
 export interface RelaxedPlan {
   terms: PlannedTerm[];
-  /** Question words that exist in the memories or in a candidate, without the term cap. */
+  /** Question words found in some memory of the base or in a candidate, over the gated set. */
   present: number;
-  /** Content words of the question, without the rescue's term cap. */
+  /** Content words of the question, up to RELAXED_PRESENCE_MAX_TERMS; it also tells a
+   * one-word query. */
   wordCount: number;
 }
 
 /**
- * One count per question word decides rarity and presence over the noise-filtered set, so a
- * long question stops paying for names no record has; only the capped terms are scored.
+ * One prepared count serves every word the gate inspects, so a long question stops paying
+ * for names no record has; only the capped terms are scored.
  */
 export function planTerms(
   db: DB,
@@ -194,13 +203,14 @@ export function planTerms(
   const rare = Math.max(RELAXED_RARE_MIN_DOCS, Math.ceil(total * RELAXED_RARE_FRACTION));
   const candidateTokens = rows.map((row) => tokensOf(row.search_text ?? row.text));
   const searched = new Set(terms.map(({ word }) => word));
+  const frequencyOf = documentFrequencyCounter(db);
   const planned: PlannedTerm[] = [];
   let present = 0;
-  for (const term of allTerms) {
-    const frequency = documentFrequency(db, term);
+  for (const term of allTerms.slice(0, RELAXED_PRESENCE_MAX_TERMS)) {
+    const frequency = frequencyOf(term);
     const inCandidates = candidateTokens.some((tokens) => termInTokens(tokens, term));
-    // A word that is neither in the memories nor in any candidate cannot match anything;
-    // keeping it only inflated the required number of coincidences.
+    // A word absent from every memory of the base and from every candidate cannot match
+    // anything; keeping it only inflated the required number of coincidences.
     if (frequency === 0 && !inCandidates) continue;
     present += 1;
     if (!searched.has(term.word)) continue;
@@ -213,7 +223,11 @@ export function planTerms(
       informative: frequency <= rare || frequency === total,
     });
   }
-  return { terms: planned, present, wordCount };
+  return {
+    terms: planned,
+    present,
+    wordCount: Math.min(wordCount, RELAXED_PRESENCE_MAX_TERMS),
+  };
 }
 
 /** FTS5 splits on every non-letter, including `_`; the rescue has to count the same way. */
@@ -248,7 +262,8 @@ export function relaxRows<T extends RankedCandidate>(rows: T[], plan: RelaxedPla
   // If most of the question is about things no record contains, the few words that do
   // exist are not evidence; this keeps a long off-topic question from being rescued by two
   // generic words while a real long question still passes with most of its words present.
-  // Both sides count before the term cap: only the candidate query is capped.
+  // Both sides stop at the same bound: only the candidate query is capped at twelve terms,
+  // and the gate reads at most RELAXED_PRESENCE_MAX_TERMS words.
   if (plan.present / plan.wordCount < RELAXED_MIN_PRESENT_RATIO) return [];
   // A one-word query cannot reach two matches; anything else asks for two. The exception
   // is the original query having one word, not the plan keeping one term: two forms of the
