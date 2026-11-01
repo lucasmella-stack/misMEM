@@ -21,6 +21,65 @@
 - El JSDoc de `accumulateCoUse` citaba el fichero equivocado: el test que lo ata a `hubs()` está en
   `tests/support.test.ts`.
 
+### Salir del visor puede fallar y decirlo, y el grafo oculto no se vuelve a pedir
+
+- El botón de salir navegaba al formulario de entrada **pasara lo que pasara**: iba con `.finally()`,
+  así que una salida que falló se veía exactamente igual que una que funcionó, con la cookie todavía
+  viva. Ahora sólo navega si el servidor confirmó, y si no lo dice. Sus dos rutas pasan a ser
+  relativas, como las de `api.ts`, para que misMEM siga funcionando montado en otra ruta.
+- La pestaña del grafo está `forceMount`, así que sus dos consultas seguían activas con la pestaña
+  oculta: editar una memoria desde otra pestaña volvía a pedir `/api/graph` y, con el color por tema,
+  `/api/topics`, que son las dos lecturas más caras del visor (un coseno por par cada una). Quedan
+  condicionadas a que la pestaña esté a la vista; el dibujo sigue en la caché y se refresca al volver.
+
+### La cámara del grafo vuelve a encuadrar al cambiar de ámbito
+
+- El encuadre se hacía una sola vez por montaje y la pestaña del grafo está `forceMount`, así que
+  nunca se desmonta: sólo el **primer** grafo de la sesión quedaba encuadrado. Pasar de un ámbito de
+  cuatrocientos nodos a uno de tres dejaba la cámara en el encuadre viejo, con el dibujo nuevo fuera
+  de vista. El ref pasa a guardar **qué** ámbito se encuadró, en vez de que se encuadró algo.
+
+### El visor vuelve a avisar de un vector que ya no coincide con su texto
+
+- El motor cuenta en `outdated` los vectores del modelo y el ancho activos cuya huella dejó de
+  coincidir con el texto, que es lo que pasa al editar el gist de una memoria. El tipo que declara la
+  interfaz no tenía ese campo, así que `embeddingWarning` sólo miraba `missing`, `stale_model` y
+  `stale_dims`: los tres quedaban en cero y **el visor decía que el índice estaba al día** mientras
+  `mismem-embed --status` sí lo contaba.
+- Un contador que el servidor dejara de mandar producía «El índice semántico no está al día: .», con la
+  lista vacía. Ahora, sin nada que enumerar, no hay aviso.
+
+### Tres tests que el visor no tenía, y uno que no probaba lo que decía
+
+- **El filtro por ámbito de los temas no lo ejercitaba nadie.** `queries/topics.ts` enciende una rama
+  del `WHERE` cuando se le pasa `scope`, y ninguno de sus ocho tests se lo pasaba: borrarla dejaba la
+  suite entera verde y la pestaña Temas ignorando el ámbito por el que navega el resto del visor.
+- **`respeta el orden en que el motor rankeó los hubs`**: el test que decía «ordena la entrada por
+  asociación» tenía un solo hub en su `summary`, así que con un orden invertido seguía pasando. Pasa a
+  llamarse por lo que comprueba y el orden se prueba aparte, con dos.
+- **El conjunto de claves de `/api/embeddings`** queda fijado: que la URL del proveedor no salga ya
+  estaba probado, pero un campo nuevo en el estado entraba a la respuesta sin que nadie lo decidiera.
+- Los temporizadores falsos se restauran en un `afterEach` y no dentro del cuerpo del test: si ese test
+  fallaba antes de llegar a su última línea, se filtraban al siguiente y lo colgaban por una razón
+  ajena.
+
+### El instalador dice por qué falló, y sus tests dejan de llenar /tmp
+
+- `scripts/install.sh` corría `pnpm install --frozen-lockfile >/dev/null` y `pnpm build >/dev/null`.
+  **pnpm escribe sus errores en stdout**, así que una instalación que abortaba por un lockfile que no
+  cuadra moría sin imprimir una sola línea útil. La salida se guarda y se imprime sólo si el comando
+  falla.
+- `tests/installer.test.ts` creaba un directorio temporal por sandbox y no borraba ninguno: había 248
+  acumulados, 380 MB. Se borran en el `afterEach`, como pide
+  [docs/standards/tests.md](docs/standards/tests.md).
+
+### El log de la consolidación deja de llevar el texto de una memoria
+
+- Al descartar una memoria destilada por quedarse sin evidencia, el log imprimía sesenta caracteres
+  de su `gist`. Ese log sale por `console.log` desde el CLI y es el `job.log` que el visor pinta, así
+  que era dato del usuario en un log, que `AGENTS.md` prohíbe sin matices. Ahora lleva el ámbito y
+  cuántos episodios había citado, que es lo que hace falta para distinguir un descarte de un fallo.
+
 ### El README dice lo mismo con menos palabras
 
 - El párrafo del instalador eran ciento setenta palabras en un bloque, con detalles que ya están en su

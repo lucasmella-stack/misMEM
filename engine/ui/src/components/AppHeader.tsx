@@ -1,4 +1,4 @@
-import type { FormEvent, RefObject } from "react";
+import { useState, type FormEvent, type RefObject } from "react";
 import { LogOutIcon, SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,7 @@ export function AppHeader({
   /** Only with credentials configured: without them there is no session to end. */
   canSignOut: boolean;
 }) {
+  const [failed, setFailed] = useState(false);
   return (
     <header className="flex flex-wrap items-center gap-2 border-b border-edge px-3 py-2 sm:gap-3 sm:px-4">
       <a href="./" className="font-semibold tracking-tight" aria-label="misMEM, inicio">
@@ -64,14 +65,23 @@ export function AppHeader({
             title="Salir"
             aria-label="Salir"
             onClick={() => {
-              // A form would be blocked: the viewer's CSP sets form-action 'none'.
-              void fetch("/logout", { method: "POST" }).finally(() => {
-                window.location.assign("/login");
-              });
+              setFailed(false);
+              // A form would be blocked: the viewer's CSP sets form-action 'none'. The paths are
+              // relative like `api.ts`, so misMEM keeps working mounted on another path, and only
+              // a sign-out that happened navigates: `finally` showed the login form with the
+              // cookie still alive.
+              void fetch("../logout", { method: "POST" })
+                .then((res) => (res.ok ? window.location.assign("../login") : setFailed(true)))
+                .catch(() => setFailed(true));
             }}
           >
             <LogOutIcon aria-hidden="true" className="size-4" />
           </Button>
+        )}
+        {failed && (
+          <p role="alert" className="text-ink-muted">
+            No se pudo cerrar la sesión.
+          </p>
         )}
       </div>
     </header>

@@ -11,7 +11,9 @@ export function embeddingWarning(status: EmbeddingStatus | undefined): string | 
   if (!status?.enabled) return null;
   // Nothing was ever indexed: the embedding server is optional, so there is nothing to fix yet.
   if (status.embedded === 0) return null;
-  if (status.missing <= 0 && status.stale_model <= 0 && status.stale_dims <= 0) return null;
+  if (status.missing <= 0 && status.stale_model <= 0 && status.outdated <= 0 && status.stale_dims <= 0) {
+    return null;
+  }
 
   const parts: string[] = [];
   if (status.missing > 0) {
@@ -28,6 +30,13 @@ export function embeddingWarning(status: EmbeddingStatus | undefined): string | 
         : `${status.stale_model} memorias con vectores de otro modelo`,
     );
   }
+  if (status.outdated > 0) {
+    parts.push(
+      status.outdated === 1
+        ? "1 memoria con un vector que ya no coincide con su texto"
+        : `${status.outdated} memorias con un vector que ya no coincide con su texto`,
+    );
+  }
   if (status.stale_dims > 0) {
     parts.push(
       status.stale_dims === 1
@@ -35,8 +44,12 @@ export function embeddingWarning(status: EmbeddingStatus | undefined): string | 
         : `${status.stale_dims} memorias con vectores de otras dimensiones`,
     );
   }
+  // A counter the server stopped sending would otherwise read as "not up to date: ." with an
+  // empty list, which says less than silence.
+  if (parts.length === 0) return null;
+
   const reindex = status.stale_dims > 0;
-  const pending = status.missing > 0 || status.stale_model > 0;
+  const pending = status.missing > 0 || status.stale_model > 0 || status.outdated > 0;
   const remedy = reindex
     ? pending
       ? "Ejecuta mismem-embed para lo pendiente y mismem-embed --force para reindexar todo al ancho actual."

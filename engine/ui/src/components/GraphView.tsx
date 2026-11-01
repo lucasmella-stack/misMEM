@@ -45,7 +45,9 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
   const [size, setSize] = useState({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<ForceGraphMethods<GraphNode, GraphLink> | undefined>(undefined);
-  const fitted = useRef(false);
+  // The scope whose drawing the camera already framed, null before the first one. A boolean kept
+  // the first framing for the whole session, because the tab is forceMount'd and never unmounts.
+  const fitted = useRef<string | null>(null);
   const positions = useRef(new Map<string, { x: number; y: number }>());
 
   // Switching scope never shows the previous scope's graph: it is only kept while the same
@@ -56,6 +58,9 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
       api.graph(scope, settings.episodes, settings.related, { enabled: settings.coUse, minN: settings.coUseMinN }, signal),
     placeholderData: (previous, previousQuery) =>
       previousQuery?.queryKey[1] === (scope ?? "") ? previous : undefined,
+    // Hidden it stays mounted, so every write elsewhere refetched the most expensive read the
+    // viewer has. The cache keeps the drawing; coming back is when it is worth refreshing.
+    enabled: visible,
   });
   const data = graphQuery.data;
 
@@ -156,7 +161,7 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
   const topicsQuery = useQuery({
     queryKey: ["topics", scope ?? ""],
     queryFn: ({ signal }) => api.topics(scope, signal),
-    enabled: settings.colorBy === "topic",
+    enabled: visible && settings.colorBy === "topic",
   });
 
   const byTopic = useMemo(
@@ -223,10 +228,11 @@ export default function GraphView({ scope, query, selectedId, active: visible, o
   );
 
   const onEngineStop = useCallback(() => {
-    if (fitted.current || graphData.nodes.length === 0) return;
-    fitted.current = true;
+    const current = scope ?? "";
+    if (fitted.current === current || graphData.nodes.length === 0) return;
+    fitted.current = current;
     graphRef.current?.zoomToFit(500, 40);
-  }, [graphData.nodes.length]);
+  }, [graphData.nodes.length, scope]);
 
   // Forces from the mock-up: gravity to the centre, repulsion, link and distance adjustable.
   useEffect(() => {

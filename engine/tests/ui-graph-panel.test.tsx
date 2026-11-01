@@ -14,6 +14,9 @@ import { installDomStubs } from "./support/dom";
 
 installDomStubs();
 afterEach(cleanup);
+// Restoring inside a test body never runs when that body fails earlier, and the fake timers then
+// reach the next test, which hangs on userEvent for a reason that is not its own.
+afterEach(() => void vi.useRealTimers());
 
 const summary: ConnectomeSummary = {
   turns: 40,
@@ -111,7 +114,6 @@ describe("el soporte mínimo no pide el grafo en cada paso", () => {
 
     vi.advanceTimersByTime(COMMIT_DELAY_MS + 1);
     expect(onChange.mock.calls).toEqual([[{ coUseMinN: 6 }]]);
-    vi.useRealTimers();
   });
 
   it("los deslizadores que sólo pintan en el cliente siguen avisando en cada paso", async () => {
@@ -126,7 +128,7 @@ describe("el soporte mínimo no pide el grafo en cada paso", () => {
 });
 
 describe("la lectura del conectoma", () => {
-  it("ordena la entrada por asociación y enseña su fuerza", () => {
+  it("enseña la etiqueta de un hub y su fuerza con dos decimales", () => {
     render(
       <ConnectomePanel
         summary={summary}
@@ -138,6 +140,37 @@ describe("la lectura del conectoma", () => {
     );
     const entry = screen.getByRole("button", { name: /una memoria/i });
     expect(within(entry).getByText("0.60")).toBeTruthy();
+  });
+
+  it("respeta el orden en que el motor rankeó los hubs", () => {
+    // The engine ranks by accumulated association; the panel must not reorder by neighbours on
+    // its own, or the way in disagrees with the halo the canvas paints.
+    const dos: ConnectomeSummary = {
+      ...summary,
+      hubs: [
+        { id: "m1", degree: 3, strength: 0.6, support: 5 },
+        { id: "m2", degree: 9, strength: 0.2, support: 4 },
+      ],
+    };
+
+    render(
+      <ConnectomePanel
+        summary={dos}
+        labels={
+          new Map([
+            ["m1", "la más asociada"],
+            ["m2", "la de más vecinos"],
+          ])
+        }
+        maxHubStrength={0.6}
+        drawn={new Set(["m1", "m2"])}
+        onSelect={() => {}}
+      />,
+    );
+
+    const entradas = screen.getAllByRole("button").map((b) => b.textContent ?? "");
+    expect(entradas[0]).toContain("la más asociada");
+    expect(entradas[1]).toContain("la de más vecinos");
   });
 });
 
