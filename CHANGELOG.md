@@ -2,6 +2,27 @@
 
 ## Sin publicar
 
+### Un solo proveedor de embeddings, con EmbeddingGemma 2 por defecto y sin nomic (#229)
+
+- **Un protocolo**: el `/v1/embeddings` de OpenAI, que sirven llama-server y Ollama. Fuera el camino `/api/embed`,
+  `MISMEM_EMBEDDING_PROVIDER` y `MISMEM_OLLAMA_URL`; otro servidor u otro modelo se eligen con
+  `MISMEM_EMBEDDING_URL` y `MISMEM_EMBEDDING_MODEL`, y cambiar de modelo sigue reindexando solo.
+- **Sin configurar nada**, EmbeddingGemma 2 en `http://127.0.0.1:8080`, el puerto del instalador. Con un modelo
+  de la familia EmbeddingGemma (su id contiene `embeddinggemma`) van solos sus prefijos y el corte de 0,65, el
+  mayor que no pierde aciertos en el golden eval (PR #181, que esto sustituye); otro modelo arranca sin prefijos
+  y con 0,5. Quien configuró EmbeddingGemma a mano sin prefijos tiene que reindexar con `mismem-embed --force`.
+- **El instalador** monta sólo EmbeddingGemma 2: `--embeddings gemma|off`. Una instalación con nomic en el Ollama local pasa
+  a EmbeddingGemma 2 al re-ejecutarlo si hay `llama-server` (si no, conserva nomic); nomic en otro servidor u otro modelo se conservan, y una búsqueda apagada
+  con `MISMEM_EMBEDDINGS=off` sigue apagada.
+- **Rompe** a quien use nomic o el proveedor `ollama`, a mano o con el instalador anterior, hasta que re-ejecute el
+  instalador: el motor ya no lee `MISMEM_EMBEDDING_PROVIDER` ni `MISMEM_OLLAMA_URL`, así que la URL pasa a
+  `http://127.0.0.1:8080`, el modelo por defecto a EmbeddingGemma 2 y el corte de nomic de 0,65 a 0,5. Para conservar lo
+  que tenía, que escriba `MISMEM_EMBEDDING_URL=http://127.0.0.1:11434`,
+  `MISMEM_EMBEDDING_MODEL=nomic-embed-text` y `MISMEM_EMBEDDING_MIN_SCORE=0.65`; para pasarse a EmbeddingGemma 2,
+  que re-ejecute el instalador.
+- El comentario del umbral de aristas `related` del grafo se rehace con EmbeddingGemma 2 medido sobre una base
+  real: el par mediano da 0,673 y el vecino más cercano 0,822; el 0,75 se mantiene.
+
 ### Un vector inválido ya no esconde una memoria de la búsqueda (#155)
 
 - Cada vector se valida y se normaliza a norma 1 al entrar, venga del servidor de embeddings o de un

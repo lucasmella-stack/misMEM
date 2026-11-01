@@ -78,7 +78,7 @@ export function recall(
 
 /**
  * Hybrid recall: FTS5 (lexical) plus cosine over embeddings (semantic). With no embedder
- * available (Ollama down / MISMEM_EMBEDDINGS=off) the result is identical to `recall()`.
+ * available (server down / MISMEM_EMBEDDINGS=off) the result is identical to `recall()`.
  */
 export async function recallHybrid(
   db: DB,

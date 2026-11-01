@@ -28,7 +28,8 @@ elige la mayor que las deje a cero.
 ## Por significado (opcional)
 
 Con un servidor de embeddings corriendo, `recall` suma búsqueda por significado: "problemas de plata"
-encuentra memorias que dicen "deudas". El valor por defecto es Ollama (`ollama pull nomic-embed-text`), un modelo pensado para inglés.
+encuentra memorias que dicen "deudas". El modelo por defecto es EmbeddingGemma 2, multilingüe, servido por
+`llama-server` en `http://127.0.0.1:8080`.
 Los vectores se guardan como BLOB en la misma SQLite y la búsqueda es coseno en JS, sin extensiones
 nativas. Si el servidor no responde, todo degrada silenciosamente a FTS5 puro.
 
@@ -42,27 +43,16 @@ dos seguidas abortan la corrida como si el servidor estuviera caído. El backfil
 vectores inválidos que una versión anterior ya había guardado. `--status` cuenta esos vectores
 inválidos en `invalid`, sin los marcadores de ruido, que el backfill nunca reescribe.
 
-También habla con cualquier servidor compatible con OpenAI (`/v1/embeddings`, por ejemplo
-`llama-server --embedding`). **Si las memorias no están en inglés, conviene EmbeddingGemma 2**: con memorias en
-castellano encontró 34 de 50 paráfrasis frente a 4 de 50 de `nomic-embed-text` (medido en la issue #72), y
-en CPU no gasta VRAM. Va con sus prefijos y un corte de 0,65 (con 0,68 sale casi igual):
-
-```bash
-MISMEM_EMBEDDING_PROVIDER=openai
-MISMEM_EMBEDDING_URL=http://127.0.0.1:8080
-MISMEM_EMBEDDING_MODEL=embeddinggemma-2
-MISMEM_EMBEDDING_QUERY_PREFIX="task: search result | query: "
-MISMEM_EMBEDDING_DOC_PREFIX="title: none | text: "
-MISMEM_EMBEDDING_MIN_SCORE=0.65
-```
+Habla un solo protocolo, el `/v1/embeddings` de OpenAI, que sirven `llama-server --embedding` y Ollama: otro
+servidor u otro modelo se eligen con `MISMEM_EMBEDDING_URL` y `MISMEM_EMBEDDING_MODEL`. Con memorias en
+castellano, EmbeddingGemma 2 encontró 34 de 50 paráfrasis frente a 4 de 50 de un modelo pensado para inglés
+(medido en la issue #72), y en CPU no gasta VRAM. Con un modelo de la familia EmbeddingGemma van solos sus
+prefijos de consulta y documento y un corte de 0,65, el mayor que no pierde aciertos (PR #181); otro modelo
+arranca sin prefijos y con 0,5. Un `MISMEM_EMBEDDING_MIN_SCORE` explícito gana siempre.
 
 `scripts/install.sh` lo monta si hay `llama-server` (baja el modelo sólo si se acepta, lo deja como servicio
-de systemd de usuario en CPU, y en la GPU con `--embeddings-gpu`); `--embeddings gemma|nomic` elige el
-modelo sin preguntas.
-
-Con `nomic-embed-text` el corte por defecto es 0,65: con 0,5 el hook de inyección añadía recuerdos sin
-relación a cada prompt. No hay que esperar paráfrasis: encuentra la memoria cuando la consulta comparte sus
-palabras, no cuando la dice de otra forma. Un `MISMEM_EMBEDDING_MIN_SCORE` explícito gana siempre.
+de systemd de usuario en CPU, y en la GPU con `--embeddings-gpu`); `--embeddings gemma|off` lo elige o apaga
+la capa sin preguntas.
 
 La búsqueda sólo compara vectores del modelo configurado. Cambiar de modelo reindexa solo en el siguiente
 backfill (`mismem-embed`); cambiar un prefijo no se detecta y exige `mismem-embed --force`. Todas las
