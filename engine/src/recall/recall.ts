@@ -6,6 +6,7 @@ import { CANDIDATE_POOL_LIMIT, lexicalCandidates } from "./lexical.js";
 import { fuseMemories, hasComparableVectors } from "./fuse.js";
 import { embedTexts, loadEmbeddingConfig, type EmbedFn } from "../embeddings/provider.js";
 import { semanticSearchMemories } from "../embeddings/store.js";
+import { checkedUnitVectors } from "../embeddings/vector.js";
 import { reinforceMemories } from "../memory/salience.js";
 
 /**
@@ -92,7 +93,9 @@ export async function recallHybrid(
     embedFn ?? ((texts: string[]) => embedTexts(texts, cfg, "query"));
 
   const vecs = await actualEmbedFn([input.query]);
-  const queryVec = vecs?.[0];
+  // The query vector goes through the same check as a stored one: an injected embedFn or a
+  // broken provider must degrade to lexical search, not carry NaN into the cosine.
+  const queryVec = checkedUnitVectors(vecs ?? [])?.[0] ?? undefined;
   const semanticModel = options.embeddingModel ?? (embedFn ? undefined : cfg.model);
   const semantic = queryVec
     ? semanticSearchMemories(db, queryVec, {
