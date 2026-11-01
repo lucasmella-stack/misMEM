@@ -44,6 +44,12 @@ export function App() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   const scopesQuery = useQuery({ queryKey: ["scopes"], queryFn: ({ signal }) => api.scopes(signal) });
+  // Whether there is a session to end. It does not change while the page is open.
+  const sessionQuery = useQuery({
+    queryKey: ["session"],
+    queryFn: ({ signal }) => api.session(signal),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
   const scopeList = scopesQuery.data?.scopes;
 
   // Search waits 250 ms after the last keystroke; TanStack's `signal` cancels the previous one.
@@ -138,6 +144,7 @@ export function App() {
         themeChoice={themeChoice}
         onThemeChange={setThemeChoice}
         onConsolidate={() => setConsolidating(true)}
+        canSignOut={sessionQuery.data?.active === true}
       />
 
       <EmbeddingNotice />

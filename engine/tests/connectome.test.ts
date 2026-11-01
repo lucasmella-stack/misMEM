@@ -191,6 +191,47 @@ describe("hubs", () => {
 
     expect(hubs(db)).toEqual([]);
   });
+
+  it("una coincidencia no encabeza el ranking por encima de un par repetido", () => {
+    // NPMI gives a pair seen once the maximum, so without weighting the support the list of
+    // "where to enter" is led by exactly the pairs nobody ever used together twice.
+    const repetido1 = memory("el visor recorta el grafo a cuatrocientos nodos");
+    const repetido2 = memory("el conectoma ilumina el mismo grafo");
+    // Three pairs seen once each score the maximum too, so unweighted they add up to three
+    // times the repeated pair. This is the shape production actually had.
+    const centro = memory("el respaldo corre a las tres de la mañana");
+    const suelto1 = memory("la imagen se publica en cada etiqueta");
+    const suelto2 = memory("el visor pide la interfaz compilada");
+    const suelto3 = memory("la consolidación mira lo que no se consolidó");
+
+    for (let i = 0; i < 6; i++) turn(repetido1, repetido2);
+    turn(centro, suelto1);
+    turn(centro, suelto2);
+    turn(centro, suelto3);
+
+    const ranking = hubs(db);
+    expect(ranking.find((x) => x.id === centro)!.degree).toBeGreaterThan(
+      ranking.find((x) => x.id === repetido1)!.degree,
+    );
+    expect([repetido1, repetido2]).toContain(ranking[0]?.id);
+  });
+
+  it("cada hub lleva el mejor soporte que respalda su fuerza", () => {
+    // NPMI reads 1 both for "always together" and for "once, and that was the only turn".
+    // Without the support beside it, the figure cannot be told apart from a coincidence.
+    const a = memory("el visor recorta el grafo a cuatrocientos nodos");
+    const b = memory("el conectoma ilumina el mismo grafo");
+    const suelto = memory("el respaldo corre a las tres de la mañana");
+
+    for (let i = 0; i < 5; i++) turn(a, b);
+    turn(a, suelto);
+
+    const ranking = hubs(db);
+    expect(ranking.find((x) => x.id === b)?.support).toBe(5);
+    expect(ranking.find((x) => x.id === suelto)?.support).toBe(1);
+    // `a` belongs to both pairs: its best evidence is the one it repeated.
+    expect(ranking.find((x) => x.id === a)?.support).toBe(5);
+  });
 });
 
 describe("semilla del contador de turnos", () => {

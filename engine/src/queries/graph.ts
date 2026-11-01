@@ -3,12 +3,13 @@
 // the one that had more rows than its cap, not the one that just filled it.
 import type { Database as DB } from "better-sqlite3";
 import { coUseLinks, parseIds, relatedLinks, type GraphLink } from "./relations.js";
-import { hubs, turnsRegistered, type Hub } from "../store/connectome.js";
+import { integerFloor } from "../domain/support.js";
+import { coUsePairs, hubs, turnsRegistered, type Hub } from "../store/connectome.js";
 import {
   excludeNoiseSql,
-  MEMORY_COLUMNS,
+  MEMORY_NODE_COLUMNS,
   type ConsolidatedEpisodeRow,
-  type MemoryRow,
+  type MemoryNodeRow,
   type TraitRow,
 } from "../store/rows.js";
 import { effectiveSalience } from "../memory/salience.js";
@@ -16,8 +17,10 @@ import { effectiveSalience } from "../memory/salience.js";
 const GRAPH_MAX_MEMORIES = 400;
 const GRAPH_MAX_TRAITS = 200;
 const GRAPH_MAX_EPISODES = 2000;
-const GRAPH_LABEL_CHARS = 120;
-const GRAPH_MAX_HUBS = 20;
+/** Trimmed again on the canvas to `CANVAS_LABEL_CHARS`: this has to stay the longer. */
+export const GRAPH_LABEL_CHARS = 120;
+/** Sent to the panel, which lists `PANEL_MAX_HUBS` of them: this has to stay the larger. */
+export const GRAPH_MAX_HUBS = 20;
 
 /** Caps per layer; the tests lower them so they do not seed hundreds of rows. */
 export interface GraphCaps {
@@ -44,7 +47,7 @@ interface GraphNode {
   label: string;
   salience?: number;
   strength?: number;
-  co_use?: { degree: number; strength: number };
+  co_use?: { degree: number; strength: number; support: number };
 }
 
 export interface GraphBody {
@@ -56,6 +59,8 @@ export interface GraphBody {
     pairs: number;
     shown: number;
     min_n: number;
+    /** Best support among the edges drawn: with every pair at 1, no figure above means anything. */
+    max_n: number;
     hubs: Hub[];
   };
 }
@@ -66,7 +71,9 @@ const label = (text: string): string =>
 export function graphData(db: DB, query: GraphQuery): GraphBody {
   const { scope } = query;
   const at = query.at ?? Date.now();
-  const coUseMinN = Math.max(1, query.coUseMinN ?? 1);
+  // A floor arrives from the query string: `1e400` parses as Infinity, which SQLite matches
+  // against nothing and JSON serialises as null, leaving a hole where the panel prints it.
+  const coUseMinN = integerFloor(query.coUseMinN);
   const maxMemories = query.caps?.memories ?? GRAPH_MAX_MEMORIES;
   const maxTraits = query.caps?.traits ?? GRAPH_MAX_TRAITS;
   const maxEpisodes = query.caps?.episodes ?? GRAPH_MAX_EPISODES;
@@ -77,8 +84,8 @@ export function graphData(db: DB, query: GraphQuery): GraphBody {
   ).n;
   const memories = (
     db
-      .prepare(`SELECT ${MEMORY_COLUMNS} FROM memories m WHERE ${memoriesWhere}`)
-      .all({ scope }) as MemoryRow[]
+      .prepare(`SELECT ${MEMORY_NODE_COLUMNS} FROM memories m WHERE ${memoriesWhere}`)
+      .all({ scope }) as MemoryNodeRow[]
   )
     .map((row) => ({ row, salience: effectiveSalience(row, at) }))
     .sort((a, b) => b.salience - a.salience)
@@ -143,35 +150,42 @@ export function graphData(db: DB, query: GraphQuery): GraphBody {
   if (query.withRelated) links.push(...relatedLinks(db, [...memoryIds]));
 
   if (!query.withCoUse) return { nodes, links, truncated };
+  return withLateralLayer(db, { nodes, links, truncated }, [...memoryIds], coUseMinN);
+}
 
-  const drawn = [...memoryIds];
-  const lateral = coUseLinks(db, drawn, coUseMinN);
-  const degrees = new Map<string, { degree: number; strength: number }>();
-  for (const link of lateral) {
-    for (const id of [link.source, link.target]) {
-      const current = degrees.get(id) ?? { degree: 0, strength: 0 };
-      current.degree += 1;
-      if ((link.strength ?? 0) > 0) current.strength += link.strength ?? 0;
-      degrees.set(id, current);
-    }
-  }
-  links.push(...lateral);
+/**
+ * Adds the measured co-use layer and the sample behind it. Nothing here may present noise as
+ * topology: a pair seen once scores maximum strength by construction, so the support travels
+ * beside every figure that depends on it.
+ */
+function withLateralLayer(
+  db: DB,
+  body: GraphBody,
+  drawn: readonly string[],
+  minN: number,
+): GraphBody {
+  const lateral = coUseLinks(db, drawn, minN);
+  // One accumulator for the whole layer, in the module that owns it: the halo on the canvas and
+  // the list in the panel have to answer to the same definition of a hub.
+  const ranked = hubs(db, { ids: drawn, minN });
+  const byId = new Map(ranked.map((hub) => [hub.id, hub]));
 
   return {
-    nodes: nodes.map((node) => {
-      const own = degrees.get(node.id);
-      return own ? { ...node, co_use: own } : node;
+    nodes: body.nodes.map((node) => {
+      const own = byId.get(node.id);
+      return own
+        ? { ...node, co_use: { degree: own.degree, strength: own.strength, support: own.support } }
+        : node;
     }),
-    links,
-    truncated,
-    // The side panels must not present noise as topology: with few turns, a pair seen
-    // once scores maximum strength by construction.
+    links: [...body.links, ...lateral],
+    truncated: body.truncated,
     connectome: {
       turns: turnsRegistered(db),
-      pairs: coUseLinks(db, drawn, 1).length,
+      pairs: coUsePairs(db),
       shown: lateral.length,
-      min_n: coUseMinN,
-      hubs: hubs(db, { ids: drawn, minN: coUseMinN }).slice(0, GRAPH_MAX_HUBS),
+      min_n: minN,
+      max_n: lateral.reduce((top, link) => Math.max(top, link.n ?? 0), 0),
+      hubs: ranked.slice(0, GRAPH_MAX_HUBS),
     },
   };
 }

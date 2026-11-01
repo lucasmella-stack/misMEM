@@ -237,12 +237,19 @@ describe("server-http with MISMEM_AUTH_USER/PASS", () => {
     expect((await send(secured.port, "/healthz")).status).toBe(200);
   });
 
-  it("returns 401 on /mcp, /viewer and /api without credentials", async () => {
-    for (const path of ["/mcp", "/viewer", "/api/stats"]) {
+  it("returns 401 on /mcp and /api without credentials: a caller reads an error, not HTML", async () => {
+    for (const path of ["/mcp", "/api/stats"]) {
       const post = path === "/mcp";
       const r = await send(secured.port, path, post ? { method: "POST", headers: mcpHeaders, body: mcpInit } : {});
       expect(r.status, path).toBe(401);
     }
+  });
+
+  it("sends a person to the form instead of the browser's dialog", async () => {
+    // http.request does not follow redirects, so the 302 arrives as it is.
+    const r = await send(secured.port, "/viewer");
+
+    expect(r.status).toBe(302);
   });
 
   it("returns 401 for wrong credentials", async () => {
