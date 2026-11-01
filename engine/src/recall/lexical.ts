@@ -116,24 +116,23 @@ export function lexicalCandidates(
     strictRows.traits.length === 0 &&
     strictRows.memories.length === 0 &&
     strictRows.episodes.length === 0;
-  // Frequency is only queried when a rescue is really needed: up to twelve counts over
-  // memories_fts that a normal search must not pay for.
+  // Frequency is only queried when a rescue is really needed: one count per question word
+  // over memories_fts that a normal search must not pay for.
   let rescuedPlan: RelaxedPlan | null = null;
   let rows = strictRows;
   if (strictEmpty && rescue) {
-    const { terms, wordCount } = relaxedTerms(input.query);
-    const relaxed = relaxedFts(terms);
+    const relaxedQuery = relaxedTerms(input.query);
+    const relaxed = relaxedFts(relaxedQuery.terms);
     if (relaxed !== strict) {
       rows = run(relaxed);
-      // The presence gate is measured over the whole question, not over the capped search:
-      // a word past the cap was part of what the question is about, and letting the cap
-      // shrink the denominator would pass questions mostly about things no record has.
-      rescuedPlan = planTerms(
-        db,
-        terms,
-        wordCount,
-        [...rows.traits, ...rows.memories, ...rows.episodes],
-      );
+      // Both sides of the presence gate cover the whole question, never the capped search:
+      // the cap only trims the candidate query, and counting the numerator over its twelve
+      // words made the gate unreachable from forty-one content words on.
+      rescuedPlan = planTerms(db, relaxedQuery, [
+        ...rows.traits,
+        ...rows.memories,
+        ...rows.episodes,
+      ]);
     }
   }
   const traits: RecallHit[] = (

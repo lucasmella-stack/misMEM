@@ -135,6 +135,45 @@ describe("recall léxico: frases normales", () => {
     expect(memoryIds("cómo apago las luces del teclado de mi portátil")).toEqual([three, two]);
   });
 
+  it("una pregunta de más de cuarenta palabras se rescata si todas están en la memoria", () => {
+    // The gate divided a numerator capped at twelve terms by the whole question, so from
+    // 41 content words on, 12/N stayed below 30 % even when every word was in the record.
+    // The memory repeats each word with a suffix (usually its plural), so the strict query
+    // misses it and only the rescue's prefix finds it.
+    const words = [
+      "servidor", "teclado", "pantalla", "impresora", "contrato", "factura",
+      "recibo", "cliente", "proyecto", "modulo", "funcion", "prueba", "error",
+      "registro", "alerta", "informe", "reunion", "correo", "fichero", "carpeta",
+      "variable", "endpoint", "comando", "usuario", "sesion", "token", "script",
+      "columna", "tabla", "consulta", "repositorio", "commit", "despliegue",
+      "contenedor", "orquestador", "balanceador", "certificado", "dominio",
+      "proveedor", "pasarela", "auditoria", "presupuesto",
+    ];
+    const id = memory(
+      "dev",
+      words.map((word) => (/[aeiou]$/.test(word) ? `${word}s` : `${word}es`)).join(" "),
+    );
+    expect(memoryIds(words.join(" "))).toEqual([id]);
+  });
+
+  it("al relajar, dos términos raros adelantan a tres comunes", () => {
+    // The ordering case above is nested: one candidate contains every word of the other,
+    // so dropping the IDF key still leaves the longer match first. Here the matched sets
+    // are disjoint. The three common words are in every memory (frequency === total), so
+    // they are informative but worth log 2 each; the two rare ones are worth log(1 + N).
+    for (let i = 0; i < 20; i++) memory("dev", `sistema proyecto configuracion nota ${i}`);
+    const raro = capture(db, { scope: "dev", body: "kubernetes traefik en produccion" }).id;
+    const comun = capture(db, { scope: "dev", body: "sistema proyecto configuracion del equipo" })
+      .id;
+    const hits = recall(db, {
+      query: "kubernetes traefik sistema proyecto configuracion",
+      reinforce: false,
+    }).hits;
+    expect(
+      hits.filter((hit) => hit.layer === "episode").map((hit) => hit.id),
+    ).toEqual([raro, comun]);
+  });
+
   it("una pregunta ajena y larga con dos palabras comunes no rescata nada", () => {
     memory("jardin", "el sistema tiene un riego automático para el jardín");
     expect(

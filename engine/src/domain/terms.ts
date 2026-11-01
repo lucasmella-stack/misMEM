@@ -53,11 +53,11 @@ export function searchTerms(query: string): string[] {
   const words = split(query);
   const terms = words.filter(carries);
   if (terms.length > 0) return terms;
-  // Every word was empty, and a strict search still needs something to match. The filter
-  // above dropped these for being stopwords or too short, so length is the only signal
-  // left: keep the long ones and fall back to the whole query only when even that leaves
-  // nothing ("la de"). Returning every word re-injected the filler ("la de antes" demanded
-  // "la"), which no memory has.
+  // Every word was empty, and a strict search still needs something to match. Only reached
+  // when no word survives as a term, because the filter above dropped them all for being
+  // stopwords or too short: length is the only signal left. Keep the long ones and fall
+  // back to the whole query only when even that leaves nothing ("la de"). Returning every
+  // word re-injected the filler: "dime sobre el" demanded "el", which no memory has.
   const long = words.filter((word) => word.length >= MIN_TERM_LENGTH);
   return long.length > 0 ? long : words;
 }
