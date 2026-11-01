@@ -20,6 +20,8 @@ export interface BatchStats {
   embedded: number;
   reembedded: number;
   failed: number;
+  /** Rows whose save refused the vector because the item changed meanwhile. Not a failure. */
+  discarded: number;
 }
 
 export interface ResolveOptions {
@@ -75,7 +77,7 @@ export async function embedInBatches<T extends BatchRow>(
   textOf: (row: T) => string,
   save: (row: T, vec: Float32Array) => boolean,
 ): Promise<BatchStats> {
-  const stats: BatchStats = { embedded: 0, reembedded: 0, failed: 0 };
+  const stats: BatchStats = { embedded: 0, reembedded: 0, failed: 0, discarded: 0 };
   let consecutiveFailures = 0;
   for (let i = 0; i < rows.length; i += batchSize) {
     const batch = rows.slice(i, i + batchSize);
@@ -105,7 +107,12 @@ export async function embedInBatches<T extends BatchRow>(
         stats.failed++;
         continue;
       }
-      if (!save(row, vec)) continue;
+      // The item was consolidated, renamed or deleted while the embedder worked. Counting
+      // it apart from `failed` keeps a legitimate race from looking like a dead embedder.
+      if (!save(row, vec)) {
+        stats.discarded++;
+        continue;
+      }
       stats.embedded++;
       if (row.had_embedding) stats.reembedded++;
     }

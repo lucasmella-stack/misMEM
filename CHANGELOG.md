@@ -22,9 +22,12 @@
   de memorias no los deje nunca sin vector; si no hay capas pendientes, las memorias gastan el tope entero.
   `mismem-embed` no tiene tope. Cambiar `MISMEM_EMBEDDING_QUERY_PREFIX` no invalida ningún vector guardado.
 - Una edición desde el visor embebe su memoria antes que el resto del backlog, dentro del mismo tope de 64
-  filas, y sólo responde `reembedded: true` si el vector existe al terminar. Antes, con más de 64 pendientes,
-  la memoria editada podía quedarse sin vector y la respuesta decía que se había reembebido. Tests en
-  `engine/tests/viewer-actions.test.ts` y `engine/tests/embeddings.test.ts`.
+  filas, y sólo responde `reembedded: true` si el vector existe al terminar. Antes la respuesta daba `true`
+  sin comprobarlo, también con el embedder caído o sin configurar, cuando no se había guardado ningún vector.
+  Tests en `engine/tests/viewer-actions.test.ts` y `engine/tests/embeddings.test.ts`.
+- El backfill que sigue a la herramienta `consolidate` también embebe primero la memoria recién destilada: con
+  un backlog mayor que el tope de 64 filas, antes la memoria nueva se quedaba sin vector pasada tras pasada.
+  Test en `engine/tests/server-core.test.ts`.
 - `getEmbeddingIndexStatus` y `mismem-embed --status` cuentan en `outdated`, para memorias y para cada capa, las
   filas del modelo activo con huella distinta o nula. El conteo de memorias excluye los marcadores de ruido, igual
   que el backfill.

@@ -194,12 +194,12 @@ docker exec mismem-brain node dist/embed-cli.js --status   # cuántas memorias t
 docker exec mismem-brain node dist/embed-cli.js            # completa las que faltan
 ```
 
-Cambiar de **modelo**, de **prefijo de documento** o de `MISMEM_EMBEDDING_MAX_CHARS`, o editar el
-texto de una memoria, un rasgo o un episodio, se detecta solo: cada vector guarda
-una huella del texto exacto que se envió, y el siguiente `mismem-embed` reembebe lo
-afectado. `--status` los cuenta en `outdated`. Mientras dura el reindexado, la
-búsqueda por significado sigue viendo los vectores viejos. El prefijo de consulta
-(`MISMEM_EMBEDDING_QUERY_PREFIX`) no entra en la huella: cambiarlo no invalida
+Cambiar de **modelo** aparece en `stale_model`; cambiar el **prefijo de documento**,
+`MISMEM_EMBEDDING_MAX_CHARS` o el texto de una memoria, un rasgo o un episodio, en
+`outdated`. Ambos se detectan solos: cada vector guarda una huella del texto exacto que
+se envió, y el siguiente `mismem-embed` reembebe lo afectado. Mientras dura el
+reindexado, la búsqueda por significado sigue viendo los vectores viejos. El prefijo de
+consulta (`MISMEM_EMBEDDING_QUERY_PREFIX`) no entra en la huella: cambiarlo no invalida
 ningún vector guardado.
 
 Tras actualizar desde una versión sin huella, conviene correr `mismem-embed` una vez: las filas

@@ -315,13 +315,14 @@ export async function embedLayerRowsResolved(
   opts: ResolvedEmbedOptions,
   pending: PendingLayerRows,
   maxRows: number,
-): Promise<{ pending: number; embedded: number; failed: number }> {
+): Promise<{ pending: number; embedded: number; failed: number; discarded: number }> {
   const traitRows = pending.traits.slice(0, maxRows);
   const episodeRows = pending.episodes.slice(0, Math.max(0, maxRows - traitRows.length));
-  const stats: { pending: number; embedded: number; failed: number } = {
+  const stats: { pending: number; embedded: number; failed: number; discarded: number } = {
     pending: pending.traits.length + pending.episodes.length,
     embedded: 0,
     failed: 0,
+    discarded: 0,
   };
   const layers: Array<{ layer: LayerName; rows: Array<{ id: string; text: string } & BatchRow> }> = [
     { layer: "trait", rows: traitRows },
@@ -337,6 +338,7 @@ export async function embedLayerRowsResolved(
     );
     stats.embedded += batch.embedded;
     stats.failed += batch.failed;
+    stats.discarded += batch.discarded;
   }
   return stats;
 }

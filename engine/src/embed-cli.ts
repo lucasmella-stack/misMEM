@@ -60,8 +60,10 @@ async function main(): Promise<void> {
       `[embed] pendientes=${result.pending} embebidas=${result.embedded} reembebidas=${result.reembedded} fallidas=${result.failed}`,
     );
     console.log(
-      `[embed] rasgos y episodios pendientes=${result.layers.pending} embebidos=${result.layers.embedded} fallidos=${result.layers.failed}`,
+      `[embed] rasgos y episodios pendientes=${result.layers.pending} embebidos=${result.layers.embedded} fallidos=${result.layers.failed} descartados=${result.layers.discarded}`,
     );
+    // A discarded layer row changed while its vector was computed: it is not an embedder
+    // failure, so it stays out of the exit code below.
     // The layer backfill fails on its own when every pending item is a trait or an episode,
     // which leaves the memory counters at zero: the exit code has to read both.
     const failed = result.failed + result.layers.failed;

@@ -97,7 +97,7 @@ describe("MCP tool dispatch", () => {
     expect(src).toEqual({ consolidated_into: r.memory_id });
   });
 
-  it("el backfill que sigue a consolidate respeta el tope de 64", async () => {
+  it("el backfill que sigue a consolidate respeta el tope de 64 y no deja sin vector la memoria nueva", async () => {
     const insert = db.prepare(
       "INSERT INTO memories (id, scope, gist, source_episode_ids, created_at) VALUES (?, ?, ?, '[]', ?)",
     );
@@ -119,11 +119,17 @@ describe("MCP tool dispatch", () => {
     process.env.MISMEM_EMBEDDING_URL = "http://embed.test";
     process.env.MISMEM_EMBEDDING_MODEL = "fake";
     try {
-      await ok("consolidate", {
+      const memory = await ok<{ memory_id: string }>("consolidate", {
         scope: "p/a",
         gist: "distilled under a backlog",
         source_episode_ids: [ep.id],
       });
+      // The row created last would sit behind the whole backlog in scan order, so only a
+      // priority id keeps it inside the cap; the rest of the backlog waits for the next pass.
+      expect(sent).toContain("distilled under a backlog");
+      expect(
+        db.prepare("SELECT memory_id FROM memory_embeddings WHERE memory_id = ?").get(memory.memory_id),
+      ).toEqual({ memory_id: memory.memory_id });
     } finally {
       vi.unstubAllGlobals();
       for (const key of keys) {

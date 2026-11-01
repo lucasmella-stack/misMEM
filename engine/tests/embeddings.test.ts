@@ -353,9 +353,9 @@ describe("embedPendingMemories", () => {
     const second = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake", maxRows: 3 });
 
     expect(first).toMatchObject({ pending: 2, embedded: 2 });
-    expect(first.layers).toEqual({ pending: 2, embedded: 1, failed: 0 });
+    expect(first.layers).toEqual({ pending: 2, embedded: 1, failed: 0, discarded: 0 });
     expect(second).toMatchObject({ pending: 0, embedded: 0 });
-    expect(second.layers).toEqual({ pending: 1, embedded: 1, failed: 0 });
+    expect(second.layers).toEqual({ pending: 1, embedded: 1, failed: 0, discarded: 0 });
   });
 
   it("con un backlog de memorias que llena el tope, los rasgos conservan su reserva", async () => {
@@ -370,7 +370,7 @@ describe("embedPendingMemories", () => {
     // The reservation is a quarter of the cap, capped by what the layers actually need:
     // memories keep the other 54 rows, so the run still stops at 64.
     expect(r).toMatchObject({ pending: 100, embedded: 54 });
-    expect(r.layers).toEqual({ pending: 10, embedded: 10, failed: 0 });
+    expect(r.layers).toEqual({ pending: 10, embedded: 10, failed: 0, discarded: 0 });
     expect(r.embedded + r.layers.embedded).toBe(64);
   });
 
@@ -380,7 +380,7 @@ describe("embedPendingMemories", () => {
     const r = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake", maxRows: 64 });
 
     expect(r).toMatchObject({ pending: 100, embedded: 64 });
-    expect(r.layers).toEqual({ pending: 0, embedded: 0, failed: 0 });
+    expect(r.layers).toEqual({ pending: 0, embedded: 0, failed: 0, discarded: 0 });
   });
 
   it("permite reindexar explícitamente el mismo modelo con --force", async () => {
@@ -465,7 +465,7 @@ describe("huella del texto embebido", () => {
     expect(status.outdated).toBe(1);
   });
 
-  it("añade la huella a una base creada antes y la migración se puede repetir", () => {
+  it("añade la huella a una base creada antes, conserva los vectores y la migración se puede repetir", () => {
     const dir = mkdtempSync(join(tmpdir(), "mismem-fingerprint-"));
     const path = join(dir, "mem.db");
     const columns = (open: DB, table: string): string[] =>
@@ -480,6 +480,22 @@ describe("huella del texto embebido", () => {
         gist: "cashflow del mes",
         source_episode_ids: [source.id],
       }).memory_id;
+      const pending = capture(before, { scope: "vida", body: "episodio todavía pendiente" });
+      // The vectors are the data the migration must not cost: recreating a table instead
+      // of adding a column would pass the column check below and lose both.
+      const vec = Buffer.from(new Float32Array([0.6, 0.8]).buffer);
+      before
+        .prepare(
+          `INSERT INTO memory_embeddings (memory_id, model, dims, vec, created_at, fingerprint)
+           VALUES (?, 'fake', 2, ?, 1, 'huella')`,
+        )
+        .run(memoryId, vec);
+      before
+        .prepare(
+          `INSERT INTO layer_embeddings (layer, item_id, model, dims, vec, created_at, fingerprint)
+           VALUES ('episode', ?, 'fake', 2, ?, 1, 'huella')`,
+        )
+        .run(pending.id, vec);
       before.exec("ALTER TABLE memory_embeddings DROP COLUMN fingerprint");
       before.exec("ALTER TABLE layer_embeddings DROP COLUMN fingerprint");
       before.close();
@@ -492,6 +508,16 @@ describe("huella del texto embebido", () => {
           expect(reopened.prepare("SELECT gist FROM memories WHERE id = ?").get(memoryId)).toEqual({
             gist: "cashflow del mes",
           });
+          const stored = reopened
+            .prepare("SELECT memory_id, vec FROM memory_embeddings")
+            .all() as Array<{ memory_id: string; vec: Buffer }>;
+          expect(stored.map((row) => row.memory_id)).toEqual([memoryId]);
+          expect(stored[0]?.vec.equals(vec)).toBe(true);
+          const layer = reopened
+            .prepare("SELECT item_id, vec FROM layer_embeddings WHERE layer = 'episode'")
+            .all() as Array<{ item_id: string; vec: Buffer }>;
+          expect(layer.map((row) => row.item_id)).toEqual([pending.id]);
+          expect(layer[0]?.vec.equals(vec)).toBe(true);
         } finally {
           reopened.close();
         }

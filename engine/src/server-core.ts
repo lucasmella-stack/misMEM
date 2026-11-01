@@ -170,12 +170,17 @@ export function createServer(
           result = await recallHybrid(db, args);
           break;
         case "consolidate": {
-          result = consolidate(db, args);
+          const consolidated = consolidate(db, args);
+          result = consolidated;
           // Best effort: with a local embedder the new memory is embedded right away; the
-          // nightly backfill picks it up otherwise. Bounded so the client never waits for
-          // a full reindex.
+          // nightly backfill picks it up otherwise. Bounded so the client never waits for a
+          // full reindex, and the new id is prioritised because a backlog longer than that
+          // cap would otherwise leave it unembedded pass after pass.
           try {
-            await embedPendingMemories(db, { maxRows: AUTO_BACKFILL_MAX_ROWS });
+            await embedPendingMemories(db, {
+              maxRows: AUTO_BACKFILL_MAX_ROWS,
+              priorityIds: [consolidated.memory_id],
+            });
           } catch {
             /* semantics are optional and never break the write path */
           }
