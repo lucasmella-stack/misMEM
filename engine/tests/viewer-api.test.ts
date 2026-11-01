@@ -23,9 +23,7 @@ let db: DB;
 
 const EMBED_ENV_KEYS = [
   "MISMEM_EMBEDDINGS",
-  "MISMEM_EMBEDDING_PROVIDER",
   "MISMEM_EMBEDDING_URL",
-  "MISMEM_OLLAMA_URL",
   "MISMEM_EMBEDDING_MODEL",
 ] as const;
 const savedEmbedEnv = Object.fromEntries(EMBED_ENV_KEYS.map((key) => [key, process.env[key]]));
@@ -105,7 +103,6 @@ interface ApiBody {
 
 interface EmbeddingBody {
   enabled: boolean;
-  provider: string;
   model: string;
   memories: number;
   embedded: number;
@@ -113,6 +110,7 @@ interface EmbeddingBody {
   compatible: number;
   stale_model: number;
   stale_dims: number;
+  invalid: number;
   active_dims: number | null;
   models: Array<{ model: string; dims: number; count: number }>;
 }
@@ -160,7 +158,6 @@ describe("viewer-api: /api/embeddings", () => {
 
     expect(status()).toMatchObject({
       enabled: false,
-      provider: "ollama",
       model: "embeddinggemma-2",
       memories: 0,
       embedded: 0,
@@ -168,6 +165,7 @@ describe("viewer-api: /api/embeddings", () => {
       compatible: 0,
       stale_model: 0,
       stale_dims: 0,
+      invalid: 0,
       active_dims: null,
       models: [],
     });
@@ -227,13 +225,12 @@ describe("viewer-api: /api/embeddings", () => {
     // Built at runtime so the fixture never reads as a committed credential to secret scanners.
     const userinfo = ["usuario", "secreto"].join(":");
     setEmbedEnv({
-      MISMEM_EMBEDDING_PROVIDER: "openai",
       MISMEM_EMBEDDING_URL: `http://${userinfo}@embed.test/v1`,
       MISMEM_EMBEDDING_MODEL: "embeddinggemma-2",
     });
 
     const body = status();
-    expect(body).toMatchObject({ provider: "openai", model: "embeddinggemma-2" });
+    expect(body).toMatchObject({ model: "embeddinggemma-2" });
     expect(JSON.stringify(body)).not.toContain("usuario");
     expect(JSON.stringify(body)).not.toContain("secreto");
     expect(JSON.stringify(body)).not.toContain("embed.test");

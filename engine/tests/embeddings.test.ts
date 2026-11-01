@@ -176,6 +176,149 @@ describe("embedPendingMemories", () => {
     expect(stored.model).toBe("modelo-a");
   });
 
+  // The batch used to be all-or-nothing. That pinned the healthy neighbour as pending forever,
+  // because the pending order is stable across runs and it always met the same poisoned batch.
+  it.each([
+    { label: "NaN", bad: [Number.NaN, 0, 0] },
+    { label: "Infinity", bad: [Number.POSITIVE_INFINITY, 0, 0] },
+    { label: "norma cero", bad: [0, 0, 0] },
+    { label: "desbordamiento a Float32", bad: [1e39, 0, 0] },
+  ])("un vector con $label se pierde solo y su compañero se guarda", async ({ bad }) => {
+    makeMemory("vida", "uno");
+    makeMemory("vida", "dos");
+    const poisoned: EmbedFn = async () => [Float32Array.from([1, 0, 0]), Float32Array.from(bad)];
+
+    const r = await embedPendingMemories(db, { embedFn: poisoned, model: "fake" });
+
+    expect(r).toMatchObject({ pending: 2, embedded: 1, failed: 1 });
+    const stored = db.prepare("SELECT COUNT(*) AS n FROM memory_embeddings").get() as { n: number };
+    expect(stored.n).toBe(1);
+  });
+
+  it("un lote con dimensiones mezcladas no escribe nada y cuenta como fallido", async () => {
+    makeMemory("vida", "uno");
+    makeMemory("vida", "dos");
+    const poisoned: EmbedFn = async () => [
+      Float32Array.from([1, 0, 0]),
+      Float32Array.from([1, 0]),
+    ];
+
+    const r = await embedPendingMemories(db, { embedFn: poisoned, model: "fake" });
+
+    expect(r).toMatchObject({ pending: 2, embedded: 0, failed: 2 });
+    const stored = db.prepare("SELECT COUNT(*) AS n FROM memory_embeddings").get() as { n: number };
+    expect(stored.n).toBe(0);
+  });
+
+  it("un vector inválido no condena a su compañero de lote", async () => {
+    for (const gist of ["cashflow uno", "cashflow dos", "veneno", "cashflow cuatro"]) {
+      makeMemory("vida", gist);
+    }
+    const poisoned: EmbedFn = async (texts) =>
+      texts.map((text) =>
+        text.includes("veneno") ? new Float32Array([Number.NaN, 0, 0]) : fakeVec(text),
+      );
+
+    const r = await embedPendingMemories(db, { embedFn: poisoned, model: "fake", batchSize: 2 });
+
+    expect(r).toMatchObject({ pending: 4, embedded: 3, failed: 1 });
+    const stored = db.prepare("SELECT COUNT(*) AS n FROM memory_embeddings").get() as { n: number };
+    expect(stored.n).toBe(3);
+  });
+
+  it("un embedFn que devuelve menos vectores que textos es un lote nulo", async () => {
+    makeMemory("vida", "cashflow uno");
+    makeMemory("vida", "cashflow dos");
+    const short: EmbedFn = async (texts) => texts.slice(0, 1).map(fakeVec);
+
+    const r = await embedPendingMemories(db, { embedFn: short, model: "fake" });
+
+    expect(r).toMatchObject({ pending: 2, embedded: 0, failed: 2 });
+    const stored = db.prepare("SELECT COUNT(*) AS n FROM memory_embeddings").get() as { n: number };
+    expect(stored.n).toBe(0);
+  });
+
+  it("dos lotes de forma imposible seguidos abortan la corrida", async () => {
+    for (const gist of ["a", "b", "c", "d"]) makeMemory("vida", gist);
+    let calls = 0;
+    const short: EmbedFn = async () => {
+      calls++;
+      return [];
+    };
+
+    const r = await embedPendingMemories(db, { embedFn: short, model: "fake", batchSize: 1 });
+
+    expect(calls).toBe(2);
+    expect(r).toMatchObject({ embedded: 0, failed: 4 });
+  });
+
+  it("una tanda entera de vectores inválidos cuenta como fallida y aborta a la segunda", async () => {
+    for (const gist of ["a", "b", "c", "d", "e"]) makeMemory("vida", gist);
+    let calls = 0;
+    const zero: EmbedFn = async () => {
+      calls++;
+      return [new Float32Array([0, 0, 0])];
+    };
+
+    const r = await embedPendingMemories(db, { embedFn: zero, model: "fake", batchSize: 1 });
+
+    expect(calls).toBe(2);
+    expect(r).toMatchObject({ embedded: 0, failed: 5 });
+  });
+
+  it("una tanda entera de NaN también cuenta como fallida", async () => {
+    for (const gist of ["a", "b", "c"]) makeMemory("vida", gist);
+    let calls = 0;
+    const poisoned: EmbedFn = async () => {
+      calls++;
+      return [new Float32Array([Number.NaN, 0, 0])];
+    };
+
+    const r = await embedPendingMemories(db, { embedFn: poisoned, model: "fake", batchSize: 1 });
+
+    expect(calls).toBe(2);
+    expect(r).toMatchObject({ embedded: 0, failed: 3 });
+  });
+
+  it("el recuento de inválidos ignora el ruido, que el backfill nunca reescribe", () => {
+    const noiseId = makeMemory("vida", "[noise] episodio descartado");
+    saveMemoryEmbedding(db, noiseId, "fake", new Float32Array([0, 0, 0]));
+    const memoryId = makeMemory("vida", "cashflow del mes");
+    saveMemoryEmbedding(db, memoryId, "fake", new Float32Array([Number.NaN, 0, 0]));
+
+    expect(getEmbeddingIndexStatus(db, "fake").invalid).toBe(1);
+  });
+
+  it("el backfill cura una fila inválida que guardó una versión anterior", async () => {
+    const memoryId = makeMemory("vida", "cashflow del mes");
+    saveMemoryEmbedding(db, memoryId, "fake", new Float32Array([Number.NaN, 0, 0]));
+    expect(getEmbeddingIndexStatus(db, "fake").invalid).toBe(1);
+
+    const r = await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+
+    expect(r).toMatchObject({ pending: 1, embedded: 1, reembedded: 1, failed: 0 });
+    expect(getEmbeddingIndexStatus(db, "fake").invalid).toBe(0);
+    const row = db
+      .prepare("SELECT vec FROM memory_embeddings WHERE memory_id = ?")
+      .get(memoryId) as { vec: Buffer };
+    const stored = new Float32Array(row.vec.buffer, row.vec.byteOffset, row.vec.byteLength / 4);
+    expect(Array.from(stored).every(Number.isFinite)).toBe(true);
+  });
+
+  it("guarda con norma 1 un vector válido que llega sin normalizar", async () => {
+    const memoryId = makeMemory("vida", "cashflow del mes");
+    const unnormalized: EmbedFn = async () => [new Float32Array([3, 4, 0])];
+
+    await embedPendingMemories(db, { embedFn: unnormalized, model: "fake" });
+
+    const row = db
+      .prepare("SELECT vec FROM memory_embeddings WHERE memory_id = ?")
+      .get(memoryId) as { vec: Buffer };
+    const stored = new Float32Array(row.vec.buffer, row.vec.byteOffset, row.vec.byteLength / 4);
+    expect(Math.hypot(...stored)).toBeCloseTo(1);
+    expect(Array.from(stored).map((v) => Number(v.toFixed(3)))).toEqual([0.6, 0.8, 0]);
+  });
+
   it("permite reindexar explícitamente el mismo modelo con --force", async () => {
     makeMemory("vida", "cashflow del mes");
     await embedPendingMemories(db, {
@@ -204,6 +347,7 @@ describe("getEmbeddingIndexStatus", () => {
       compatible: 0,
       stale_model: 0,
       stale_dims: 0,
+      invalid: 0,
       active_dims: null,
       models: [],
     });
@@ -264,12 +408,14 @@ describe("getEmbeddingIndexStatus", () => {
 
     // With no known width it is a tie, settled deterministically by the smaller one.
     expect(getEmbeddingIndexStatus(db, "m")).toMatchObject({
+      active_dims: 3,
       compatible: 1,
       stale_model: 0,
       stale_dims: 1,
     });
-    // With the active model's width, the 5-dimension vector cannot be searched.
+    // With an expected width of 5 the 3-dimension vector is the one search cannot read.
     expect(getEmbeddingIndexStatus(db, "m", 5)).toMatchObject({
+      active_dims: 5,
       compatible: 1,
       stale_model: 0,
       stale_dims: 1,
@@ -381,6 +527,21 @@ describe("recallHybrid", () => {
       { reinforce: false, embeddingModel: "modelo-b" },
     );
     expect(hybrid.hits).toHaveLength(0);
+  });
+
+  it("una consulta con vector inválido degrada a léxico sin lanzar", async () => {
+    makeMemory("vida", "cashflow apretado");
+    await embedPendingMemories(db, { embedFn: fakeEmbed, model: "fake" });
+    // Only the lexical rescue finds it: proof that the semantic layer is off.
+    const rescatado = capture(db, { scope: "vida", body: "configurar servidor nginx" }).id;
+    const poisonedQuery: EmbedFn = async () => [new Float32Array([Number.NaN, 0, 0])];
+
+    const hybrid = await recallHybrid(db, { query: "configurando servidores nginx" }, poisonedQuery, {
+      reinforce: false,
+      embeddingModel: "fake",
+    });
+
+    expect(hybrid.hits.map((hit) => hit.id)).toContain(rescatado);
   });
 
   it("descarta dimensiones incompatibles sin comparar vectores", async () => {

@@ -13,7 +13,6 @@ const NOW = Date.UTC(2026, 9, 25, 12, 0, 0);
 function status(overrides: Partial<EmbeddingStatus> = {}): EmbeddingStatus {
   return {
     enabled: true,
-    provider: "ollama",
     model: "embeddinggemma-2",
     memories: 10,
     embedded: 10,
@@ -21,6 +20,7 @@ function status(overrides: Partial<EmbeddingStatus> = {}): EmbeddingStatus {
     compatible: 10,
     stale_model: 0,
     stale_dims: 0,
+    invalid: 0,
     active_dims: null,
     models: [],
     ...overrides,
@@ -102,12 +102,8 @@ describe("activeModelDims", () => {
     expect(dims).toBe(768);
   });
 
-  it("sin ancho registrado no inventa uno a partir de los vectores guardados", () => {
-    expect(
-      activeModelDims(
-        status({ active_dims: null, models: [{ model: "embeddinggemma-2", dims: 768, count: 9 }] }),
-      ),
-    ).toBeUndefined();
+  it("sin ancho activo en el estado no deduce uno: confía en lo que dice el servidor", () => {
+    expect(activeModelDims(status({ active_dims: null, models: [] }))).toBeUndefined();
   });
 });
 
