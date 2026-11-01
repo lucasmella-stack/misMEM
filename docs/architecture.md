@@ -91,7 +91,8 @@ en sólo lectura que el fichero es una base de misMEM con `store/probe.ts` antes
 ## Almacenamiento
 
 SQLite con WAL (varios lectores y un escritor concurrente), con `better-sqlite3`. Los vectores de la
-búsqueda por significado son un BLOB por memoria en la misma base. El fichero se crea con permisos `0600`.
+búsqueda por significado son un BLOB por memoria (`memory_embeddings`) y por rasgo o episodio pendiente
+(`layer_embeddings`) en la misma base. El fichero se crea con permisos `0600`.
 
 ## Saliencia, decay y olvido
 
