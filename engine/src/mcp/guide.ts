@@ -18,6 +18,6 @@ A recall or mem_search with no hits adds scopes: the scopes that do hold content
 
 reinforce after answering, with the ids the answer actually relied on, not every hit.
 
-consolidate distills pending episodes into one memory; crystallize promotes a pattern that repeats across memories. forget prunes old consolidated episodes and low-salience memories, and only writes with dry_run false.
+consolidate saves a memory you wrote from the episodes you list (the nightly run distills pending ones by itself); crystallize promotes a pattern that repeats across memories. forget prunes old consolidated episodes and low-salience memories, and only writes with dry_run false.
 
 A validation error comes as one line per problem: "Error en <tool>: <field>: <what it expects>". Fix that field and retry; sent unchanged, the call fails again.`;

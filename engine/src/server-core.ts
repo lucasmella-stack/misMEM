@@ -76,7 +76,7 @@ export const CANONICAL_TOOLS = [
   {
     name: "consolidate",
     description:
-      "Distill N episodes into a single memory (gist + details). Marks episodes as consolidated. Use when a scope has pending episodes that belong together, or let the nightly consolidation do it.",
+      "Save a memory you wrote (gist + details) from the N episodes you list, and mark them consolidated. Use when you have read pending episodes of a scope that belong together; otherwise the nightly consolidation distills them.",
     inputSchema: {
       type: "object",
       required: ["scope", "gist", "source_episode_ids"],

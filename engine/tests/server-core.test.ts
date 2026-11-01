@@ -233,6 +233,15 @@ describe("MCP guidance", () => {
     expect(instructions).toContain("hint says it matched nothing");
   });
 
+  it("says consolidate saves what the caller wrote, not that it distills by itself", async () => {
+    const { tools } = await client.listTools();
+    const instructions = client.getInstructions() ?? "";
+
+    // The tool requires gist and source_episode_ids: a model told it distills would call it empty.
+    expect(instructions).toContain("consolidate saves a memory you wrote");
+    expect(tools.find((tool) => tool.name === "consolidate")?.description).toMatch(/^Save a memory you wrote/);
+  });
+
   it("tells the model when to use each canonical tool", async () => {
     const { tools } = await client.listTools();
 
