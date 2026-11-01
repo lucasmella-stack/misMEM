@@ -411,7 +411,7 @@ Sin default: si falta una de las dos (como variable o como parámetro del script
 | Var | Default | Descripción |
 |-----|---------|-------------|
 | `MISMEM_EMBEDDINGS` | `auto` | `off` apaga la capa; con `auto`, si el servidor no responde se busca sólo por palabras |
-| `MISMEM_EMBEDDING_URL` | `http://127.0.0.1:8080` | Servidor de embeddings con `/v1/embeddings`: llama-server, u Ollama en `http://127.0.0.1:11434` |
+| `MISMEM_EMBEDDING_URL` | `http://127.0.0.1:8080` | Servidor de embeddings con `/v1/embeddings`: llama-server, u Ollama en `http://127.0.0.1:11434`. Con otro servidor, fijar también `MISMEM_EMBEDDING_MODEL` con un modelo que sirva (por ejemplo `nomic-embed-text` y, para ese, `MISMEM_EMBEDDING_MIN_SCORE=0.65`) |
 | `MISMEM_EMBEDDING_MODEL` | `embeddinggemma-2` | Modelo. Cambiarlo reindexa solo |
 | `MISMEM_EMBEDDING_QUERY_PREFIX` / `_DOC_PREFIX` | los de EmbeddingGemma (`task: search result \| query: ` y `title: none \| text: `) si el modelo es de esa familia (su id contiene `embeddinggemma`, sin distinguir mayúsculas); si no, vacíos | Prefijos de consulta y documento. Vacíos a propósito (`=`) los quitan. Cambiarlos exige `mismem-embed --force` |
 | `MISMEM_EMBEDDING_MIN_SCORE` | `0.65` con la familia EmbeddingGemma; `0.5` con cualquier otro modelo | Parecido mínimo (coseno) para que una memoria cuente. 0,65 es el mayor corte que no pierde aciertos con EmbeddingGemma (PR #181); `0` trae todo. Un valor explícito gana siempre |

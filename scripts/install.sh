@@ -369,7 +369,13 @@ fi
 if [ -z "$EMBED_FLAG" ] && [ "$EMBED_CHOICE" != custom ] && [ "$(prev MISMEM_EMBEDDINGS)" = off ]; then
   EMBED_CHOICE=off
 fi
-if [ "$EMBED_CHOICE" = nomic ]; then
+if [ "$EMBED_CHOICE" = nomic ] && [ -z "$CAN_GEMMA" ]; then
+  # Sin llama-server la migración dejaría la búsqueda apuntando a un puerto vacío: nomic, que funciona, se
+  # conserva como configuración propia, con la URL, el modelo y el corte escritos.
+  say "  Sin llama-server no puedo montar EmbeddingGemma 2: conservo nomic-embed-text de Ollama."
+  PREV_KIND=custom
+  EMBED_CHOICE=custom
+elif [ "$EMBED_CHOICE" = nomic ]; then
   say "  nomic-embed-text ya no se usa: paso a EmbeddingGemma 2, y las memorias se reindexan solas."
   EMBED_CHOICE=gemma
 fi
@@ -400,7 +406,11 @@ elif [ "$EMBED_CHOICE" = gemma ]; then
 else
   # Apagada del todo: sin servidor, cada búsqueda esperaría el timeout del embedder para nada.
   EMBEDDINGS_OFF=1
-  say "  Búsqueda sólo por palabras. Para buscar por significado: instala llama.cpp (llama-server) y vuelve a ejecutar esto."
+  if [ -n "$CAN_GEMMA" ]; then
+    say "  Búsqueda sólo por palabras. Para buscar por significado: vuelve a ejecutar esto con --embeddings gemma."
+  else
+    say "  Búsqueda sólo por palabras. Para buscar por significado: instala llama.cpp (llama-server) y vuelve a ejecutar esto."
+  fi
 fi
 
 NEW_EMBED=""
