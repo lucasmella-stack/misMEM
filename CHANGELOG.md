@@ -12,6 +12,37 @@
 - Un contador que el servidor dejara de mandar producía «El índice semántico no está al día: .», con la
   lista vacía. Ahora, sin nada que enumerar, no hay aviso.
 
+### Tres tests que el visor no tenía, y uno que no probaba lo que decía
+
+- **El filtro por ámbito de los temas no lo ejercitaba nadie.** `queries/topics.ts` enciende una rama
+  del `WHERE` cuando se le pasa `scope`, y ninguno de sus ocho tests se lo pasaba: borrarla dejaba la
+  suite entera verde y la pestaña Temas ignorando el ámbito por el que navega el resto del visor.
+- **`respeta el orden en que el motor rankeó los hubs`**: el test que decía «ordena la entrada por
+  asociación» tenía un solo hub en su `summary`, así que con un orden invertido seguía pasando. Pasa a
+  llamarse por lo que comprueba y el orden se prueba aparte, con dos.
+- **El conjunto de claves de `/api/embeddings`** queda fijado: que la URL del proveedor no salga ya
+  estaba probado, pero un campo nuevo en el estado entraba a la respuesta sin que nadie lo decidiera.
+- Los temporizadores falsos se restauran en un `afterEach` y no dentro del cuerpo del test: si ese test
+  fallaba antes de llegar a su última línea, se filtraban al siguiente y lo colgaban por una razón
+  ajena.
+
+### El instalador dice por qué falló, y sus tests dejan de llenar /tmp
+
+- `scripts/install.sh` corría `pnpm install --frozen-lockfile >/dev/null` y `pnpm build >/dev/null`.
+  **pnpm escribe sus errores en stdout**, así que una instalación que abortaba por un lockfile que no
+  cuadra moría sin imprimir una sola línea útil. La salida se guarda y se imprime sólo si el comando
+  falla.
+- `tests/installer.test.ts` creaba un directorio temporal por sandbox y no borraba ninguno: había 248
+  acumulados, 380 MB. Se borran en el `afterEach`, como pide
+  [docs/standards/tests.md](docs/standards/tests.md).
+
+### El log de la consolidación deja de llevar el texto de una memoria
+
+- Al descartar una memoria destilada por quedarse sin evidencia, el log imprimía sesenta caracteres
+  de su `gist`. Ese log sale por `console.log` desde el CLI y es el `job.log` que el visor pinta, así
+  que era dato del usuario en un log, que `AGENTS.md` prohíbe sin matices. Ahora lleva el ámbito y
+  cuántos episodios había citado, que es lo que hace falta para distinguir un descarte de un fallo.
+
 ### El README dice lo mismo con menos palabras
 
 - El párrafo del instalador eran ciento setenta palabras en un bloque, con detalles que ya están en su

@@ -50,6 +50,20 @@ describe("temas", () => {
     expect(out.alone).toBe(1);
   });
 
+  it("con un ámbito sólo mira las memorias de ese ámbito", () => {
+    // The WHERE branch that `scope` turns on was never exercised: deleting it left the suite
+    // green and the Temas tab ignoring the scope the rest of the viewer navigates by.
+    memory("a", "hosting en Hetzner", { scope: "infra", vec: onAngle(0) });
+    memory("b", "el servidor de Hetzner", { scope: "infra", vec: onAngle(10) });
+    memory("c", "costos del hosting", { scope: "otro", vec: onAngle(20) });
+
+    const out = topics(db, { minScore: 0.9, scope: "infra" });
+
+    expect(out.considered).toBe(2);
+    expect(out.topics).toHaveLength(1);
+    expect(out.topics[0]?.members.sort()).toEqual(["a", "b"]);
+  });
+
   it("un tema dice de qué ámbitos sale, que es lo que no se ve navegando por ámbito", () => {
     memory("a", "arquitectura de Daimon", { scope: "project", vec: onAngle(0) });
     memory("b", "Daimon en traefik", { scope: "session", vec: onAngle(8) });

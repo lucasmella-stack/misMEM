@@ -198,7 +198,11 @@ export async function processScope(
     // evidence, because consolidate() refuses to take an episode another memory already owns.
     const evidence = m.evidence_episode_ids.filter((id) => validIds.has(id) && !cited.has(id));
     if (evidence.length === 0) {
-      log(`[consolidation] skip memoria sin evidencia v\u00e1lida o ya citada: "${m.gist.slice(0, 60)}"`);
+      // The gist is the user's own text and this log reaches console and the viewer, so it
+      // carries the count instead: enough to tell a skip from a failure.
+      log(
+        `[consolidation] scope="${scope}" -> skip memoria: sus ${m.evidence_episode_ids.length} episodios citados ya estaban tomados o no son válidos`,
+      );
       continue;
     }
     const result = consolidate(db, {
