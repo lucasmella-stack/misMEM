@@ -2,7 +2,7 @@
 
 ## Sin publicar
 
-### El README describe el sistema, no modelos ni clientes concretos
+### El README describe el sistema: sin modelos concretos y sin una lista cerrada de clientes
 
 - La búsqueda por significado funciona con cualquier modelo detrás de un servidor de embeddings, y la
   consolidación con cualquier LLM de API compatible con OpenAI: el README deja de presentar modelos concretos
