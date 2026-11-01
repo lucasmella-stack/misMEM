@@ -132,20 +132,25 @@ Y en la configuración MCP del cliente: `"command": "node", "args": ["<ruta-al-r
 | | Qué hace | Más |
 |---|---|---|
 | **Seis invocaciones** | `capture`, `recall`, `reinforce`, `consolidate`, `crystallize`, `forget`, más una capa de compatibilidad con Engram (`mem_save`, `mem_search`, ...) | [Arquitectura](docs/architecture.md#seis-invocaciones) |
-| **Recall híbrido** | Palabras (FTS5) y significado (embeddings, opcional) fusionados por RRF; si el servidor de embeddings cae, sigue por palabras | [Recall](docs/recall.md) |
+| **Recall híbrido** | Palabras (FTS5) y significado (embeddings, opcional) fusionados por RRF sobre las tres capas a la vez; si el servidor de embeddings cae, sigue por palabras | [Recall](docs/recall.md) |
+| **Medido, no supuesto** | Un corpus dorado público en castellano (doce dominios) y `pnpm eval`, que informa aciertos y MRR por tipo de pregunta y por dominio contra un suelo declarado | [Recall](docs/recall.md) |
 | **Saliencia con decay** | Lo que no se usa pierde la mitad cada 90 días; el refuerzo sigue el uso real, no la aparición | [Arquitectura](docs/architecture.md#saliencia-decay-y-olvido) |
 | **Índice hebbiano** | Cuenta qué recuerdos se usaron juntos en el mismo turno | [Arquitectura](docs/architecture.md#el-índice-hebbiano) |
 | **Ámbitos** | Un `scope` por proyecto o cliente dentro de la misma base; una búsqueda con ámbito no mezcla los demás | [Arquitectura](docs/architecture.md#un-territorio-varias-instancias) |
 | **Consolidación nocturna** | Un LLM destila los episodios en memorias, con prefiltro de ruido | [Consolidación](engine/src/consolidation/README.md) |
-| **Visor web** | Memorias por saliencia, rasgos, lo pendiente, el origen de cada recuerdo y el grafo; con acciones opcionales | [Arquitectura](docs/architecture.md#componentes) |
+| **Visor web** | Memorias por saliencia, rasgos, lo pendiente, el origen de cada recuerdo, el estado del índice semántico y el grafo; con acciones opcionales | [Arquitectura](docs/architecture.md#componentes) |
+| **Temas** | Las islas de significado: qué recuerdos hablan de lo mismo aunque vivan en ámbitos distintos, calculadas sobre los vectores. El grafo se puede pintar por tema | [Arquitectura](docs/architecture.md#componentes) |
+| **Lo que el modelo recibe** | El servidor anuncia cuándo usar cada herramienta y cómo salir de un fallo; cada resultado de `recall` trae su capa, su fecha, los detalles y la polaridad | [Arquitectura](docs/architecture.md#seis-invocaciones) |
 | **Hooks de cliente** | Adelantan recuerdos antes de responder y refuerzan los que se usaron | [Hooks](docs/hooks.md) |
 | **Ingesta y exportación** | Exports de ChatGPT, transcripts de VS Code, migración desde Engram, bóveda de Obsidian | [Arquitectura](docs/architecture.md#componentes) |
-| **Servidor remoto** | MCP por Streamable HTTP con BasicAuth, guarda de `Host` y límite de cuerpo | [DEPLOY.md](DEPLOY.md) |
+| **Servidor remoto** | MCP por Streamable HTTP con BasicAuth, guarda de `Host` y límite de cuerpo; el visor entra por su propio formulario, con la sesión firmada | [DEPLOY.md](DEPLOY.md) |
 
 ## El visor
 
 Capturas del visor (`/viewer`): el grafo entero con sus ajustes, y el grafo local alrededor de una
-memoria con su detalle al costado.
+memoria con su detalle al costado. El tamaño de cada nodo mide sus conexiones visibles, y los colores
+pueden seguir al ámbito o al tema. Las demás pestañas son las memorias por saliencia, los rasgos, lo
+que falta consolidar y los temas.
 
 <p align="center">
   <img alt="Visor: grafo de episodios, memorias y rasgos, con los ajustes del grafo abiertos" src="docs/assets/viewer-grafo.webp" width="48%">
