@@ -2,7 +2,9 @@
 
 `recall` pone traits, memories y episodes en un solo ranking: las tres capas compiten por la misma plaza con
 RRF. Cada señal aporta `peso / (60 + puesto)` y un recuerdo que encuentran varias señales sube; ninguna capa
-conserva un escalón fijo. La saliencia sólo desempata entre memories. Las constantes están en
+conserva un escalón fijo. La saliencia sólo puntúa a las memories: suma `saliencia * 0,0002` a su RRF, por
+debajo de un puesto en la cabeza, así que ahí sólo desempata y más abajo puede mover dos o tres plazas; rasgos
+y episodios no la llevan. Las constantes están en
 `engine/src/recall/` y las variables, en la tabla de [DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única).
 
 ## Por palabras (siempre)

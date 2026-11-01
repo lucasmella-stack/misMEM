@@ -25,6 +25,13 @@
 - `docs/recall.md` y `docs/architecture.md` describen el ranking nuevo y la línea base del 2026-10-30. El test
   de `fin-q35` recorre las capas reales por `recallHybrid` y comprueba que el hook recibe `fin-t1`. Tests en
   `engine/tests/hybrid-layers.test.ts`, `engine/tests/inject.test.ts` y `engine/tests/recall-relaxed.test.ts`.
+- Corrige los hallazgos de revisión del PR: `mismem-embed` y `consolidate` cuentan también los fallos del
+  backfill de rasgos y episodios, así que el CLI ya no sale con 0 cuando sólo falla esa capa; `mem_update` con
+  el mismo nombre de rasgo conserva el vector pero avanza `updated_at`, que es por lo que ordena el visor; el
+  test de una base anterior a `layer_embeddings` borra también sus disparadores y comprueba que borrar o
+  consolidar el item quita su vector; y `docs/recall.md` describe la saliencia como lo que hace el código, un
+  peso pequeño sobre las memorias y no un desempate sólo entre ellas. Tests en
+  `engine/tests/embed-cli.test.ts`, `engine/tests/hybrid-layers.test.ts` y `engine/tests/engram-compat.test.ts`.
 
 ### Un eval dorado público en castellano, con suelo en CI
 
