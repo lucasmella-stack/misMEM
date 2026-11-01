@@ -2,6 +2,15 @@
 
 ## Sin publicar
 
+### El README y la arquitectura cuentan lo que el motor hace hoy
+
+- La tabla del README no mencionaba los temas, el eval dorado, el estado del índice semántico, el
+  formulario de entrada del visor ni lo que el servidor MCP le anuncia al modelo. Todo eso entró en las
+  últimas versiones y no estaba contado donde primero se mira.
+- `docs/architecture.md` describía la interfaz sin su pestaña de temas ni el grafo por tema o por
+  conexiones.
+- El logo, las dos capturas del grafo y la configuración de Dependabot quedan como estaban.
+
 ### El grafo se puede pintar por tema, no sólo por ámbito
 
 - *Ajustes del grafo* cambia **Color por ámbito** por una elección de tres: **ámbito, tema o ninguno**.
