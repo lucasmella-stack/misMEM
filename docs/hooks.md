@@ -16,8 +16,8 @@ Dos matices sobre esa aproximación:
   presupuesto de 2.000 o más, el recorte remoto cabe y el texto entero local no, y lo inyectado deja de ser
   lo mismo.
 - `mismem-used` mide el solapamiento sólo sobre el `text` del hit, recortado cuando vino de un `recall` por
-  MCP: no cuenta los `details`, aunque el modelo también los recibe, así que una respuesta construida sólo
-  desde el detalle no refuerza la memoria. El recorte puede quitar palabras que la respuesta no repetía, así que para un gist por
+  MCP: los `details` no cuentan como señal, aunque el modelo también los recibe: el refuerzo depende sólo de
+  que la respuesta repita palabras del gist. El recorte puede quitar palabras que la respuesta no repetía, así que para un gist por
   encima del tope el error ya no cae siempre del lado de no reforzar.
 
 ## Qué sale de la máquina

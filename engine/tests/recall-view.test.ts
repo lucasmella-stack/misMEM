@@ -100,6 +100,8 @@ describe("recallForModel", () => {
       hit({ layer: "episode", id: "nan", created_at: Number.NaN }),
       // Finite but out of Date's range, so toISOString would throw RangeError.
       hit({ layer: "episode", id: "huge", created_at: Number.MAX_VALUE }),
+      // Inside Date's range but past year 9999 (an epoch in microseconds): not YYYY-MM-DD.
+      hit({ layer: "episode", id: "micros", created_at: 1e15 }),
     ]);
 
     for (const view of hits) expect(view).not.toHaveProperty("date");
