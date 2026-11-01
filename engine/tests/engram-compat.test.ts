@@ -249,7 +249,7 @@ describe("engram-compat: mem_update", () => {
     ).toEqual([0, 1]);
   });
 
-  it("renombrar un rasgo con el mismo nombre no toca su vector", async () => {
+  it("renombrar un rasgo con el mismo nombre no toca su vector pero sí updated_at", async () => {
     const { id: ep } = capture(db, { scope: "s", body: "x" });
     const { memory_id } = consolidate(db, {
       scope: "s",
@@ -265,6 +265,7 @@ describe("engram-compat: mem_update", () => {
       `INSERT INTO layer_embeddings (layer, item_id, model, dims, vec, created_at)
        VALUES ('trait', ?, 'fake', 1, ?, ?)`,
     ).run(trait_id, Buffer.from(new Float32Array([1]).buffer), Date.now());
+    db.prepare("UPDATE traits SET updated_at = ? WHERE id = ?").run(1, trait_id);
 
     let calls = 0;
     const embedFn: EmbedFn = async (texts) => {
@@ -279,6 +280,10 @@ describe("engram-compat: mem_update", () => {
     );
 
     expect(calls).toBe(0);
+    const updated = db
+      .prepare("SELECT updated_at FROM traits WHERE id = ?")
+      .get(trait_id) as { updated_at: number };
+    expect(updated.updated_at).toBeGreaterThan(1);
     const row = db
       .prepare(
         "SELECT dims, vec FROM layer_embeddings WHERE layer = 'trait' AND item_id = ?",
@@ -288,6 +293,40 @@ describe("engram-compat: mem_update", () => {
     expect(
       Array.from(new Float32Array(row.vec.buffer, row.vec.byteOffset, row.vec.byteLength / 4)),
     ).toEqual([1]);
+  });
+
+  it("renombrar un rasgo con el embedder caído no deja el vector viejo", async () => {
+    const { id: ep } = capture(db, { scope: "s", body: "x" });
+    const { memory_id } = consolidate(db, {
+      scope: "s",
+      gist: "g",
+      source_episode_ids: [ep],
+    });
+    const { trait_id } = crystallize(db, {
+      scope: "s",
+      name: "nombre viejo",
+      evidence_memory_ids: [memory_id],
+    });
+    db.prepare(
+      `INSERT INTO layer_embeddings (layer, item_id, model, dims, vec, created_at)
+       VALUES ('trait', ?, 'fake', 1, ?, ?)`,
+    ).run(trait_id, Buffer.from(new Float32Array([1]).buffer), Date.now());
+
+    await dispatchEngramTool(
+      db,
+      "mem_update",
+      { id: trait_id, content: "nombre nuevo" },
+      { embedFn: async () => null, embeddingModel: "fake" },
+    );
+
+    expect(db.prepare("SELECT name FROM traits WHERE id = ?").get(trait_id)).toEqual({
+      name: "nombre nuevo",
+    });
+    expect(
+      db
+        .prepare("SELECT 1 FROM layer_embeddings WHERE layer = 'trait' AND item_id = ?")
+        .get(trait_id),
+    ).toBeUndefined();
   });
 
   it("rolls the gist back when invalidating the embedding fails", async () => {

@@ -62,7 +62,12 @@ async function main(): Promise<void> {
     console.log(
       `[embed] rasgos y episodios pendientes=${result.layers.pending} embebidos=${result.layers.embedded} fallidos=${result.layers.failed}`,
     );
-    if (result.failed > 0 && result.embedded === 0) {
+    // The layer backfill fails on its own when every pending item is a trait or an episode,
+    // which leaves the memory counters at zero: the exit code has to read both.
+    const failed = result.failed + result.layers.failed;
+    const embedded = result.embedded + result.layers.embedded;
+    console.log(`[embed] total embebidas=${embedded} fallidas=${failed}`);
+    if (failed > 0 && embedded === 0) {
       console.error(`[embed] ¿El servidor de embeddings está corriendo en ${cfg.url} y sirve ${cfg.model}?`);
       process.exitCode = 1;
     }
