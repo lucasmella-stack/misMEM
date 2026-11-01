@@ -1,7 +1,7 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "@/api";
 import { ago } from "@/format";
-import { mergePages } from "@/lib/pages";
+import { mergePages, nextPageOffset } from "@/lib/pages";
 import { Chip, Count, Empty, Failure, Loading, type ListProps, PagedList, Row } from "./primitives";
 
 export function PendingList({ scope, selected, onSelect }: ListProps) {
@@ -10,12 +10,13 @@ export function PendingList({ scope, selected, onSelect }: ListProps) {
     queryFn: ({ pageParam, signal }) => api.pendingEpisodes(scope, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (last, _pages, lastOffset) =>
-      lastOffset + last.rows.length < last.total ? lastOffset + last.rows.length : undefined,
+      nextPageOffset(lastOffset, last.rows.length, last.total),
   });
 
   if (query.isPending) return <Loading label="Cargando los episodios sin consolidar…" />;
   const rows = mergePages(query.data?.pages.map((page) => page.rows) ?? []);
-  const total = query.data?.pages[0]?.total ?? 0;
+  // The total comes from the last page so the header and "load more" agree on what is left.
+  const total = query.data?.pages.at(-1)?.total ?? 0;
   const remaining = Math.max(0, total - rows.length);
 
   return (

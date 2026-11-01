@@ -22,4 +22,10 @@ export function ago(ts: number | null | undefined, now = Date.now()): string {
 
 export const exact = (ts: number): string => absolute.format(new Date(ts));
 
+/** The relative one to orient yourself, the absolute one to avoid doing the math. */
+export function when(ts: number | null | undefined, now = Date.now()): string {
+  if (!ts) return "nunca";
+  return `${ago(ts, now)} (${exact(ts)})`;
+}
+
 export const percent = (value: number): string => `${Math.round(value * 100)} %`;

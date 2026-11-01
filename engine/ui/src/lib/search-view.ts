@@ -1,5 +1,5 @@
 /** The views of the main panel. They live here so the search logic does not depend on React. */
-export type View = "memories" | "traits" | "pending" | "results" | "graph";
+export type View = "memories" | "traits" | "topics" | "pending" | "results" | "graph";
 
 /**
  * Where the search box text leads. In the graph the text filters locally and instantly: jumping

@@ -83,6 +83,33 @@ describe("runConsolidation", () => {
     });
   });
 
+  it("dos memorias que citan el mismo episodio no rompen la corrida ni crean una memoria sin origen", async () => {
+    const shared = captureOld("s", "decidimos migrar el hosting a Hetzner por costo", 48);
+    captureOld("s", "el presupuesto de infra baja un 40%", 48);
+    captureOld("s", "hay que avisar al equipo del cambio", 48);
+    // A model can cite the same episode in two memories; only one of them can keep it.
+    const distillFn = vi.fn(async () => [
+      { gist: "Hosting en Hetzner", evidence_episode_ids: [shared] },
+      { gist: "Lo mismo visto de otra forma", evidence_episode_ids: [shared] },
+    ]);
+
+    const summary = await runConsolidation(db, {
+      paretoPrefilter: false,
+      llm: llmCfg,
+      distillFn,
+      log: () => {},
+    });
+
+    expect(summary.scopes_failed).toBe(0);
+    expect(summary.memories_created).toBe(1);
+    const sourceless = db
+      .prepare(
+        "SELECT count(*) n FROM memories m WHERE NOT EXISTS (SELECT 1 FROM episodes e WHERE e.consolidated_into = m.id)",
+      )
+      .get() as { n: number };
+    expect(sourceless.n).toBe(0);
+  });
+
   it("un ámbito chico que lleva tiempo quieto se consolida igual: si no, queda pendiente para siempre", async () => {
     const lone = captureOld("charla-vieja", "decidimos migrar el hosting a Hetzner por costo", 24 * 20);
     captureOld("activo", "idea suelta de esta semana", 48);

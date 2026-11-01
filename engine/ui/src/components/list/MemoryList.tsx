@@ -2,7 +2,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { api } from "@/api";
 import { ago, percent } from "@/format";
-import { mergePages } from "@/lib/pages";
+import { mergePages, nextPageOffset } from "@/lib/pages";
 import { Chip, Empty, Failure, Loading, type ListProps, PagedList, type Picked, Row } from "./primitives";
 
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
@@ -26,12 +26,13 @@ export function MemoryList({
     queryFn: ({ pageParam, signal }) => api.memories(scope, pageParam, signal),
     initialPageParam: 0,
     getNextPageParam: (last, _pages, lastOffset) =>
-      lastOffset + last.memories.length < last.total ? lastOffset + last.memories.length : undefined,
+      nextPageOffset(lastOffset, last.memories.length, last.total),
   });
 
   if (query.isPending) return <Loading label="Cargando las memorias…" />;
   const rows = mergePages(query.data?.pages.map((page) => page.memories) ?? []);
-  const total = query.data?.pages[0]?.total ?? 0;
+  // The total comes from the last page so the header and "load more" agree on what is left.
+  const total = query.data?.pages.at(-1)?.total ?? 0;
   const remaining = Math.max(0, total - rows.length);
 
   return (

@@ -4,7 +4,7 @@
 import type { ServerResponse } from "node:http";
 import type { Database as DB } from "better-sqlite3";
 import { countPendingEpisodes, pendingEpisodes } from "../../memory/pending.js";
-import { recentRows } from "../../queries/recent.js";
+import { recentRows, traitPage } from "../../queries/recent.js";
 import { viewerStats } from "../../queries/stats.js";
 import { recallHybrid } from "../../recall/recall.js";
 import type { EmbedFn } from "../../embeddings/provider.js";
@@ -47,13 +47,21 @@ export function handleRecent(db: DB, res: ServerResponse, url: URL): void {
   const scope = url.searchParams.get("scope");
   const limit = clampLimit(url.searchParams.get("limit"), 50, 200);
 
-  // Only episodes have a consolidation state: on the other layers `pending` changes nothing
-  // and the response stays as it always was, without `total`.
+  // Only episodes have a consolidation state: `pending` changes nothing on the other layers.
   if (layer === "episode" && url.searchParams.get("pending") === "1") {
     const offset = parseOffset(url.searchParams.get("offset"));
     // The total counts every pending episode: the client pages with it, not with the page size.
     const total = countPendingEpisodes(db, scope);
     const rows = pendingEpisodes(db, scope, limit, offset);
+    json(res, 200, { layer, scope, rows, total });
+    return;
+  }
+
+  // Traits carry their own total so the list can page: every other layer keeps the shape it
+  // always had, without `total`.
+  if (layer === "trait") {
+    const offset = parseOffset(url.searchParams.get("offset"));
+    const { rows, total } = traitPage(db, scope, limit, offset);
     json(res, 200, { layer, scope, rows, total });
     return;
   }
@@ -82,7 +90,8 @@ export async function handleSearch(
       embedFn,
       { reinforce: false, embeddingModel },
     );
-    json(res, 200, out);
+    // A full page cannot tell "exactly these" from "more below", so the client says it may be cut.
+    json(res, 200, { ...out, limit, truncated: out.hits.length >= limit });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     json(res, 500, { error: message });

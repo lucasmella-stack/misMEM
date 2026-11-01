@@ -8,12 +8,8 @@ import { capture } from "../src/memory/capture.js";
 import { consolidate } from "../src/memory/consolidate.js";
 import { crystallize } from "../src/memory/crystallize.js";
 import { recallHybrid } from "../src/recall/recall.js";
-import {
-  saveMemoryEmbedding,
-  semanticSearchMemories,
-  embedPendingMemories,
-  getEmbeddingIndexStatus,
-} from "../src/embeddings/store.js";
+import { saveMemoryEmbedding, semanticSearchMemories, embedPendingMemories } from "../src/embeddings/store.js";
+import { getEmbeddingIndexStatus } from "../src/embeddings/status.js";
 import { loadEmbeddingConfig, type EmbedFn } from "../src/embeddings/provider.js";
 
 let db: DB;
@@ -548,6 +544,146 @@ describe("huella del texto embebido", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("getEmbeddingIndexStatus", () => {
+  it("una base vacía no tiene nada que indexar", () => {
+    expect(getEmbeddingIndexStatus(db, "m")).toEqual({
+      memories: 0,
+      embedded: 0,
+      missing: 0,
+      compatible: 0,
+      stale_model: 0,
+      stale_dims: 0,
+      // The fingerprint catches changed text or prefix; dims catch a new width.
+      outdated: 0,
+      invalid: 0,
+      active_dims: null,
+      // Layers share the status: a trait and a pending episode are indexed too.
+      layers: {
+        trait: { items: 0, embedded: 0, missing: 0, compatible: 0, stale_model: 0, outdated: 0 },
+        episode: { items: 0, embedded: 0, missing: 0, compatible: 0, stale_model: 0, outdated: 0 },
+      },
+      models: [],
+    });
+  });
+
+  it("el ancho que produjo el embedder manda sobre la mayoría de vectores viejos", async () => {
+    const a = makeMemory("vida", "uno");
+    const b = makeMemory("vida", "dos");
+    makeMemory("vida", "tres");
+    saveMemoryEmbedding(db, a, "m", Float32Array.from([1, 0, 0]));
+    saveMemoryEmbedding(db, b, "m", Float32Array.from([1, 0, 0]));
+    // The provider now answers with another width: only the new vector is searchable.
+    const fiveDims: EmbedFn = async () => [new Float32Array([1, 0, 0, 0, 0])];
+
+    await embedPendingMemories(db, { embedFn: fiveDims, model: "m" });
+
+    expect(getEmbeddingIndexStatus(db, "m")).toMatchObject({
+      embedded: 3,
+      compatible: 1,
+      stale_model: 0,
+      stale_dims: 2,
+      active_dims: 5,
+    });
+    // An explicit width still wins over the recorded one.
+    expect(getEmbeddingIndexStatus(db, "m", undefined, 3)).toMatchObject({
+      compatible: 2,
+      stale_model: 0,
+      stale_dims: 1,
+      active_dims: 3,
+    });
+  });
+
+  it("sólo cuenta como compatible el modelo activo con sus dimensiones dominantes", () => {
+    const a = makeMemory("vida", "uno");
+    const b = makeMemory("vida", "dos");
+    const c = makeMemory("vida", "tres");
+    saveMemoryEmbedding(db, a, "m", Float32Array.from([1, 0, 0]));
+    saveMemoryEmbedding(db, b, "m", Float32Array.from([1, 0, 0]));
+    saveMemoryEmbedding(db, c, "m", Float32Array.from([1, 0, 0, 0, 0]));
+
+    // Two 3-dimension vectors against one of 5: nothing recorded, so the dominant width is 3.
+    expect(getEmbeddingIndexStatus(db, "m")).toMatchObject({
+      memories: 3,
+      embedded: 3,
+      missing: 0,
+      compatible: 2,
+      stale_model: 0,
+      stale_dims: 1,
+      active_dims: 3,
+    });
+  });
+
+  it("con dos vectores del mismo modelo y dimensiones distintas, las esperadas mandan", () => {
+    const a = makeMemory("vida", "uno");
+    const b = makeMemory("vida", "dos");
+    saveMemoryEmbedding(db, a, "m", Float32Array.from([1, 0, 0]));
+    saveMemoryEmbedding(db, b, "m", Float32Array.from([1, 0, 0, 0, 0]));
+
+    // With no known width it is a tie, settled deterministically by the smaller one.
+    expect(getEmbeddingIndexStatus(db, "m")).toMatchObject({
+      active_dims: 3,
+      compatible: 1,
+      stale_model: 0,
+      stale_dims: 1,
+    });
+    // With an expected width of 5 the 3-dimension vector is the one search cannot read.
+    expect(getEmbeddingIndexStatus(db, "m", undefined, 5)).toMatchObject({
+      active_dims: 5,
+      compatible: 1,
+      stale_model: 0,
+      stale_dims: 1,
+    });
+  });
+
+  it("separa los vectores de otro modelo de los del modelo activo con otro ancho", () => {
+    const a = makeMemory("vida", "uno");
+    const b = makeMemory("vida", "dos");
+    const c = makeMemory("vida", "tres");
+    const d = makeMemory("vida", "cuatro");
+    saveMemoryEmbedding(db, a, "m", Float32Array.from([1, 0, 0]));
+    saveMemoryEmbedding(db, b, "m", Float32Array.from([1, 0, 0]));
+    saveMemoryEmbedding(db, c, "m", Float32Array.from([1, 0, 0, 0, 0]));
+    saveMemoryEmbedding(db, d, "viejo", Float32Array.from([1, 0, 0]));
+
+    expect(getEmbeddingIndexStatus(db, "m")).toMatchObject({
+      memories: 4,
+      embedded: 4,
+      missing: 0,
+      compatible: 2,
+      stale_model: 1,
+      stale_dims: 1,
+    });
+  });
+
+  it("un vector de otro modelo es obsoleto y no cambia lo que falta", () => {
+    const a = makeMemory("vida", "uno");
+    saveMemoryEmbedding(db, a, "viejo", Float32Array.from([1, 0, 0]));
+
+    expect(getEmbeddingIndexStatus(db, "m")).toMatchObject({
+      memories: 1,
+      embedded: 1,
+      missing: 0,
+      compatible: 0,
+      stale_model: 1,
+      stale_dims: 0,
+    });
+  });
+
+  it("las memorias marcador de ruido no cuentan como sin vector", () => {
+    const real = makeMemory("vida", "una memoria de verdad");
+    makeMemory("vida", "[noise] lo que el LLM descartó");
+    saveMemoryEmbedding(db, real, "m", Float32Array.from([1, 0, 0]));
+
+    expect(getEmbeddingIndexStatus(db, "m")).toMatchObject({
+      memories: 1,
+      embedded: 1,
+      missing: 0,
+      stale_model: 0,
+      stale_dims: 0,
+    });
   });
 });
 

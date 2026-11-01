@@ -3,7 +3,8 @@
 // episodes against the configured server (EmbeddingGemma 2 on llama-server by default).
 // Idempotent: it fills missing or stale vectors; --force rebuilds compatible ones too.
 import { defaultDbPath, openDefaultDb } from "./store/db.js";
-import { embedPendingMemories, getEmbeddingIndexStatus } from "./embeddings/store.js";
+import { embedPendingMemories } from "./embeddings/store.js";
+import { getEmbeddingIndexStatus } from "./embeddings/status.js";
 import { loadEmbeddingConfig } from "./embeddings/provider.js";
 import { ArgsError, EXIT_USAGE } from "./cli-args.js";
 import { parseEmbedArgs } from "./embed-args.js";

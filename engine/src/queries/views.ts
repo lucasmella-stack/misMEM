@@ -11,6 +11,7 @@ export interface MemoryView {
   details: string | null;
   salience: number;
   stored_salience: number;
+  use_count: number;
   created_at: number;
   last_accessed_at: number | null;
   noise: boolean;
@@ -34,6 +35,7 @@ export function memoryView(row: MemoryRow, at: number): MemoryView {
     details: row.details,
     salience: effectiveSalience(row, at),
     stored_salience: row.salience,
+    use_count: row.use_count,
     created_at: row.created_at,
     last_accessed_at: row.last_accessed_at,
     noise: isNoiseGist(row.gist),

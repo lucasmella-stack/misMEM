@@ -33,6 +33,31 @@ interface RecentTrait {
 
 export type RecentRow = RecentEpisode | RecentMemory | RecentTrait;
 
+export interface TraitPage {
+  rows: RecentTrait[];
+  total: number;
+}
+
+/**
+ * One page of traits with the total behind it: the client pages with the total, which is how it
+ * tells "nothing else" from "on the next page". `id` breaks the tie because traits crystallized
+ * in the same millisecond share strength and updated_at, and a partial order repeats rows.
+ */
+export function traitPage(db: DB, scope: string | null, limit: number, offset: number): TraitPage {
+  const { n: total } = db
+    .prepare("SELECT COUNT(*) AS n FROM traits WHERE (@scope IS NULL OR scope = @scope)")
+    .get({ scope }) as { n: number };
+  const rows = db
+    .prepare(
+      `SELECT id, scope, name AS text, strength, polarity, created_at, updated_at
+       FROM traits
+       WHERE (@scope IS NULL OR scope = @scope)
+       ORDER BY strength DESC, updated_at DESC, id DESC LIMIT @limit OFFSET @offset`,
+    )
+    .all({ scope, limit, offset }) as RecentTrait[];
+  return { rows, total };
+}
+
 export function recentRows(db: DB, layer: Layer, scope: string | null, limit: number): RecentRow[] {
   if (layer === "episode") {
     return db
@@ -54,12 +79,5 @@ export function recentRows(db: DB, layer: Layer, scope: string | null, limit: nu
       )
       .all({ scope, limit }) as RecentMemory[];
   }
-  return db
-    .prepare(
-      `SELECT id, scope, name AS text, strength, polarity, created_at, updated_at
-       FROM traits
-       WHERE (@scope IS NULL OR scope = @scope)
-       ORDER BY strength DESC, updated_at DESC LIMIT @limit`,
-    )
-    .all({ scope, limit }) as RecentTrait[];
+  return traitPage(db, scope, limit, 0).rows;
 }

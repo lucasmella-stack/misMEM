@@ -193,9 +193,12 @@ export async function processScope(
   const createdIds: string[] = [];
 
   for (const m of distilled) {
-    const evidence = m.evidence_episode_ids.filter((id) => validIds.has(id));
+    // An episode belongs to one memory: `consolidated_into` holds a single id. When the model
+    // cites the same one twice, the first memory keeps it and the second looks for other
+    // evidence, because consolidate() refuses to take an episode another memory already owns.
+    const evidence = m.evidence_episode_ids.filter((id) => validIds.has(id) && !cited.has(id));
     if (evidence.length === 0) {
-      log(`[consolidation] skip memoria sin evidencia v\u00e1lida: "${m.gist.slice(0, 60)}"`);
+      log(`[consolidation] skip memoria sin evidencia v\u00e1lida o ya citada: "${m.gist.slice(0, 60)}"`);
       continue;
     }
     const result = consolidate(db, {

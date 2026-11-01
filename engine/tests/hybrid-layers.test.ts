@@ -13,11 +13,8 @@ import {
   saveLayerEmbedding,
   semanticSearchLayer,
 } from "../src/embeddings/layers.js";
-import {
-  embedPendingMemories,
-  getEmbeddingIndexStatus,
-  saveMemoryEmbedding,
-} from "../src/embeddings/store.js";
+import { embedPendingMemories, saveMemoryEmbedding } from "../src/embeddings/store.js";
+import { getEmbeddingIndexStatus } from "../src/embeddings/status.js";
 import { runConsolidation } from "../src/consolidation/run.js";
 import type { EmbedFn } from "../src/embeddings/provider.js";
 

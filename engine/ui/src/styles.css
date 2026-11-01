@@ -26,6 +26,7 @@
   --color-edge: rgb(255 255 255 / 0.14);
   --color-divider: rgb(255 255 255 / 0.24);
   --color-brand: #f087ad;
+  --color-graph-halo: #f087ad;
   --color-brand-text: #f087ad;
   --color-brand-contrast: #141311;
   --color-composer: #262421;
@@ -54,6 +55,9 @@
   --color-edge: rgb(255 255 255 / 0.14);
   --color-divider: rgb(255 255 255 / 0.24);
   --color-brand: #f087ad;
+  /* El halo del conectoma tiene su propio token: el de marca funciona como resplandor sobre una
+     superficie oscura, pero en claro el mismo tono a baja opacidad lee como un cerco sucio. */
+  --color-graph-halo: #f087ad;
   /* En oscuro el rosa de marca ya pasa AA sobre las dos superficies. */
   --color-brand-text: #f087ad;
   --color-brand-contrast: #141311;
@@ -80,6 +84,9 @@
   --color-edge: rgb(0 0 0 / 0.12);
   --color-divider: rgb(0 0 0 / 0.22);
   --color-brand: #b23a76;
+  /* Un rosa más vivo que el de marca: en claro hace falta saturación para que el halo lea como
+     luz y no como gris, porque el #b23a76 a baja opacidad sobre una superficie clara se apaga. */
+  --color-graph-halo: #e0569a;
   /* El #b23a76 de marca no pasa AA como texto. #8e2e5e pasaba sobre surface pero se
      quedaba en 4,00:1 sobre field y 3,94:1 sobre brand/15; este tono da 4,78 y 4,71. */
   --color-brand-text: #7c274f;

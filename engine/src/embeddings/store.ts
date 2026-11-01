@@ -1,6 +1,7 @@
 // Owns the memory_embeddings SQL: saving vectors, brute-force search over them, backfill and
 // index status. The vectors of traits and pending episodes live in `layers.ts`.
 import type { Database as DB } from "better-sqlite3";
+import { readMeta, writeMeta } from "../store/meta.js";
 import { excludeNoiseSql } from "../store/rows.js";
 import {
   embedInBatches,
@@ -9,9 +10,7 @@ import {
 } from "./batch.js";
 import {
   embedLayerRowsResolved,
-  layerIndexStatus,
   pendingLayerRows,
-  type LayerIndexStatus,
 } from "./layers.js";
 import {
   embeddingFingerprint,
@@ -19,6 +18,37 @@ import {
   type EmbeddingConfig,
 } from "./provider.js";
 import { cosine } from "./vector.js";
+
+const activeDimsKey = (model: string): string => `embedding_dims:${model}`;
+
+
+/**
+ * The width the embedder last produced for this model. Ground truth over the stored majority:
+ * after a provider change of width, the old vectors outnumber the new and are the stale ones.
+ */
+export function recordedDims(db: DB, model: string): number | undefined {
+  const raw = readMeta(db, activeDimsKey(model));
+  const value = Number(raw);
+  return raw !== undefined && Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+
+
+/** Ids of the active model's rows that a previous version stored unusable. */
+export function invalidEmbeddingIds(db: DB, model: string): string[] {
+  // Noise markers never reach the backfill, so counting their rows would keep `--status`
+  // reporting an invalid vector that nothing can cure.
+  const rows = db
+    .prepare(
+      `SELECT e.memory_id, e.vec
+       FROM memory_embeddings e JOIN memories m ON m.id = e.memory_id
+       WHERE e.model = ? AND ${excludeNoiseSql("m")}`,
+    )
+    .all(model) as Array<{ memory_id: string; vec: Buffer }>;
+  return rows.filter((row) => !isValidStoredVector(row.vec)).map((row) => row.memory_id);
+}
+
+
 
 /**
  * Automatic backfills (the consolidate tool, a viewer edit, the nightly run) can fire while a
@@ -37,7 +67,7 @@ function memoryEmbeddingText(row: { gist: string; details: string | null }): str
  * Deterministic and built from the config of this call, which is what turns "the vector no
  * longer describes its row" into a plain SQL predicate.
  */
-function registerFingerprintFunctions(db: DB, cfg: EmbeddingConfig): void {
+export function registerFingerprintFunctions(db: DB, cfg: EmbeddingConfig): void {
   db.function("mismem_fp_text", { deterministic: true }, (text: string) =>
     embeddingFingerprint(text, cfg),
   );
@@ -179,20 +209,6 @@ function isValidStoredVector(vec: Buffer): boolean {
   return Number.isFinite(squares) && squares > 0;
 }
 
-/** Ids of the active model's rows that a previous version stored unusable. */
-function invalidEmbeddingIds(db: DB, model: string): string[] {
-  // Noise markers never reach the backfill, so counting their rows would keep `--status`
-  // reporting an invalid vector that nothing can cure.
-  const rows = db
-    .prepare(
-      `SELECT e.memory_id, e.vec
-       FROM memory_embeddings e JOIN memories m ON m.id = e.memory_id
-       WHERE e.model = ? AND ${excludeNoiseSql("m")}`,
-    )
-    .all(model) as Array<{ memory_id: string; vec: Buffer }>;
-  return rows.filter((row) => !isValidStoredVector(row.vec)).map((row) => row.memory_id);
-}
-
 export interface BackfillOptions extends ResolveOptions {
   /**
    * Ids embedded before the rest of the backlog, inside the same `maxRows` budget. A viewer
@@ -284,6 +300,7 @@ export async function embedPendingMemories(
     ? Math.min(Math.ceil(budget / 4), layerPending)
     : layerPending;
   const selectedRows = orderedRows.slice(0, budget - reserved);
+  let savedDims: number | undefined;
   const memories = await embedInBatches(
     selectedRows,
     resolved.embedFn,
@@ -291,9 +308,12 @@ export async function embedPendingMemories(
     (m) => (m.details ? `${m.gist}\n${m.details}` : m.gist).slice(0, resolved.maxChars),
     (m, vec) => {
       saveMemoryEmbedding(db, m.id, resolved.model, vec, memoryEmbeddingText(m), resolved.cfg);
+      savedDims = vec.length;
       return true;
     },
   );
+  // The status reads this instead of guessing from the majority, which lags a width change.
+  if (savedDims !== undefined) writeMeta(db, activeDimsKey(resolved.model), String(savedDims));
 
   // Traits and pending episodes follow the same run: a caller that backfills memories
   // never leaves the other two layers without vectors. Whatever the memories did not use
@@ -307,78 +327,4 @@ export async function embedPendingMemories(
   // Memory rows always save, so their discarded count is always 0 and BackfillStats does not
   // declare it: only the layers can refuse a vector that went stale while the embedder worked.
   return { pending: pendingRows.length, ...memories, layers };
-}
-
-export interface EmbeddingIndexStatus {
-  memories: number;
-  embedded: number;
-  missing: number;
-  compatible: number;
-  stale_model: number;
-  /** Rows of the active model whose vector no longer matches their text or the config. */
-  outdated: number;
-  layers: { trait: LayerIndexStatus; episode: LayerIndexStatus };
-  /** Active-model rows a previous version stored with a non-finite component or a zero norm. */
-  invalid: number;
-  models: Array<{ model: string; dims: number; count: number }>;
-}
-
-export function getEmbeddingIndexStatus(
-  db: DB,
-  activeModel: string,
-  cfg: EmbeddingConfig = loadEmbeddingConfig(),
-): EmbeddingIndexStatus {
-  registerFingerprintFunctions(db, cfg);
-  const memories = (
-    db.prepare("SELECT COUNT(*) AS n FROM memories").get() as { n: number }
-  ).n;
-  const embedded = (
-    db.prepare("SELECT COUNT(*) AS n FROM memory_embeddings").get() as {
-      n: number;
-    }
-  ).n;
-  const compatible = (
-    db
-      .prepare(
-        "SELECT COUNT(*) AS n FROM memory_embeddings WHERE model = ?",
-      )
-      .get(activeModel) as { n: number }
-  ).n;
-  const outdated = (
-    db
-      .prepare(
-        `SELECT COUNT(*) AS n
-         FROM memory_embeddings e JOIN memories m ON m.id = e.memory_id
-         WHERE e.model = @model
-           AND ${excludeNoiseSql("m")}
-           AND COALESCE(e.fingerprint, '') <> mismem_fp_memory(m.gist, m.details)`,
-      )
-      .get({ model: activeModel }) as { n: number }
-  ).n;
-  const models = db
-    .prepare(
-      `SELECT model, dims, SUM(count) AS count FROM (
-         SELECT model, dims, COUNT(*) AS count FROM memory_embeddings GROUP BY model, dims
-         UNION ALL
-         SELECT model, dims, COUNT(*) AS count FROM layer_embeddings GROUP BY model, dims
-       )
-       GROUP BY model, dims
-       ORDER BY count DESC, model, dims`,
-    )
-    .all() as Array<{ model: string; dims: number; count: number }>;
-
-  return {
-    memories,
-    embedded,
-    missing: memories - embedded,
-    compatible,
-    stale_model: embedded - compatible,
-    outdated,
-    layers: {
-      trait: layerIndexStatus(db, "trait", activeModel),
-      episode: layerIndexStatus(db, "episode", activeModel),
-    },
-    invalid: invalidEmbeddingIds(db, activeModel).length,
-    models,
-  };
 }
