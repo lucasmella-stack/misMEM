@@ -439,30 +439,30 @@ mkdir -p "$CONF_DIR" "$BIN_DIR" "$(dirname "$DB")"
   {
     say "# Generado por scripts/install.sh de misMEM. Lo lee $RUN."
     printf 'MISMEM_DB=%q\n' "$DB"
-    if [ -n "$EMBED_KEEP" ]; then
-      # Lo que ya había se copia tal cual: el instalador sólo reescribe esto cuando se elige algo. Una
-      # variable definida pero vacía se copia vacía: omitirla la devolvería al defecto nuevo (el prefijo
-      # de EmbeddingGemma), que no es lo que había.
+    if [ -n "$EMBED_KEEP" ] || [ "$EMBED_CHOICE" = off ]; then
+      # Lo que ya había se copia tal cual (también al apagar la búsqueda, que no tiene por qué borrarlo): el
+      # instalador sólo reescribe esto cuando se elige otro modelo. Lo que el motor anterior resolvía solo y
+      # el nuevo resolvería distinto se deja escrito.
+      PREV_NOMIC=""
+      case "${PREV_EMBED:-nomic-embed-text}" in nomic-embed-text*) PREV_NOMIC=1 ;; esac
       PREV_GEMMA_FAMILY=""
       case "$(printf '%s' "$PREV_EMBED" | tr '[:upper:]' '[:lower:]')" in *embeddinggemma*) PREV_GEMMA_FAMILY=1 ;; esac
       for v in $EMBED_VARS; do
         val="$(prev "$v")"
-        if [ "$v" = MISMEM_EMBEDDING_MIN_SCORE ] && [ "$PREV_KIND" = custom ] &&
-          case "${PREV_EMBED:-nomic-embed-text}" in nomic-embed-text*) true ;; *) false ;; esac &&
-          ! printf '%s' "$val" | grep -Eq '^[0-9]+([.][0-9]+)?$'; then
-          # Vacío o inválido, el motor anterior aplicaba el 0,65 de nomic y el nuevo aplicaría 0,5.
-          printf '%s=0.65\n' "$v"
+        if [ "$v" = MISMEM_EMBEDDING_MIN_SCORE ] && ! printf '%s' "$val" | grep -Eq '^[0-9]+([.][0-9]+)?$' &&
+          { [ -n "$PREV_GEMMA_FAMILY" ] || { [ "$PREV_KIND" = custom ] && [ -n "$PREV_NOMIC" ]; }; }; then
+          # Sin corte válido, el motor anterior daba 0,65 a nomic y 0,5 al resto; el nuevo da 0,65 a la
+          # familia EmbeddingGemma y 0,5 al resto.
+          if [ -n "$PREV_GEMMA_FAMILY" ]; then printf '%s=0.5\n' "$v"; else printf '%s=0.65\n' "$v"; fi
         elif [ -n "$val" ]; then
           printf '%s=%q\n' "$v" "$val"
         elif defined "$v"; then
+          # Definida y vacía es una elección (un prefijo vacío apaga el de EmbeddingGemma): se copia vacía.
           printf '%s=\n' "$v"
         elif [ -n "$PREV_GEMMA_FAMILY" ] &&
           { [ "$v" = MISMEM_EMBEDDING_QUERY_PREFIX ] || [ "$v" = MISMEM_EMBEDDING_DOC_PREFIX ]; }; then
           # EmbeddingGemma configurado a mano sin prefijos se indexó sin ellos; el defecto nuevo los pondría.
           printf '%s=\n' "$v"
-        elif [ -n "$PREV_GEMMA_FAMILY" ] && [ "$v" = MISMEM_EMBEDDING_MIN_SCORE ]; then
-          # Y con el corte genérico de 0,5, que el defecto nuevo subiría a 0,65.
-          printf '%s=0.5\n' "$v"
         elif [ "$v" = MISMEM_EMBEDDING_URL ] && [ "$PREV_KIND" = custom ]; then
           # Sin URL propia, el motor resolvía una por su cuenta; se deja escrita para no cambiar de servidor.
           printf '%s=%q\n' "$v" "$PREV_RESOLVED_URL"
@@ -470,10 +470,6 @@ mkdir -p "$CONF_DIR" "$BIN_DIR" "$(dirname "$DB")"
           # Sin modelo, el motor anterior usaba nomic-embed-text; el nuevo pondría EmbeddingGemma 2, que ese
           # servidor no tiene.
           printf '%s=%q\n' "$v" nomic-embed-text
-        elif [ "$v" = MISMEM_EMBEDDING_MIN_SCORE ] && [ "$PREV_KIND" = custom ] &&
-          case "${PREV_EMBED:-nomic-embed-text}" in nomic-embed-text*) true ;; *) false ;; esac; then
-          # nomic tenía su corte propio de 0,65 en el código; el nuevo le daría el genérico de 0,5.
-          printf '%s=0.65\n' "$v"
         fi
       done
     elif [ "$EMBED_CHOICE" = gemma ]; then
