@@ -94,7 +94,7 @@ node dist/eval-cli.js --mode semantico
 
 El segundo exige `pnpm build` y las variables `MISMEM_EMBEDDING_*` del servidor de embeddings
 ([DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única)); `--mode auto` usa el semántico sólo si
-el embedder deja todas las memorias embebidas sin un solo lote fallido. Si alguna se queda sin vector,
+ningún lote falló, ni de memorias ni de rasgos o episodios, y hay al menos una memoria con vector; si no,
 mide en léxico y la línea `modo:` lo dice. Los datos viven en `engine/eval/golden/`, un `.jsonl` por
 dominio; su validación está en `engine/src/recall/golden-corpus.ts` y su carga y medición en
 `engine/src/recall/golden.ts`. La puerta de CI
