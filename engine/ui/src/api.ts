@@ -43,6 +43,8 @@ export interface EmbeddingStatus {
   missing: number;
   compatible: number;
   stale_model: number;
+  /** Active-model vectors whose text or config changed since they were stored. */
+  outdated: number;
   stale_dims: number;
   /** Active-model vectors with a non-finite component or a zero norm; the next backfill redoes them. */
   invalid: number;
