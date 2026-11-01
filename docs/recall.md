@@ -78,9 +78,11 @@ node dist/eval-cli.js --mode semantico
 ```
 
 El segundo exige `pnpm build` y las variables `MISMEM_EMBEDDING_*` del servidor de embeddings
-([DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única)); `--mode auto` usa el semántico si el
-embedder responde. Los datos viven en `engine/eval/golden/`, un `.jsonl` por dominio; su validación está en
-`engine/src/recall/golden-corpus.ts` y su carga y medición en `engine/src/recall/golden.ts`. La puerta de CI
+([DEPLOY.md](../DEPLOY.md#variables-de-entorno-referencia-única)); `--mode auto` usa el semántico sólo si
+el embedder deja todas las memorias embebidas sin un solo lote fallido. Si alguna se queda sin vector,
+mide en léxico y la línea `modo:` lo dice. Los datos viven en `engine/eval/golden/`, un `.jsonl` por
+dominio; su validación está en `engine/src/recall/golden-corpus.ts` y su carga y medición en
+`engine/src/recall/golden.ts`. La puerta de CI
 (`engine/tests/golden.test.ts`) exige que el modo léxico no baje del suelo por tipo de `floor.json` ni supere
 `lexico_ajenas_max`, y que ningún marcador de ruido llegue al resultado. También comprueba el reparto del
 corpus (doce dominios, 40 preguntas por dominio y los tipos esperados) y que `expect` o `evidence` no nombren
@@ -91,7 +93,7 @@ Línea base del 2026-11-01 (tope 5, aciertos dentro del tope; caduca cuando camb
 
 | Modo | Global | MRR | Paráfrasis | Episodio | Rasgo | Ajenas con algo | Recuerdos por pregunta |
 |---|---|---|---|---|---|---|---|
-| Léxico | 221/432 | 0,48 | 1/72 | 20/24 | 8/24 | 4/48 | 0,9 |
+| Léxico | 222/432 | 0,48 | 1/72 | 20/24 | 9/24 | 4/48 | 0,9 |
 | Semántico (`embeddinggemma-2`, corte 0,65) | 368/432 | 0,80 | 64/72 | 0/24 | 0/24 | 12/48 | 4,8 |
 
 Los dos ceros del semántico son el issue #154.

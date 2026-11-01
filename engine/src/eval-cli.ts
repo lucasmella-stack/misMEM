@@ -2,8 +2,6 @@
 /**
  * Golden eval CLI: measures recall by kind, domain and globally. See docs/recall.md.
  */
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ArgsError, EXIT_USAGE } from "./cli-args.js";
 import { loadEmbeddingConfig, type EmbedFn } from "./embeddings/provider.js";
@@ -13,9 +11,9 @@ import {
   jsonPayload,
   modeLine,
   parseEvalArgs,
-  type EvalMode,
   type ModeChoice,
 } from "./eval-args.js";
+import { chooseMode, readCorpus } from "./eval-mode.js";
 import { parseGolden } from "./recall/golden-corpus.js";
 import { loadGolden, runGolden, type GoldenReport, type GoldenScore } from "./recall/golden.js";
 import { openDb } from "./store/db.js";
@@ -33,34 +31,9 @@ Corre el eval dorado en castellano: carga los .jsonl de --dir en una base en mem
 mide, por tipo de pregunta, por dominio y en global, los aciertos y el MRR. Las preguntas
 ajenas se informan aparte. Un marcador de ruido devuelto es un fallo.
 
---mode auto (por defecto) usa el semántico si el embedder responde y el léxico si no.
+--mode auto (por defecto) usa el semántico sólo si deja todas las memorias embebidas sin
+un lote fallido, y el léxico en cualquier otro caso.
 Base: en memoria (:memory:), nunca ~/.mismem. No escribe nada fuera del proceso.`);
-}
-
-/**
- * `auto` does not guess: it embeds the corpus and stays semantic only when nothing failed.
- * An explicit semantic mode is honoured even with the embedder down; recall degrades to
- * FTS5 on its own and the numbers say so.
- */
-async function chooseMode(db: ReturnType<typeof openDb>, requested: EvalMode): Promise<ModeChoice> {
-  if (requested === "lexico") return { mode: "lexico", embedded: 0, failed: 0 };
-
-  const stats = await embedPendingMemories(db);
-  const embedded = getEmbeddingIndexStatus(db, loadEmbeddingConfig().model).embedded;
-  const usable = stats.failed === 0 && embedded > 0;
-  if (requested === "semantico" || usable) {
-    return { mode: "semantico", embedded, failed: stats.failed };
-  }
-  return { mode: "lexico", embedded, failed: stats.failed };
-}
-
-function readCorpus(dir: string): Array<{ name: string; text: string }> {
-  if (!existsSync(dir)) throw new Error(`no existe el directorio ${dir}`);
-  const names = readdirSync(dir)
-    .filter((name) => name.endsWith(".jsonl"))
-    .sort();
-  if (names.length === 0) throw new Error(`no hay ficheros .jsonl en ${dir}`);
-  return names.map((name) => ({ name, text: readFileSync(join(dir, name), "utf8") }));
 }
 
 const percent = (score: GoldenScore): string =>
@@ -126,7 +99,10 @@ async function main(): Promise<void> {
   try {
     const at = Date.now();
     const ids = loadGolden(db, corpus, at);
-    const chosen = await chooseMode(db, args.mode);
+    const chosen = await chooseMode(args.mode, {
+      embed: () => embedPendingMemories(db),
+      embedded: () => getEmbeddingIndexStatus(db, loadEmbeddingConfig().model).embedded,
+    });
     const embedFn = chosen.mode === "lexico" ? lexicalOnly : undefined;
     const report = await runGolden(db, corpus, ids, { limit: args.limit, embedFn, at });
 

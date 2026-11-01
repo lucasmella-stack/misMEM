@@ -75,7 +75,9 @@ quedan fuera (`engine/src/domain/noise.ts`).
 
 El eval dorado no es un binario: su corpus vive en `engine/eval/golden/` y se corre desde el repositorio con
 `pnpm eval --mode lexico` o, tras `pnpm build`, con `node dist/eval-cli.js --mode semantico`; sin `--mode`
-elige el semántico en cuanto responde un servidor de embeddings. El corpus no viaja en el paquete npm.
+elige el semántico sólo si el servidor de embeddings deja todas las memorias embebidas sin lotes fallidos;
+si alguna se queda sin vector, mide en léxico y la línea `modo:` lo declara. El corpus no viaja en el
+paquete npm.
 Su validación está en `engine/src/recall/golden-corpus.ts` y su carga y medición en `recall/golden.ts`.
 
 `mismem-obsidian` escribe la memoria como bóveda de Obsidian en `<bóveda>/misMEM/`: una nota por memoria,

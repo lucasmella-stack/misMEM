@@ -25,6 +25,7 @@ const ROOT_FILES = [
   "env.ts",
   "eval-args.ts",
   "eval-cli.ts",
+  "eval-mode.ts",
   "forget-args.ts",
   "forget-cli.ts",
   "ingest-args.ts",
