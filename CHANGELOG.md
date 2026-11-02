@@ -2,6 +2,8 @@
 
 ## Sin publicar
 
+## 0.9.1 — 2026-11-02
+
 ### Siete limpiezas del visor: cada decisión en un solo sitio
 
 - **La paleta por ámbito se calculaba dos veces**, en `GraphView` y otra vez en `GraphPanel` sobre la
