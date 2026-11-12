@@ -1,0 +1,26 @@
+# Mirror of the `test` job in .github/workflows/ci.yml, run on the self-hosted Woodpecker agent.
+when:
+  - event: push
+    branch: [main, ci/*]
+  - event: pull_request
+
+matrix:
+  NODE:
+    - 22
+    - 24
+
+steps:
+  - name: test-node-${NODE}
+    image: node:${NODE}-bookworm
+    environment:
+      CI: "true"
+    commands:
+      - corepack enable
+      - cd engine
+      - pnpm install --frozen-lockfile
+      - pnpm typecheck
+      - pnpm test
+      - pnpm knip
+      - pnpm dup
+      - pnpm lint
+      - pnpm build
