@@ -2,6 +2,15 @@
 
 ## Sin publicar
 
+### La consulta larga dejaba el recall sin parte semántica
+
+- **La consulta del `recall` no se recortaba antes de embeberla**, a diferencia de los documentos. Un
+  prompt largo (el hook de inyección manda el mensaje entero) superaba el contexto de EmbeddingGemma 2
+  (2048 tokens), el servidor rechazaba la petición y el `recall` seguía solo con la búsqueda léxica, sin
+  avisar. Ahora la consulta se corta al menor de 2000 caracteres y `MISMEM_EMBEDDING_MAX_CHARS`: medido
+  contra el servidor real, 2000 caracteres de JSON o base64 dan unos 1480 tokens, mientras que 4000 ya
+  pasaban de 2048. Tests en `tests/embeddings-provider.test.ts`.
+
 ## 0.9.1 — 2026-11-02
 
 ### Siete limpiezas del visor: cada decisión en un solo sitio

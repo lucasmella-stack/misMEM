@@ -424,7 +424,7 @@ Sin default: si falta una de las dos (como variable o como parámetro del script
 | `MISMEM_EMBEDDING_QUERY_PREFIX` | el de EmbeddingGemma (`task: search result \| query: `) si el modelo es de esa familia (su id contiene `embeddinggemma`, sin distinguir mayúsculas); si no, vacío | Prefijo de consulta. Vacío a propósito (`=`) lo quita. Cambiarlo no toca ningún vector guardado |
 | `MISMEM_EMBEDDING_DOC_PREFIX` | el de EmbeddingGemma (`title: none \| text: `) si el modelo es de esa familia; si no, vacío | Prefijo de documento. Vacío a propósito (`=`) lo quita. Cambiarlo reindexa solo en el siguiente backfill |
 | `MISMEM_EMBEDDING_MIN_SCORE` | `0.65` con la familia EmbeddingGemma; `0.5` con cualquier otro modelo | Parecido mínimo (coseno) para que una memoria cuente. 0,65 es el mayor corte que no pierde aciertos con EmbeddingGemma (PR #181); `0` trae todo. Un valor explícito gana siempre |
-| `MISMEM_EMBEDDING_MAX_CHARS` | `4000` | Tope del texto de cada memoria al indexar. Cambiarlo reindexa solo en el siguiente backfill |
+| `MISMEM_EMBEDDING_MAX_CHARS` | `4000` | Tope del texto de cada memoria al indexar. La consulta del `recall` se corta además a 2000 caracteres, para no pasar del contexto del modelo con texto denso. Cambiarlo reindexa solo en el siguiente backfill |
 | `MISMEM_EMBEDDING_TIMEOUT_MS` | `3000` | Espera por consulta (el reindexado usa 120 s) |
 
 **Consolidación**

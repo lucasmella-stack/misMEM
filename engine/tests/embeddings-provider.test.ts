@@ -166,6 +166,33 @@ describe("embedTexts con un servidor compatible con OpenAI", () => {
     expect(vecs?.map((v) => (v ? Array.from(v) : null))).toEqual([[1, 0], [0, 1]]);
   });
 
+  it("recorta la consulta a maxChars como a los documentos", async () => {
+    setEnv({ ...GEMMA_ENV, MISMEM_EMBEDDING_MAX_CHARS: "12" });
+    const fetchMock = vi.fn().mockResolvedValue(openAiResponse([[1, 0]]));
+    vi.stubGlobal("fetch", fetchMock);
+    const longQuery = "una consulta mucho más larga que el tope";
+
+    const vecs = await embedTexts([longQuery], loadEmbeddingConfig(), "query");
+
+    // An uncut query over the model context makes the server reject the whole request.
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string).input).toEqual([
+      `task: search result | query: ${longQuery.slice(0, 12)}`,
+    ]);
+    expect(vecs).not.toBeNull();
+  });
+
+  it("con el tope por defecto, la consulta no pasa de 2000 caracteres", async () => {
+    setEnv(GEMMA_ENV);
+    const fetchMock = vi.fn().mockResolvedValue(openAiResponse([[1, 0]]));
+    vi.stubGlobal("fetch", fetchMock);
+    const prompt = "x".repeat(9000);
+
+    await embedTexts([prompt], loadEmbeddingConfig(), "query");
+
+    const [sent] = JSON.parse(fetchMock.mock.calls[0]![1].body as string).input as string[];
+    expect(sent).toBe(`task: search result | query: ${"x".repeat(2000)}`);
+  });
+
   it("a los documentos les pone el prefijo de documento", async () => {
     setEnv(GEMMA_ENV);
     const fetchMock = vi.fn().mockResolvedValue(openAiResponse([[1, 0]]));
