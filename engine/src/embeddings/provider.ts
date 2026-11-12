@@ -33,6 +33,12 @@ const DEFAULT_MODEL = "embeddinggemma-2";
 const GEMMA_QUERY_PREFIX = "task: search result | query: ";
 const GEMMA_DOC_PREFIX = "title: none | text: ";
 const DEFAULT_MAX_CHARS = 4000;
+/**
+ * Past the model context (2048 tokens for EmbeddingGemma 2) the server rejects the request and
+ * recall silently drops to lexical search. Dense text such as JSON or base64 runs near 0.74
+ * tokens per char, so 2000 chars stay under the limit; a hook sends whole prompts as queries.
+ */
+const QUERY_MAX_CHARS = 2000;
 
 export function loadEmbeddingConfig(): EmbeddingConfig {
   const model = process.env.MISMEM_EMBEDDING_MODEL ?? DEFAULT_MODEL;
@@ -98,7 +104,7 @@ export async function embedTexts(
   if (!cfg.enabled || texts.length === 0) return null;
   const input =
     kind === "query"
-      ? texts.map((t) => cfg.queryPrefix + t)
+      ? texts.map((t) => cfg.queryPrefix + t.slice(0, Math.min(cfg.maxChars, QUERY_MAX_CHARS)))
       : texts.map((t) => documentText(t, cfg));
   try {
     const vectors = await requestVectors(input, cfg);
