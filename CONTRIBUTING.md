@@ -45,6 +45,11 @@ fallo en local; donde está vacía, el job sólo corre en CI.
 | `workflow-lint` | Los workflows, con actionlint y zizmor | |
 | `secret-scan` | Ninguna clave en la historia, con gitleaks | |
 
+El mismo job `test` corre además en Woodpecker ([`.woodpecker/test.yaml`](.woodpecker/test.yaml)), en un
+agente propio que es un servidor doméstico: allí los tests corren con `--maxWorkers=2 --testTimeout=20000`,
+porque las dos versiones de Node van a la vez y el límite por defecto de 5 s no alcanza. Los tiempos de
+GitHub no cambian.
+
 Aparte, [`labels.yml`](.github/workflows/labels.yml) compara `.github/labels.json` con las etiquetas
 que tiene GitHub cuando ese fichero cambia.
 
