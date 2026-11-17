@@ -7,6 +7,8 @@
 - **El test del instalador "sin pnpm" perdía `node`** en la imagen `node:*-bookworm`, donde `node` y el
   shim de `pnpm` de corepack comparten `/usr/local/bin`: al quitar esa carpeta del PATH desaparecían los
   dos. Ahora `node` va en una carpeta propia, y un test lo comprueba con los dos en el mismo sitio (#260).
+- **Cada instalación del test volvía a descargar pnpm**: el sandbox cambia `HOME` y corepack guarda allí
+  su caché. Una descarga cortada a medias hizo fallar una ejecución. Ahora usa la caché real (`COREPACK_HOME`).
 - **`.woodpecker/test.yaml`** repite el job `test` de `ci.yml` en el agente propio, con menos workers y
   un límite por test de 20 s: cuatro tests tardaban entre 5,1 y 8,4 s con las dos versiones de Node a la vez.
 

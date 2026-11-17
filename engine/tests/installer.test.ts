@@ -4,7 +4,7 @@
 import { execFile } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { mkdtempSync, readFileSync, writeFileSync, chmodSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
@@ -72,6 +72,10 @@ async function install(box: Sandbox, args: string[], extra: NodeJS.ProcessEnv = 
     ...box.env,
     PNPM_HOME: process.env.PNPM_HOME,
     npm_config_store_dir: await pnpmStore(),
+    // Corepack caches pnpm under HOME too: without this every install downloads it again, and one
+    // download cut halfway failed the Woodpecker run.
+    COREPACK_HOME:
+      process.env.COREPACK_HOME ?? join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), "node/corepack"),
     ...extra,
   };
   try {
