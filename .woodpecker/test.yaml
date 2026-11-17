@@ -19,7 +19,9 @@ steps:
       - cd engine
       - pnpm install --frozen-lockfile
       - pnpm typecheck
-      - pnpm test
+      # The agent is a home server that also runs other services, and both matrix entries run at once:
+      # fewer workers and a longer per-test limit than GitHub's defaults (5 s timed out at 5.1-8.4 s).
+      - pnpm test --maxWorkers=2 --testTimeout=20000
       - pnpm knip
       - pnpm dup
       - pnpm lint
