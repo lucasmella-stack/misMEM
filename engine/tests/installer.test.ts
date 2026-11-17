@@ -3,7 +3,7 @@
 
 import { execFile } from "node:child_process";
 import { createServer, type Server } from "node:http";
-import { mkdtempSync, readFileSync, writeFileSync, chmodSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, chmodSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -89,11 +89,16 @@ const written = (box: Sandbox, name: string): string | undefined =>
     .find((line) => line.startsWith(`${name}=`))
     ?.slice(name.length + 1);
 
-/** The same PATH without the entries that provide pnpm; node has to survive or the setup is wrong. */
-async function withoutPnpm(path: string): Promise<string> {
-  const entries = path.split(":").filter(Boolean);
-  const kept: string[] = [];
-  for (const dir of entries) {
+/**
+ * The same PATH without the entries that provide pnpm. node has to survive, and node:*-bookworm keeps
+ * node and the corepack pnpm shim in the same /usr/local/bin: a directory of its own carries node.
+ */
+async function withoutPnpm(box: Sandbox, path: string): Promise<string> {
+  const nodeOnly = join(box.root, "node-only");
+  mkdirSync(nodeOnly, { recursive: true });
+  symlinkSync(process.execPath, join(nodeOnly, "node"));
+  const kept = [nodeOnly];
+  for (const dir of path.split(":").filter(Boolean)) {
     const hasPnpm = await run("test", ["-x", join(dir, "pnpm")]).then(
       () => true,
       () => false,
@@ -119,6 +124,22 @@ function occupy(port: number, health: boolean): Promise<void> {
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((s) => new Promise((done) => s.close(done))));
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
+
+describe("withoutPnpm", () => {
+  it("keeps node when it shares a directory with pnpm, as in node:*-bookworm", async () => {
+    const box = sandbox();
+    const shared = join(box.root, "shared");
+    mkdirSync(shared);
+    for (const name of ["pnpm", "node"]) {
+      writeFileSync(join(shared, name), "#!/bin/sh\nexit 0\n");
+      chmodSync(join(shared, name), 0o755);
+    }
+    const path = await withoutPnpm(box, shared);
+    expect(path.split(":")).not.toContain(shared);
+    const { stdout } = await run("env", [`PATH=${path}`, "node", "-p", "process.version"]);
+    expect(stdout.trim()).toBe(process.version);
+  });
 });
 
 describe("install.sh", () => {
@@ -196,7 +217,7 @@ describe("install.sh", () => {
     async () => {
       const box = sandbox();
       // The repo ships only pnpm-lock.yaml, so `npm ci` could never have worked.
-      const path = await withoutPnpm(box.env.PATH ?? "");
+      const path = await withoutPnpm(box, box.env.PATH ?? "");
       await expect(install({ ...box, env: { ...box.env, PATH: path } }, [])).rejects.toMatchObject({
         stdout: expect.stringContaining("pnpm"),
       });
