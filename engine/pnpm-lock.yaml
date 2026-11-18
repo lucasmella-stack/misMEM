@@ -15,8 +15,8 @@ importers:
         specifier: ^13.0.3
         version: 13.0.3
       ulid:
-        specifier: ^2.3.0
-        version: 2.4.0
+        specifier: ^3.0.2
+        version: 3.0.2
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -3005,8 +3005,8 @@ packages:
     engines: {node: '>=16.20.0'}
     hasBin: true
 
-  ulid@2.4.0:
-    resolution: {integrity: sha512-fIRiVTJNcSRmXKPZtGzFQv9WRrZ3M9eoptl/teFJvjOzmpU+/K/JH6HZ8deBfb5vMEpicJcLn7JmvdknlMq7Zg==}
+  ulid@3.0.2:
+    resolution: {integrity: sha512-yu26mwteFYzBAot7KVMqFGCVpsF6g8wXfJzQUHvu1no3+rRRSFcSV2nKeYvNPLD2J4b08jYBDhHUjeH0ygIl9w==}
     hasBin: true
 
   unbash@5.1.0:
@@ -5903,7 +5903,7 @@ snapshots:
       '@typescript/typescript-win32-arm64': 7.0.2
       '@typescript/typescript-win32-x64': 7.0.2
 
-  ulid@2.4.0: {}
+  ulid@3.0.2: {}
 
   unbash@5.1.0: {}
 
